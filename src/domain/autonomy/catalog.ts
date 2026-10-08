@@ -25,50 +25,50 @@ export const EXECUTABLE_ACTIONS = {
   add_incident_note: {
     tier: 2, mitigates: false, reversible: false, durationSec: 1, targetKind: "incident",
     paramsSchema: z.strictObject({ text: text(500) }),
-    targetPattern: "incident/<serviço ou conta do incidente>", paramsText: "{ text: string }",
-    description: "registra uma nota no incidente em curso",
+    targetPattern: "incident/<incident service or account>", paramsText: "{ text: string }",
+    description: "records a note on the ongoing incident",
   },
   block_image_tag: {
     tier: 2, mitigates: false, reversible: true, durationSec: 5, targetKind: "image",
     paramsSchema: z.strictObject({}),
-    targetPattern: "image/<serviço>:<tag>", paramsText: "{}",
-    description: "impede que a tag da imagem seja promovida de novo",
+    targetPattern: "image/<service>:<tag>", paramsText: "{}",
+    description: "prevents the image tag from being promoted again",
   },
   tag_resource_for_review: {
     tier: 2, mitigates: false, reversible: true, durationSec: 2, targetKind: "resource",
     paramsSchema: z.strictObject({ reason: text(200) }),
-    targetPattern: "<volume, ip ou instance>/<conta>/<id>", paramsText: "{ reason: string }",
-    description: "marca o recurso para revisão do dono",
+    targetPattern: "<volume, ip or instance>/<account>/<id>", paramsText: "{ reason: string }",
+    description: "tags the resource for owner review",
   },
   create_volume_snapshot: {
     tier: 2, mitigates: false, reversible: true, durationSec: 30, targetKind: "volume",
     paramsSchema: z.strictObject({}),
-    targetPattern: "volume/<conta>/<id>", paramsText: "{}",
-    description: "cria um snapshot do volume",
+    targetPattern: "volume/<account>/<id>", paramsText: "{}",
+    description: "creates a snapshot of the volume",
   },
   rollback_deployment: {
     tier: 3, mitigates: true, reversible: true, durationSec: 90, targetKind: "deployment",
     paramsSchema: z.strictObject({ toVersion: text(40) }),
-    targetPattern: "deployment/<serviço>", paramsText: "{ toVersion: string }",
-    description: "volta o deployment para uma versão do histórico de deploys",
+    targetPattern: "deployment/<service>", paramsText: "{ toVersion: string }",
+    description: "rolls the deployment back to a version from the deploy history",
   },
   release_elastic_ip: {
     tier: 3, mitigates: true, reversible: false, durationSec: 5, targetKind: "ip",
     paramsSchema: z.strictObject({}),
-    targetPattern: "ip/<conta>/<id>", paramsText: "{}",
-    description: "libera um IPv4 público sem associação",
+    targetPattern: "ip/<account>/<id>", paramsText: "{}",
+    description: "releases an unassociated public IPv4",
   },
   delete_volume: {
     tier: 3, mitigates: true, reversible: false, durationSec: 20, targetKind: "volume",
     paramsSchema: z.strictObject({}),
-    targetPattern: "volume/<conta>/<id>", paramsText: "{}",
-    description: "exclui um volume sem anexo",
+    targetPattern: "volume/<account>/<id>", paramsText: "{}",
+    description: "deletes an unattached volume",
   },
   resize_instance: {
     tier: 3, mitigates: true, reversible: true, durationSec: 300, targetKind: "instance",
     paramsSchema: z.strictObject({ toType: text(40) }),
-    targetPattern: "instance/<conta>/<id>", paramsText: "{ toType: string }",
-    description: "troca o tipo da instância",
+    targetPattern: "instance/<account>/<id>", paramsText: "{ toType: string }",
+    description: "changes the instance type",
   },
 } as const satisfies Record<string, ActionSpec>;
 
@@ -81,12 +81,12 @@ export const EXECUTABLE_ACTION_TYPES = Object.keys(EXECUTABLE_ACTIONS) as Execut
 
 /** Motivos (texto fixo, usados em trace e auditoria). */
 export const REASONS = {
-  forbidden: "proibida por construção (faixa 4)",
-  unknown: "tipo fora do catálogo: negar por padrão",
-  outOfScope: "alvo fora do escopo do incidente",
-  noRunbook: "passo sem runbook de referência",
-  revisionsExhausted: "revisões do plano esgotadas",
-  catalogTier: (tier: Tier) => `faixa do catálogo: ${tier}`,
+  forbidden: "forbidden by construction (tier 4)",
+  unknown: "type not in catalog: deny by default",
+  outOfScope: "target outside the incident scope",
+  noRunbook: "step without a reference runbook",
+  revisionsExhausted: "plan revisions exhausted",
+  catalogTier: (tier: Tier) => `catalog tier: ${tier}`,
 } as const;
 
 export function isExecutable(t: string): t is ExecutableActionType {
@@ -103,13 +103,13 @@ export function isMitigating(t: string): boolean {
 
 export function catalogPromptText(): string {
   return [
-    "Ações executáveis (tipo: alvo; parâmetros; efeito; o que faz):",
+    "Executable actions (type: target; parameters; effect; what it does):",
     ...EXECUTABLE_ACTION_TYPES.map((t) => {
       const a = EXECUTABLE_ACTIONS[t];
-      return `- ${t}: ${a.targetPattern}; parâmetros ${a.paramsText}; ${a.mitigates ? "mitiga o incidente" : "não mitiga sozinha"}; ${a.description}`;
+      return `- ${t}: ${a.targetPattern}; parameters ${a.paramsText}; ${a.mitigates ? "mitigates the incident" : "does not mitigate on its own"}; ${a.description}`;
     }),
-    `Proibidas por construção (nunca executam): ${FORBIDDEN_ACTIONS.join(", ")}.`,
-    "Qualquer tipo fora desta lista é bloqueado.",
+    `Forbidden by construction (never executed): ${FORBIDDEN_ACTIONS.join(", ")}.`,
+    "Any type not in this list is blocked.",
   ].join("\n");
 }
 

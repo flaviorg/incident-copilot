@@ -1,6 +1,6 @@
 {
   "version": "2026-10-04",
-  "note": "preços ilustrativos do projeto para a demo; não é cotação",
+  "note": "illustrative project prices for the demo; not a quote",
   "hoursPerMonth": 730,
   "volumeGbMonthUsd": { "gp3": 0.08 },
   "publicIpv4HourUsd": 0.005,

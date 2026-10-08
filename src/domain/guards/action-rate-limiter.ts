@@ -8,7 +8,7 @@ export class ActionRateLimiter {
   private readonly lastByKey = new Map<string, number>();
 
   constructor(o: { perMinute: number; repeatWindowMin: number }) {
-    if (o.perMinute < 1 || o.repeatWindowMin < 0) throw new RangeError("rate limiter com parâmetros inválidos");
+    if (o.perMinute < 1 || o.repeatWindowMin < 0) throw new RangeError("rate limiter with invalid parameters");
     this.perMinute = o.perMinute;
     this.repeatWindowMs = o.repeatWindowMin * 60_000;
   }

@@ -2,19 +2,19 @@
 
 | Arquivo | O que mostra | Tamanho |
 |---|---|---|
-| `docs/media/demo.gif` | Cerca de 15 segundos (25 quadros) da War Room no cenário de deploy: escolha do cenário, conversa entre agentes, portão de aprovação, clique em Aprovar, diálogo de confirmação e cartões de números (MTTR de 11,2 min e 3,0 min aguardando aprovação) | 960 × 1200 px, cerca de 410 KB (alvo: até 3 MB, de 960 a 1280 px de largura) |
-| `docs/media/war-room.png` | A War Room parada no portão de aprovação do cenário `cost-anomaly`: três passos de faixa 3 aguardando decisão e o `delete_backups` de faixa 4 bloqueado sem dry run | 1280 × 1484 px, cerca de 380 KB (alvo: até 500 KB, 1280 px de largura) |
+| `docs/media/demo.gif` | Cerca de 16 segundos (27 quadros) da War Room no cenário de deploy: escolha do cenário, conversa entre agentes, portão de aprovação, clique em Aprovar, diálogo de confirmação e cartões de números (MTTR de 11.2 min e 3.0 min aguardando aprovação), com a interface em inglês | 960 × 1200 px, cerca de 810 KB (alvo: até 3 MB, de 960 a 1280 px de largura) |
+| `docs/media/war-room.png` | A War Room parada no portão de aprovação do cenário `cost-anomaly`: três passos de faixa 3 aguardando decisão e o `delete_backups` de faixa 4 bloqueado sem dry run | 1280 × 1476 px, cerca de 370 KB (alvo: até 500 KB, 1280 px de largura) |
 
-Os dois mostram a reprodução gravada com provedor fake, e o rótulo "Reprodução de execução gravada com provedor fake roteirizado" aparece no topo de todos os quadros.
+Os dois mostram a reprodução gravada com provedor fake, e o rótulo "Replay of a recorded run with a scripted fake provider" aparece no topo da página (nos últimos quadros do GIF a página rola até os cartões de números).
 
 ## Como foram feitas
 
-Em 2026-10-04, a partir do build real da War Room (`npm run web:build`, que regrava `web/public/demo` com `demo:record`):
+Regravadas em 2026-10-08, depois da tradução da interface para o inglês, a partir do build real da War Room (`npm run web:build`, que regrava `web/public/demo` com `demo:record`):
 
 1. `web/dist` servido em `127.0.0.1` por um servidor estático local, sem rede externa.
-2. Um Chromium em modo headless (perfil temporário, apagado no fim), controlado pelo protocolo DevTools: tema claro, movimento reduzido, viewport de 1280 px.
+2. Um Chromium em modo headless (perfil temporário, apagado no fim), controlado pelo Puppeteer: tema claro, movimento reduzido, viewport de 1280 px.
 3. **Captura:** cenário de custo, Avançar até o portão, recorte do topo da página até o fim do painel do portão.
-4. **GIF:** viewport de 1280 × 1600 sem rolagem (o rótulo de modo demo fica sempre no quadro), um quadro a cada dois eventos, reduzido a 960 px de largura. Roteiro: cartão "Taxa de 5xx acima de 5% no orders-api", Avançar até o portão, Aprovar, Confirmar, Avançar até o fim. Os quadros viraram GIF com o ImageIO do macOS, com o tempo de cada quadro (0,3 s por passo; mais tempo na escolha do cenário, no portão, no diálogo e nos números).
+4. **GIF:** viewport de 1280 × 1600 (o rótulo de modo demo fica no quadro até a rolagem final para os números), um quadro a cada dois eventos, reduzido a 960 px de largura. Roteiro: cartão "5xx rate above 5% in orders-api", Step até o portão, Approve, Confirm, Step até o fim e rolagem até os cartões de números. Os quadros viraram GIF com o `ffmpeg` (paleta de 128 cores), com o tempo de cada quadro (0,3 s por passo; mais tempo na escolha do cenário, no portão, no diálogo e nos números).
 
 O script de captura não faz parte do projeto, porque depende do navegador instalado na máquina. Qualquer gravação manual que siga o roteiro abaixo serve.
 
@@ -29,7 +29,7 @@ O script de captura não faz parte do projeto, porque depende do navegador insta
 
 2. Abra o endereço que o Vite mostrar (normalmente `http://localhost:5173`) numa janela de 1280 px de largura. Use o tema claro, que é o que o README assume.
 3. **GIF.** Grave a tela com a ferramenta que preferir: no macOS, Cmd+Shift+5 grava um `.mov`.
-   - Roteiro: clique no cartão "Taxa de 5xx acima de 5% no orders-api", avance até o portão, clique em Aprovar, confirme no diálogo e avance até os números.
+   - Roteiro: clique no cartão "5xx rate above 5% in orders-api", avance (Step) até o portão, clique em Approve, confirme no diálogo (Confirm) e avance até os números.
    - Converta para GIF com 10 a 12 quadros por segundo. Por exemplo, com `ffmpeg` instalado:
 
      ```bash

@@ -40,7 +40,7 @@ export function entryRoute(bb: Blackboard): "supervisor" | "executor" {
 export function afterSupervisor(bb: Blackboard): NodeName {
   if (bb.escalation !== null) return "escalation";
   const target = supervisorTargetOf(bb);
-  if (target === null) throw new Error("supervisor terminou sem decisão nem escalonamento (defeito de roteamento)");
+  if (target === null) throw new Error("supervisor finished with neither a decision nor an escalation (routing defect)");
   return target;
 }
 

@@ -8,13 +8,13 @@ import type { Approval, Blackboard, GatedAction, IncidentStatus, LlmCallRecord, 
 const mk = () => new SqliteIncidentStore(openDatabase(":memory:"), { secrets: [], now: () => new Date("2026-10-04T10:00:00Z") });
 
 const incident = (o: Partial<NewIncident> = {}): NewIncident => ({
-  id: "INC-0001", title: "5xx no orders-api", service: "orders-api", severity: "sev1", scenarioId: "deploy-5xx-rollback",
+  id: "INC-0001", title: "5xx in orders-api", service: "orders-api", severity: "sev1", scenarioId: "deploy-5xx-rollback",
   openedAt: "2026-10-04T09:42:30.000Z", impactStartedAt: "2026-10-04T09:40:30.000Z", detectedAt: "2026-10-04T09:42:30.000Z", ...o,
 });
 
 const bb = (): Blackboard => ({
   incidentId: "INC-0001", scenarioId: "deploy-5xx-rollback", runId: "RUN-0001", phase: "new", timeOffsetSec: 0,
-  alert: { title: "5xx", service: "orders-api", account: null, signal: "http_5xx_rate", threshold: 0.05, rule: "5xx acima de 5%", detectedAt: "2026-10-04T09:42:30.000Z", severity: "sev1" },
+  alert: { title: "5xx", service: "orders-api", account: null, signal: "http_5xx_rate", threshold: 0.05, rule: "5xx above 5%", detectedAt: "2026-10-04T09:42:30.000Z", severity: "sev1" },
   diagnosis: null, telemetryRuns: 0, runbookMatches: [], runbookSearchDone: false, plan: null, planRevision: 0, audit: null,
   actions: [], world: { deployments: {}, inventory: null, initialInventory: null, notes: [], tagsForReview: [], snapshots: [] },
   verification: null, metrics: null, postmortem: null, supervisor: { iterations: 0, history: [] }, escalation: null,
@@ -29,7 +29,7 @@ const event = (o: { seq: number; type?: "handoff" | "thought"; agent?: TraceEven
 
 const action = (o: Partial<GatedAction> = {}): GatedAction => ({
   id: "ACT-0001", incidentId: "INC-0001", planRevision: 0, order: 1, actionType: "rollback_deployment", target: "deployment/orders-api",
-  params: { toVersion: "v3.7.2" }, dependsOn: [], tier: 3, classificationReasons: ["catálogo: faixa 3"], status: "proposed",
+  params: { toVersion: "v3.7.2" }, dependsOn: [], tier: 3, classificationReasons: ["catalog tier: 3"], status: "proposed",
   dryRun: null, approvalId: null, proposedBy: "remediation_planner", executedAt: null, resultSummary: null, ...o,
 });
 
@@ -49,9 +49,9 @@ test("incident roundtrip and SQL filters", () => {
   assert.equal(created.status, "open"); assert.equal(created.resolvedAt, null); assert.equal(created.escalation, null);
   s.createIncident(incident({ id: "INC-0002", openedAt: "2026-10-04T09:50:00.000Z" }));
   s.createIncident(incident({ id: "INC-0003", service: "data-platform", openedAt: "2026-10-04T09:55:00.000Z" }));
-  s.updateIncidentStatus("INC-0002", "escalated", { escalation: { reason: "mitigation_rejected", detail: "rejeitado" } });
+  s.updateIncidentStatus("INC-0002", "escalated", { escalation: { reason: "mitigation_rejected", detail: "rejected" } });
   s.updateIncidentStatus("INC-0003", "resolved", { resolvedAt: "2026-10-04T10:05:00.000Z", mttrMin: 10 });
-  assert.deepEqual(s.getIncident("INC-0002")!.escalation, { reason: "mitigation_rejected", detail: "rejeitado" });
+  assert.deepEqual(s.getIncident("INC-0002")!.escalation, { reason: "mitigation_rejected", detail: "rejected" });
   assert.equal(s.getIncident("INC-0003")!.resolvedAt, "2026-10-04T10:05:00.000Z");
   assert.equal(s.getIncident("INC-9999"), null);
   assert.equal(s.listIncidents({ status: "escalated", limit: 20 }).length, 1);

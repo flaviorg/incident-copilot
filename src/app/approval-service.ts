@@ -45,14 +45,14 @@ export class ApprovalService {
   async decide(approvalId: string, body: DecisionBody, token: string | undefined, ctx: RunCtx): Promise<{ approval: Approval; incident: IncidentView }> {
     const { store, clock, incidents } = this.d;
     const parsed = parseWithIssues(DecisionBodySchema, body);
-    if (!parsed.success) throw new ValidationError(`decisão inválida: ${formatIssues(parsed.issues)}`, parsed.issues);
+    if (!parsed.success) throw new ValidationError(`invalid decision: ${formatIssues(parsed.issues)}`, parsed.issues);
     const input = parsed.data;
     const now = clock.now();
     const log = this.d.logger.child({ requestId: ctx.requestId, approvalId: clipId(approvalId) });
 
     if (this.d.approvalToken === null) throw new ApprovalsDisabledError();
     if (this.d.attempts.isLocked(now)) {
-      log.warn("decisão recusada: bloqueio por tentativas de token", { event: "approvals_locked" });
+      log.warn("decision refused: locked out after token attempts", { event: "approvals_locked" });
       throw new LockedError();
     }
     if (token === undefined || !constantTimeEqualsText(token, this.d.approvalToken)) {
@@ -65,7 +65,7 @@ export class ApprovalService {
         tier: null,
         details: { approvalId: clipId(approvalId), tokenPresent: token !== undefined, requestId: ctx.requestId },
       });
-      log.warn("token de aprovação inválido ou ausente", { event: "approval_auth_failed" });
+      log.warn("invalid or missing approval token", { event: "approval_auth_failed" });
       throw new AuthError();
     }
 
@@ -73,7 +73,7 @@ export class ApprovalService {
     let source: "structured" | "text";
     if (input.text !== undefined) {
       const p = parseDecision(input.text);
-      if (p === "ambiguous") throw new UnprocessableError("ambiguous_decision", "decisão ambígua: responda exatamente aprovar ou rejeitar (também valem sim, não, approve, reject)");
+      if (p === "ambiguous") throw new UnprocessableError("ambiguous_decision", "ambiguous decision: reply exactly approve or reject (yes, no, aprovar, rejeitar, sim and não also work)");
       decision = p;
       source = "text";
     } else {
@@ -82,14 +82,14 @@ export class ApprovalService {
     }
 
     const approval = store.getApproval(approvalId);
-    if (!approval) throw new NotFoundError("not_found", `aprovação não encontrada: ${clipId(approvalId)}`);
+    if (!approval) throw new NotFoundError("not_found", `approval not found: ${clipId(approvalId)}`);
     if (isExpired(approval, now)) {
       const { expired, pendingLeft } = incidents.expireDueApprovals(approval.incidentId, now, ctx);
-      log.info("aprovação vencida materializada", { event: "approval_expired", incidentId: approval.incidentId, expired: expired.map((a) => a.id) });
+      log.info("overdue approval materialized as expired", { event: "approval_expired", incidentId: approval.incidentId, expired: expired.map((a) => a.id) });
       if (pendingLeft === 0) await this.resumeIfReady(approval.incidentId, ctx);
-      throw new ConflictError("approval_expired", `a aprovação ${approval.id} expirou em ${approval.expiresAt}`);
+      throw new ConflictError("approval_expired", `approval ${approval.id} expired at ${approval.expiresAt}`);
     }
-    if (approval.status !== "pending") throw new ConflictError("approval_not_pending", `a aprovação ${approval.id} já foi decidida (${approval.status})`);
+    if (approval.status !== "pending") throw new ConflictError("approval_not_pending", `approval ${approval.id} was already decided (${approval.status})`);
 
     const next = transition(
       approval,
@@ -103,11 +103,11 @@ export class ApprovalService {
     );
     if (next instanceof ApprovalTransitionError) {
       throw next.code === "expired"
-        ? new ConflictError("approval_expired", `a aprovação ${approval.id} expirou em ${approval.expiresAt}`)
-        : new ConflictError("approval_not_pending", `a aprovação ${approval.id} não está pendente`);
+        ? new ConflictError("approval_expired", `approval ${approval.id} expired at ${approval.expiresAt}`)
+        : new ConflictError("approval_not_pending", `approval ${approval.id} is not pending`);
     }
     const { pendingLeft } = incidents.applyDecision(approval, next, ctx);
-    log.info("decisão registrada", { event: next.status === "approved" ? "approval_approved" : "approval_rejected", incidentId: approval.incidentId, pendingLeft });
+    log.info("decision recorded", { event: next.status === "approved" ? "approval_approved" : "approval_rejected", incidentId: approval.incidentId, pendingLeft });
     const incident = pendingLeft === 0 ? ((await this.resumeIfReady(approval.incidentId, ctx)) ?? incidents.get(approval.incidentId)) : incidents.get(approval.incidentId);
     const stored = store.getApproval(approval.id)!;
     return { approval: { ...stored, status: effectiveStatus(stored, clock.now()) }, incident };

@@ -28,7 +28,7 @@ export type Config = {
 export class ConfigError extends Error {
   readonly variables: string[];
   constructor(problems: { variable: string; rule: string }[]) {
-    super(`configuração inválida: ${problems.map((p) => `${p.variable} (${p.rule})`).join("; ")}`);
+    super(`invalid configuration: ${problems.map((p) => `${p.variable} (${p.rule})`).join("; ")}`);
     this.name = "ConfigError";
     this.variables = problems.map((p) => p.variable);
   }
@@ -38,19 +38,19 @@ const APPROVAL_TOKEN_MIN_LENGTH = 16;
 
 // Regra legível por variável. A mensagem de erro usa só isto, nunca o texto do Zod (que poderia citar a entrada).
 const RULES: Record<string, string> = {
-  LLM_PROVIDER: "use fake ou openrouter",
-  LLM_BASE_URL: "precisa ser uma URL",
-  LLM_TIMEOUT_MS: "inteiro positivo",
-  RUN_TIMEOUT_MS: "inteiro positivo",
-  PORT: "inteiro positivo",
-  APPROVAL_TOKEN: `mínimo de ${APPROVAL_TOKEN_MIN_LENGTH} caracteres quando definido`,
-  APPROVAL_TTL_MIN: "inteiro positivo",
-  ACTION_RATE_LIMIT_PER_MIN: "inteiro positivo",
-  ACTION_REPEAT_WINDOW_MIN: "inteiro positivo",
-  CIRCUIT_FAILURE_THRESHOLD: "inteiro positivo",
-  CIRCUIT_COOLDOWN_SEC: "inteiro positivo",
-  CLOCK: "use system ou simulated",
-  LOG_LEVEL: "use debug, info, warn ou error",
+  LLM_PROVIDER: "use fake or openrouter",
+  LLM_BASE_URL: "must be a URL",
+  LLM_TIMEOUT_MS: "positive integer",
+  RUN_TIMEOUT_MS: "positive integer",
+  PORT: "positive integer",
+  APPROVAL_TOKEN: `at least ${APPROVAL_TOKEN_MIN_LENGTH} characters when set`,
+  APPROVAL_TTL_MIN: "positive integer",
+  ACTION_RATE_LIMIT_PER_MIN: "positive integer",
+  ACTION_REPEAT_WINDOW_MIN: "positive integer",
+  CIRCUIT_FAILURE_THRESHOLD: "positive integer",
+  CIRCUIT_COOLDOWN_SEC: "positive integer",
+  CLOCK: "use system or simulated",
+  LOG_LEVEL: "use debug, info, warn or error",
 };
 
 const positiveInt = (fallback: number) => z.coerce.number().int().positive().default(fallback);
@@ -92,7 +92,7 @@ export function loadConfig(env: Record<string, string | undefined>, opts: { forc
       const variable = String(issue.path[0] ?? "ambiente");
       if (seen.has(variable)) continue;
       seen.add(variable);
-      problems.push({ variable, rule: RULES[variable] ?? "valor inválido" });
+      problems.push({ variable, rule: RULES[variable] ?? "invalid value" });
     }
     throw new ConfigError(problems);
   }
@@ -104,8 +104,8 @@ export function loadConfig(env: Record<string, string | undefined>, opts: { forc
 
   if (llmProvider === "openrouter") {
     const problems: { variable: string; rule: string }[] = [];
-    if (!e.OPENROUTER_API_KEY) problems.push({ variable: "OPENROUTER_API_KEY", rule: "obrigatória com o provedor openrouter" });
-    if (!e.OPENROUTER_MODEL) problems.push({ variable: "OPENROUTER_MODEL", rule: "obrigatória com o provedor openrouter" });
+    if (!e.OPENROUTER_API_KEY) problems.push({ variable: "OPENROUTER_API_KEY", rule: "required with the openrouter provider" });
+    if (!e.OPENROUTER_MODEL) problems.push({ variable: "OPENROUTER_MODEL", rule: "required with the openrouter provider" });
     if (problems.length > 0) throw new ConfigError(problems);
   }
 

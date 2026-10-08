@@ -17,7 +17,7 @@ export function assertGolden(name: string, actual: unknown): void {
     return;
   }
   if (!existsSync(path)) assert.fail(`golden ausente: tests/golden/${name}.json (rode npm run regen e revise o diff)`);
-  assert.deepEqual(JSON.parse(JSON.stringify(actual)), JSON.parse(readFileSync(path, "utf8")), `métricas diferentes do golden ${name} (se a mudança for intencional, rode npm run regen e revise o diff)`);
+  assert.deepEqual(JSON.parse(JSON.stringify(actual)), JSON.parse(readFileSync(path, "utf8")), `metrics differ from golden ${name} (if the change is intentional, run npm run regen and review the diff)`);
 }
 
 /**
@@ -36,7 +36,7 @@ export async function runScenarioBranch(
     const next = c.store.listApprovals({ incidentId: opened.incident.id }).find((a) => effectiveStatus(a, c.clock.now()) === "pending");
     if (!next) break;
     c.clock.tick(latencySec);
-    await c.approvals.decide(next.id, { decision: branch === "approved" ? "approve" : "reject", approver: "operador de teste" }, TEST_APPROVAL_TOKEN, { requestId: null });
+    await c.approvals.decide(next.id, { decision: branch === "approved" ? "approve" : "reject", approver: "test operator" }, TEST_APPROVAL_TOKEN, { requestId: null });
   }
   return { c, view: c.incidents.get(opened.incident.id) };
 }

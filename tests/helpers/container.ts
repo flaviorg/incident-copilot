@@ -58,7 +58,7 @@ export function createTestContainer(o: TestContainerOptions = {}): TestContainer
     ...(o.nodes ? { nodes: o.nodes } : {}),
     ...(o.guards ? { guards: o.guards } : {}),
   });
-  if (!c.fake) throw new Error("container de teste sem provedor fake");
+  if (!c.fake) throw new Error("test container without a fake provider");
   return { ...c, fake: c.fake, logs };
 }
 
@@ -85,13 +85,13 @@ export function countByType(events: TraceEvent[]): Partial<Record<TraceType, num
 /** Id do incidente mais recente do container (cada container de teste tem banco próprio). */
 export function incidentIdOf(c: Container): string {
   const first = c.store.listIncidents({ limit: 1 })[0];
-  if (!first) throw new Error("nenhum incidente no container");
+  if (!first) throw new Error("no incident in the container");
   return first.id;
 }
 
 class StopAtGate extends Error {
   constructor() {
-    super("parado no portão pelo teste");
+    super("stopped at the gate by the test");
     this.name = "StopAtGate";
   }
 }
@@ -120,11 +120,11 @@ export async function stateAtGate(
   await c.incidents.open({ scenarioId }, { requestId: null }).catch((e: unknown) => {
     if (!(e instanceof StopAtGate)) throw e;
   });
-  if (captured === null) throw new Error(`a equipe não chegou ao portão no cenário ${scenarioId}`);
+  if (captured === null) throw new Error(`the team did not reach the gate in scenario ${scenarioId}`);
   let bb: Blackboard = captured;
   if (extraStep) {
     const steps = bb.plan!.steps;
-    const step: PlanStep = { order: steps.length + 1, params: {}, rationale: "passo extra do teste", runbookRef: steps[0]!.runbookRef, dependsOn: [], ...extraStep };
+    const step: PlanStep = { order: steps.length + 1, params: {}, rationale: "extra test step", runbookRef: steps[0]!.runbookRef, dependsOn: [], ...extraStep };
     bb = { ...bb, plan: { ...bb.plan!, steps: [...steps, step] } };
   }
   return { c, bb };

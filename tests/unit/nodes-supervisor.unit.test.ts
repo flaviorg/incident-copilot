@@ -34,7 +34,7 @@ test("invalid choice is coerced with a critique", async () => {
   assert.equal(out.supervisor!.history.at(-1)!.coerced, true);
   const critique = c.store.listTrace(bb0.incidentId, { type: "critique" })[0]!;
   assert.deepEqual([critique.payload.by, critique.payload.verdict], ["supervisor_guard", "coerced"]);
-  assert.match(critique.payload.feedback, /^escolha gate recusada: .+; seguindo telemetry_analyst$/);
+  assert.match(critique.payload.feedback, /^choice gate refused: .+; following telemetry_analyst$/);
   assert.equal(c.store.listTrace(bb0.incidentId, { type: "handoff" })[0]!.payload.to, "telemetry_analyst");
 });
 
@@ -60,13 +60,13 @@ test("LLM failure escalates as llm_unavailable", async () => {
 
 test("escalation node writes a system answer and an audit row", async () => {
   const c = createTestContainer();
-  const bb = { ...initialBlackboard(c, "deploy-5xx-rollback"), escalation: { reason: "team_cap_reached" as const, detail: "teto" } };
+  const bb = { ...initialBlackboard(c, "deploy-5xx-rollback"), escalation: { reason: "team_cap_reached" as const, detail: "cap" } };
   const out = await createEscalationNode(ed(c))(bb as Blackboard, { configurable: { requestId: "req-9" } });
   assert.equal(out.phase, "reporting");
   const answer = c.store.listTrace(bb.incidentId, { type: "answer" })[0]!;
   assert.deepEqual([answer.agent, answer.payload.kind], ["system", "escalation"]);
   const row = c.store.listAudit(bb.incidentId).at(-1)!;
-  assert.deepEqual([row.event, row.actor, row.details.reason, row.details.detail, row.details.requestId], ["incident_escalated", "system:escalation", "team_cap_reached", "teto", "req-9"]);
+  assert.deepEqual([row.event, row.actor, row.details.reason, row.details.detail, row.details.requestId], ["incident_escalated", "system:escalation", "team_cap_reached", "cap", "req-9"]);
 });
 
 test("escalation node without a reason records no_executable_actions (gate with nothing to run)", async () => {

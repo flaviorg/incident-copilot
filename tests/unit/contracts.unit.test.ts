@@ -26,7 +26,7 @@ const step = (order: number) => ({
   order,
   actionType: "add_incident_note",
   target: "incident/INC-0001",
-  params: { text: "nota" },
+  params: { text: "note" },
   rationale: "registrar contexto",
   runbookRef: null,
   dependsOn: [],
@@ -42,7 +42,7 @@ const handoffEvent = () => ({
   agent: "supervisor",
   llm: null,
   type: "handoff",
-  payload: { from: "supervisor", to: "telemetry_analyst", brief: "investigue", reason: "sem diagnóstico" },
+  payload: { from: "supervisor", to: "telemetry_analyst", brief: "investigate", reason: "no diagnosis" },
 });
 
 const action = () => ({
@@ -55,7 +55,7 @@ const action = () => ({
   params: { toVersion: "v3.7.2" },
   dependsOn: [],
   tier: 3,
-  classificationReasons: ["catálogo: faixa 3"],
+  classificationReasons: ["catalog tier: 3"],
   status: "awaiting_approval",
   dryRun: null,
   approvalId: "APR-0001",
@@ -107,28 +107,28 @@ function fixtureProblems(raw: unknown, prompts: PromptDef<any, any>[]): string[]
   const problems: string[] = [];
   for (const [version, hash] of Object.entries(parsed.data.promptHashes)) {
     const p = byVersion.get(version);
-    if (!p) problems.push(`hash de prompt desconhecido: ${version}`);
-    else if (hash !== promptHash(p)) problems.push(`hash desatualizado: ${version} (rode npm run fixtures:rehash)`);
+    if (!p) problems.push(`unknown prompt hash: ${version}`);
+    else if (hash !== promptHash(p)) problems.push(`stale hash: ${version} (run npm run fixtures:rehash)`);
   }
   for (const t of parsed.data.turns) {
     const p = byVersion.get(t.prompt);
     if (!p) { problems.push(`${t.id}: prompt desconhecido ${t.prompt}`); continue; }
-    if (!(t.prompt in parsed.data.promptHashes)) problems.push(`${t.id}: prompt ${t.prompt} sem hash registrado`);
-    if (t.output !== undefined && !p.outputSchema.safeParse(t.output).success) problems.push(`${t.id}: saída fora do schema de ${t.prompt}`);
+    if (!(t.prompt in parsed.data.promptHashes)) problems.push(`${t.id}: prompt ${t.prompt} has no registered hash`);
+    if (t.output !== undefined && !p.outputSchema.safeParse(t.output).success) problems.push(`${t.id}: output outside the schema of ${t.prompt}`);
   }
   return problems;
 }
 
 test("every LLM fixture parses, has current prompt hashes and outputs that pass each prompt schema", () => {
   const files = fixtureFiles();
-  assert.ok(files.length >= 5, `esperava ao menos 5 fixtures, achei ${files.length}`);
+  assert.ok(files.length >= 5, `expected at least 5 fixtures, found ${files.length}`);
   for (const file of files) assert.deepEqual(fixtureProblems(JSON.parse(readFileSync(file, "utf8")), ALL_PROMPTS), [], file);
   // O próprio verificador pega uma saída inválida e um hash velho.
   const broken = JSON.parse(readFileSync(files[0]!, "utf8"));
   broken.turns[0].output = { next: "escalation" };
   broken.promptHashes["planner.v1"] = "sha256:old";
   const found = fixtureProblems(broken, ALL_PROMPTS);
-  assert.ok(found.some((p) => p.includes("saída fora do schema")) && found.some((p) => p.includes("hash desatualizado")), found.join("; "));
+  assert.ok(found.some((p) => p.includes("output outside the schema")) && found.some((p) => p.includes("stale hash")), found.join("; "));
 });
 
 // Revisão final: os campos livres que chegam pelo MCP (sem autenticação) e pelo planejador têm teto de tamanho.

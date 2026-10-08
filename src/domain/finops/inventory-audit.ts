@@ -27,8 +27,8 @@ export function roundUsd(x: number): number {
   return Math.round((x + Number.EPSILON) * 100) / 100;
 }
 
-const usd = (x: number) => `US$ ${x.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const num = (x: number) => x.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+const usd = (x: number) => `US$ ${x.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })}`;
+const num = (x: number) => x.toLocaleString("en-US", { maximumFractionDigits: 1, useGrouping: false });
 
 /** Volume sem anexo, IP sem associação e instância com CPU baixa viram achados. Cofres de backup nunca viram achado. */
 export function auditInventory(inv: Inventory, prices: CloudPrices): { findings: InventoryFinding[]; totalMonthlySavingsUsd: number } {
@@ -45,7 +45,7 @@ export function auditInventory(inv: Inventory, prices: CloudPrices): { findings:
       target: `volume/${inv.account}/${v.id}`,
       monthlyCostUsd: cost,
       monthlySavingsUsd: cost,
-      detail: `volume ${v.type} de ${num(v.sizeGb)} GB sem anexo há ${v.unattachedDays} dias custa ${usd(cost)} por mês`,
+      detail: `${v.type} volume of ${num(v.sizeGb)} GB unattached for ${v.unattachedDays} days costs ${usd(cost)} per month`,
       recommendation: { actionType: "delete_volume", params: {} },
     });
   }
@@ -59,7 +59,7 @@ export function auditInventory(inv: Inventory, prices: CloudPrices): { findings:
       target: `ip/${inv.account}/${ip.id}`,
       monthlyCostUsd: cost,
       monthlySavingsUsd: cost,
-      detail: `IPv4 público ${ip.id} sem associação custa ${usd(cost)} por mês`,
+      detail: `unassociated public IPv4 ${ip.id} costs ${usd(cost)} per month`,
       recommendation: { actionType: "release_elastic_ip", params: {} },
     });
   }
@@ -78,7 +78,7 @@ export function auditInventory(inv: Inventory, prices: CloudPrices): { findings:
       target: `instance/${inv.account}/${i.id}`,
       monthlyCostUsd: roundUsd(current * prices.hoursPerMonth),
       monthlySavingsUsd: savings,
-      detail: `instância ${i.type} (${i.role}) com CPU média de ${num(i.avgCpuPct14d)}% em 14 dias; ${toType} economiza ${usd(savings)} por mês`,
+      detail: `instance ${i.type} (${i.role}) with ${num(i.avgCpuPct14d)}% average CPU over 14 days; ${toType} saves ${usd(savings)} per month`,
       recommendation: { actionType: "resize_instance", params: { toType } },
     });
   }

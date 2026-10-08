@@ -4,7 +4,7 @@ import { DEMO_LABEL } from "@contracts";
 export function ModeBanner() {
   return (
     <div className="mode-banner" role="status">
-      <strong>Modo demo:</strong> {DEMO_LABEL}
+      <strong>Demo mode:</strong> {DEMO_LABEL}
     </div>
   );
 }

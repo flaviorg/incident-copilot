@@ -14,8 +14,8 @@ export function bb(over: Partial<Blackboard> = {}): Blackboard {
     phase: "investigating",
     timeOffsetSec: 0,
     alert: {
-      title: "Taxa de 5xx acima de 5% no orders-api", service: "orders-api", account: null, signal: "http_5xx_rate",
-      threshold: 0.05, rule: "5xx acima de 5% por 2 min", detectedAt: "2026-10-04T09:42:30.000Z", severity: "sev1",
+      title: "5xx rate above 5% in orders-api", service: "orders-api", account: null, signal: "http_5xx_rate",
+      threshold: 0.05, rule: "5xx above 5% for 2 min", detectedAt: "2026-10-04T09:42:30.000Z", severity: "sev1",
     },
     diagnosis: null,
     telemetryRuns: 0,
@@ -36,8 +36,8 @@ export function bb(over: Partial<Blackboard> = {}): Blackboard {
 }
 
 const diag = (confidence: Diagnosis["confidence"]): Diagnosis => ({
-  hypothesis: "deploy com defeito", category: "bad_deploy", confidence, capReached: false,
-  evidence: [{ source: "logs", ref: "logs:orders-api:ERROR@09:28-09:43", summary: "TypeError só na v3.8.0" }],
+  hypothesis: "bad deploy", category: "bad_deploy", confidence, capReached: false,
+  evidence: [{ source: "logs", ref: "logs:orders-api:ERROR@09:28-09:43", summary: "TypeError only in v3.8.0" }],
 });
 export const high = (): Diagnosis => diag("high");
 export const medium = (): Diagnosis => diag("medium");

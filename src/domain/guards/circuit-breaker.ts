@@ -12,7 +12,7 @@ export class CircuitBreaker {
   private trialTaken = false;
 
   constructor(o: { failureThreshold: number; cooldownSec: number }) {
-    if (o.failureThreshold < 1 || o.cooldownSec < 0) throw new RangeError("circuit breaker com parâmetros inválidos");
+    if (o.failureThreshold < 1 || o.cooldownSec < 0) throw new RangeError("circuit breaker with invalid parameters");
     this.failureThreshold = o.failureThreshold;
     this.cooldownMs = o.cooldownSec * 1000;
   }

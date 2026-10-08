@@ -83,8 +83,8 @@ export const BlackboardSchema = z.object({
 // Saídas de LLM
 export const SupervisorDecisionSchema = z.object({
   next: z.enum(["telemetry_analyst", "runbook_retriever", "remediation_planner", "gate", "reporter", "done"]),
-  brief: z.string().max(300).describe("Instrução curta ao especialista escolhido"),
-  reason: z.string().max(300).describe("Por que este é o próximo passo; vira trilha de auditoria"),
+  brief: z.string().max(300).describe("Short instruction to the chosen specialist"),
+  reason: z.string().max(300).describe("Why this is the next step; becomes part of the audit trail"),
 });
 
 export const ReactStepSchema = z.discriminatedUnion("kind", [

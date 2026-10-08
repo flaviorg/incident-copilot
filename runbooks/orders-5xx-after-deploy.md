@@ -1,22 +1,22 @@
 ---
 id: orders-5xx-after-deploy
-title: 5xx no orders-api logo após um deploy
+title: 5xx in orders-api right after a deploy
 service: [orders-api]
 category: [bad_deploy]
 ---
 
-## Sintomas
+## Symptoms
 
-A taxa de respostas 5xx do orders-api passa de 5% poucos minutos depois de um deploy novo. A latência P99 costuma subir junto. Os erros aparecem só nas réplicas que já rodam a versão nova; a versão anterior estava estável.
+The orders-api 5xx response rate goes above 5% a few minutes after a new deploy. P99 latency usually rises with it. The errors show up only on the replicas already running the new version; the previous version was stable.
 
-## Diagnóstico
+## Diagnosis
 
-Compare o início do pico de 5xx com o horário do último deploy do orders-api. Agrupe os logs de ERROR por mensagem e confira em qual versão cada exceção aparece (por exemplo, um TypeError num formatador). Se o erro só existe na versão nova e começou junto com o rollout, trate como bad deploy. Se ele também aparece na versão anterior, procure outra causa antes de reverter.
+Compare the start of the 5xx spike with the time of the latest orders-api deploy. Group the ERROR logs by message and check in which version each exception appears (for example, a TypeError in a formatter). If the error exists only in the new version and started together with the rollout, treat it as a bad deploy. If it also appears in the previous version, look for another cause before rolling back.
 
-## Mitigação
+## Mitigation
 
-Faça rollback do deployment do orders-api para a versão anterior estável; é uma ação de alto impacto e exige aprovação humana. Depois do rollback, bloqueie a tag da imagem da versão com defeito para que nenhum pipeline a promova de novo. Registre no incidente uma nota com a versão revertida e o motivo. Acompanhe a taxa de 5xx e a latência P99 por alguns minutos antes de encerrar.
+Roll back the orders-api deployment to the previous stable version; it is a high-impact action and requires human approval. After the rollback, block the image tag of the faulty version so no pipeline promotes it again. Record a note in the incident with the rolled-back version and the reason. Watch the 5xx rate and P99 latency for a few minutes before closing.
 
-## Prevenção
+## Prevention
 
-Promova versões com rollout gradual e canário automático antes de atingir todas as réplicas. Cubra com teste os caminhos que leem campos opcionais (como a moeda de um preço). Mantenha a versão anterior pronta para rollback rápido e documente quem pode aprovar.
+Promote versions with a gradual rollout and an automatic canary before reaching all replicas. Cover with tests the paths that read optional fields (such as the currency of a price). Keep the previous version ready for a fast rollback and document who can approve it.

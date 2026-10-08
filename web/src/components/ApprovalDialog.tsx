@@ -17,7 +17,7 @@ export function ApprovalDialog({ open, decision, approvalIds = [], onConfirm, on
   const descId = useId();
   useFocusTrap(ref, { active: open, onEscape: onClose, returnFocusTo });
   if (!open) return null;
-  const verb = decision === "approve" ? "Aprovar" : "Rejeitar";
+  const verb = decision === "approve" ? "Approve" : "Reject";
   const ids = approvalIds.length > 0 ? ` ${approvalIds.join(", ")}` : "";
   return (
     <div className="dialog-backdrop">
@@ -25,15 +25,15 @@ export function ApprovalDialog({ open, decision, approvalIds = [], onConfirm, on
         <h2 id={titleId}>{`${verb}${ids}?`}</h2>
         <p id={descId}>
           {decision === "approve"
-            ? "A reprodução segue pelo ramo gravado em que todas as aprovações pendentes foram aprovadas."
-            : "A reprodução segue pelo ramo gravado em que todas as aprovações pendentes foram rejeitadas; os passos dependentes são cancelados."}
+            ? "The replay continues along the recorded branch in which all pending approvals were approved."
+            : "The replay continues along the recorded branch in which all pending approvals were rejected; dependent steps are cancelled."}
         </p>
         <p className="dialog-warning">
-          <strong>Simulação local: nenhuma ação real.</strong> A decisão só escolhe qual gravação continuar.
+          <strong>Local simulation: no real action.</strong> The decision only picks which recording to continue.
         </p>
         <div className="dialog-actions">
-          <button type="button" onClick={onClose}>Cancelar</button>
-          <button type="button" className={decision === "approve" ? "button-primary" : "button-danger"} onClick={onConfirm}>Confirmar</button>
+          <button type="button" onClick={onClose}>Cancel</button>
+          <button type="button" className={decision === "approve" ? "button-primary" : "button-danger"} onClick={onConfirm}>Confirm</button>
         </div>
       </div>
     </div>

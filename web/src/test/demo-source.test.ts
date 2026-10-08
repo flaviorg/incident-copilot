@@ -24,13 +24,13 @@ describe("demo source", () => {
   });
 
   it("invalid recording is an explicit error and nothing partial is returned", async () => {
-    const r = await loadRecording("deploy-5xx-rollback", fakeFetch({ ...rec, label: "outra" }));
+    const r = await loadRecording("deploy-5xx-rollback", fakeFetch({ ...rec, label: "other" }));
     expect(r.ok).toBe(false);
-    expect((r as { error: string }).error).toMatch(/gravação inválida/);
+    expect((r as { error: string }).error).toMatch(/invalid recording/);
     expect("value" in r).toBe(false);
     const broken = await loadRecording("deploy-5xx-rollback", fakeFetch("{nope"));
     expect(broken.ok).toBe(false);
-    expect((broken as { error: string }).error).toMatch(/gravação inválida/);
+    expect((broken as { error: string }).error).toMatch(/invalid recording/);
   });
 
   it("only fetches files under ./demo/", async () => {
@@ -45,14 +45,14 @@ describe("demo source", () => {
   });
 
   it("HTTP and network failures are explicit errors", async () => {
-    const notFound = await loadRecording("cost-anomaly", fakeFetch("nada", 404));
+    const notFound = await loadRecording("cost-anomaly", fakeFetch("nothing", 404));
     expect(notFound.ok).toBe(false);
     expect((notFound as { error: string }).error).toMatch(/404/);
     const offline = await loadIndex((async () => {
       throw new TypeError("offline");
     }) as typeof fetch);
     expect(offline.ok).toBe(false);
-    expect((offline as { error: string }).error).toMatch(/não foi possível carregar/);
+    expect((offline as { error: string }).error).toMatch(/could not load/);
   });
 
   it("loads and validates the index from ./demo/index.json", async () => {
@@ -65,6 +65,6 @@ describe("demo source", () => {
     expect(ok.ok && ok.value[0]!.id).toBe("deploy-5xx-rollback");
     const bad = await loadIndex(fakeFetch([{ id: 1 }]));
     expect(bad.ok).toBe(false);
-    expect((bad as { error: string }).error).toMatch(/índice inválido/);
+    expect((bad as { error: string }).error).toMatch(/invalid index/);
   });
 });

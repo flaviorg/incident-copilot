@@ -21,9 +21,9 @@ const entry = (details: Record<string, unknown>) => ({ incidentId: "INC-0001", a
 /** Lê o CREATE TABLE em sqlite_master e extrai a lista do CHECK (col IN (...)). */
 function checkValues(db: DatabaseSync, table: string, column: string): (string | number)[] {
   const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get(table) as { sql: string } | undefined;
-  assert.ok(row, `tabela ${table} inexistente`);
+  assert.ok(row, `table ${table} does not exist`);
   const m = new RegExp(`\\b${column} IN \\(([^)]*)\\)`).exec(row.sql);
-  assert.ok(m, `CHECK de ${table}.${column} não encontrado`);
+  assert.ok(m, `CHECK for ${table}.${column} not found`);
   return m[1]!.split(",").map((v) => v.trim()).map((v) => (v.startsWith("'") ? v.slice(1, -1) : Number(v)));
 }
 
@@ -81,7 +81,7 @@ test("each incident trail is its own chain, verifiable from genesis even when in
   for (const id of ["INC-0001", "INC-0002"]) {
     const rows = s.listAudit(id);
     assert.equal(rows[0]!.prevHash, "0".repeat(64), id);
-    for (let i = 1; i < rows.length; i++) assert.equal(rows[i]!.prevHash, rows[i - 1]!.hash, `${id} linha ${i}`);
+    for (let i = 1; i < rows.length; i++) assert.equal(rows[i]!.prevHash, rows[i - 1]!.hash, `${id} row ${i}`);
   }
 });
 
@@ -153,7 +153,7 @@ test("a version 1 database is migrated keeping the audit order, the chain and th
     assert.deepEqual(rows.map((r) => r.id), ["AUD-9999", "AUD-10000", "AUD-10001"]);
     assert.equal(rows[0]!.prevHash, "0".repeat(64));
     for (let i = 1; i < rows.length; i++) assert.equal(rows[i]!.prevHash, rows[i - 1]!.hash);
-    assert.equal(s.appendAudit(entry({ depois: true })).prevHash, prev, "a próxima linha continua a cadeia migrada");
+    assert.equal(s.appendAudit(entry({ depois: true })).prevHash, prev, "the next row continues the migrated chain");
     assert.throws(() => s.db.exec("UPDATE audit_log SET actor = 'x'"), /append-only/);
     assert.throws(() => s.db.exec("DELETE FROM audit_log"), /append-only/);
     s.db.close();

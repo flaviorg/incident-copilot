@@ -13,7 +13,7 @@ for (const id of ["deploy-5xx-rollback", "cost-anomaly"]) {
     const rec = await recordScenario(id);
     assert.equal(DemoRecordingSchema.safeParse(rec).success, true);
     assert.ok(Buffer.byteLength(JSON.stringify(rec)) <= 300 * 1024);
-    assert.equal(rec.label, "Reprodução de execução gravada com provedor fake roteirizado");
+    assert.equal(rec.label, "Replay of a recorded run with a scripted fake provider");
     assert.ok(!("appVersion" in rec.recordedWith));
     assert.equal(rec.recordedWith.provider, "fake");
     assert.equal(rec.scenario.id, id);

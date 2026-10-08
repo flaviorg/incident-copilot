@@ -12,23 +12,23 @@ function encode(value: unknown, path: string): string {
     case "boolean":
       return value ? "true" : "false";
     case "number":
-      if (!Number.isFinite(value)) throw new TypeError(`canonicalJson: número não finito em ${path}`);
+      if (!Number.isFinite(value)) throw new TypeError(`canonicalJson: non-finite number at ${path}`);
       return JSON.stringify(value); // JSON.stringify(-0) === "0"
     case "string":
       return JSON.stringify(value);
     case "object":
       break;
     default:
-      throw new TypeError(`canonicalJson: tipo ${typeof value} não suportado em ${path}`);
+      throw new TypeError(`canonicalJson: unsupported type ${typeof value} at ${path}`);
   }
   if (Array.isArray(value)) {
     return "[" + value.map((v, i) => {
-      if (v === undefined) throw new TypeError(`canonicalJson: undefined em array em ${path}[${i}]`);
+      if (v === undefined) throw new TypeError(`canonicalJson: undefined in array at ${path}[${i}]`);
       return encode(v, `${path}[${i}]`);
     }).join(",") + "]";
   }
   const proto = Object.getPrototypeOf(value);
-  if (proto !== Object.prototype && proto !== null) throw new TypeError(`canonicalJson: objeto não simples em ${path}`);
+  if (proto !== Object.prototype && proto !== null) throw new TypeError(`canonicalJson: non-plain object at ${path}`);
   const obj = value as Record<string, unknown>;
   const parts: string[] = [];
   for (const key of Object.keys(obj).sort()) {

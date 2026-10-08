@@ -8,7 +8,7 @@ import type { TraceSink } from "../../app/trace-sink.ts";
 import { runContextOf } from "../run-context.ts";
 import type { NodeFn } from "../run-context.ts";
 
-const NOTHING_TO_RUN: Escalation = { reason: "no_executable_actions", detail: "o portão não deixou nenhuma ação pronta nem pendente de aprovação" };
+const NOTHING_TO_RUN: Escalation = { reason: "no_executable_actions", detail: "the gate left no action ready or pending approval" };
 
 export function createEscalationNode(d: { trace: TraceSink; audit: (e: NewAuditEntry) => AuditEntry }): NodeFn {
   return async (state, config) => {

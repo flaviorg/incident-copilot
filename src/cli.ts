@@ -9,17 +9,17 @@ import { UsageError } from "./cli/io.ts";
 type Command = (argv: string[], io: CliIO) => Promise<number>;
 
 const COMMANDS: Record<string, { help: string; load: () => Promise<Command> }> = {
-  scenarios: { help: "scenarios                                      lista os cenários de demo", load: async () => (await import("./cli/scenarios.ts")).runScenariosCommand },
-  tool: { help: "tool <nome> --scenario <id> [--args '<json>']  executa uma ferramenta de leitura", load: async () => (await import("./cli/tool.ts")).runToolCommand },
-  demo: { help: "demo [--scenario <id>] [--reject] [--persist] [--json] [--live]  cenário completo com aprovação do operador demo", load: async () => (await import("./cli/demo.ts")).runDemoCommand },
-  diagnose: { help: "diagnose --scenario <id>                       só o analista de telemetria (ReAct) e o diagnóstico", load: async () => (await import("./cli/diagnose.ts")).runDiagnoseCommand },
-  "record-demo": { help: "record-demo [--out <dir>]                      gera as gravações da War Room (padrão web/public/demo)", load: async () => (await import("./cli/record-demo.ts")).runRecordDemoCommand },
+  scenarios: { help: "scenarios                                      lists the demo scenarios", load: async () => (await import("./cli/scenarios.ts")).runScenariosCommand },
+  tool: { help: "tool <name> --scenario <id> [--args '<json>']  runs a read-only tool", load: async () => (await import("./cli/tool.ts")).runToolCommand },
+  demo: { help: "demo [--scenario <id>] [--reject] [--persist] [--json] [--live]  full scenario with approval by the demo operator", load: async () => (await import("./cli/demo.ts")).runDemoCommand },
+  diagnose: { help: "diagnose --scenario <id>                       only the telemetry analyst (ReAct) and the diagnosis", load: async () => (await import("./cli/diagnose.ts")).runDiagnoseCommand },
+  "record-demo": { help: "record-demo [--out <dir>]                      generates the War Room recordings (default web/public/demo)", load: async () => (await import("./cli/record-demo.ts")).runRecordDemoCommand },
 };
 
 const USAGE = [
-  "uso: node src/cli.ts <comando> [opções]",
+  "usage: node src/cli.ts <command> [options]",
   "",
-  "comandos:",
+  "commands:",
   ...Object.values(COMMANDS).map((c) => `  ${c.help}`),
 ].join("\n");
 
@@ -33,25 +33,25 @@ export async function main(argv: string[], env: Record<string, string | undefine
   const [name, ...rest] = argv;
   const command = name ? COMMANDS[name] : undefined;
   if (!command) {
-    io.err(name ? `comando desconhecido: ${name}\n\n${USAGE}` : USAGE);
+    io.err(name ? `unknown command: ${name}\n\n${USAGE}` : USAGE);
     return 1;
   }
   try {
     return await (await command.load())(rest, io);
   } catch (e) {
     if (e instanceof UsageError) {
-      io.err(`erro: ${e.message}\n\n${USAGE}`);
+      io.err(`error: ${e.message}\n\n${USAGE}`);
       return 1;
     }
     if (e instanceof UnscriptedLlmCallError || e instanceof FixturePromptDriftError) {
-      io.err(`erro de fixture: ${e.message}`);
+      io.err(`fixture error: ${e.message}`);
       return 2;
     }
     if (e instanceof ConfigError || e instanceof ValidationError || e instanceof NotFoundError) {
-      io.err(`erro: ${e.message}`);
+      io.err(`error: ${e.message}`);
       return 1;
     }
-    io.err(`erro inesperado: ${(e as Error)?.message ?? String(e)}`);
+    io.err(`unexpected error: ${(e as Error)?.message ?? String(e)}`);
     return 1;
   }
 }

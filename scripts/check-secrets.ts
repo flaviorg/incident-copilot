@@ -16,7 +16,7 @@ const SECRET_PATTERNS: RegExp[] = [
   new RegExp("APPROVAL_TOKEN" + "=\\S{8,}", "g"),
 ];
 
-const PATTERN_NAMES = ["chave do OpenRouter", "chave sk-", "APPROVAL_TOKEN com valor"];
+const PATTERN_NAMES = ["OpenRouter key", "sk- key", "APPROVAL_TOKEN with a value"];
 
 export type SecretFinding = { path: string; line: number; pattern: string };
 
@@ -97,10 +97,10 @@ export function scanProject(root = PROJECT_ROOT, opts: ScanOptions = {}): { file
 if (import.meta.main) {
   const { files, findings } = scanProject();
   if (findings.length > 0) {
-    for (const f of findings) process.stderr.write(`${f.path}:${f.line}: possível segredo (${f.pattern}); valor omitido\n`);
-    process.stderr.write(`check:secrets: ${findings.length} ocorrência(s) em ${files} arquivo(s) de texto\n`);
+    for (const f of findings) process.stderr.write(`${f.path}:${f.line}: possible secret (${f.pattern}); value omitted\n`);
+    process.stderr.write(`check:secrets: ${findings.length} finding(s) in ${files} text file(s)\n`);
     process.exitCode = 1;
   } else {
-    process.stdout.write(`check:secrets: nenhum segredo em ${files} arquivo(s) de texto\n`);
+    process.stdout.write(`check:secrets: no secrets in ${files} text file(s)\n`);
   }
 }

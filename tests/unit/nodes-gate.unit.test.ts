@@ -33,8 +33,8 @@ test("deploy plan: note ready, rollback awaiting approval, block_image_tag ready
   // As decisões do portão saem juntas, no fim do lote: o pedido de aprovação é desse instante.
   assert.equal(apr.requestedAt, c.clock.now().toISOString());
   assert.deepEqual(out.actions!.map((a) => a.dryRun?.ok), [true, true, true]);
-  assert.deepEqual(out.actions![1]!.dryRun!.changes, ["deployment/orders-api: v3.8.0 -> v3.7.2 (6 réplicas)"]);
-  assert.deepEqual(out.actions!.map((a) => a.classificationReasons), [["faixa do catálogo: 2"], ["faixa do catálogo: 3"], ["faixa do catálogo: 2"]]);
+  assert.deepEqual(out.actions![1]!.dryRun!.changes, ["deployment/orders-api: v3.8.0 -> v3.7.2 (6 replicas)"]);
+  assert.deepEqual(out.actions!.map((a) => a.classificationReasons), [["catalog tier: 2"], ["catalog tier: 3"], ["catalog tier: 2"]]);
   const events = gateEvents(c, bb.incidentId);
   assert.ok(countByType(events).action! >= 3);
   assert.deepEqual(events.filter((e) => e.type === "action").map((e) => e.type === "action" && [e.payload.tool, e.payload.tier]), [["add_incident_note", 2], ["rollback_deployment", 3], ["block_image_tag", 2]]);
@@ -49,7 +49,7 @@ test("forbidden step is blocked without dry run, with audit and critique", async
   const { c, bb } = await stateAtGate("deploy-5xx-rollback", { extraStep: { actionType: "delete_backups", target: "backup_vault/orders-api/prod" } });
   const a = (await createGateNode(gd(c))(bb)).actions!.find((x) => x.actionType === "delete_backups")!;
   assert.deepEqual([a.status, a.tier, a.dryRun, a.approvalId], ["blocked_forbidden", 4, null, null]);
-  assert.deepEqual(a.classificationReasons, ["proibida por construção (faixa 4)"]);
+  assert.deepEqual(a.classificationReasons, ["forbidden by construction (tier 4)"]);
   assert.ok(c.store.listAudit(bb.incidentId).some((e) => e.event === "action_blocked_forbidden" && e.tier === 4));
   assert.ok(c.store.listTrace(bb.incidentId, { type: "critique" }).some((e) => e.payload.by === "gate" && e.payload.verdict === "blocked"));
   assert.equal(c.store.listApprovals({ incidentId: bb.incidentId }).length, 1); // só a do rollback
@@ -62,7 +62,7 @@ test("unknown type, failed dry run, dependents and scope", async () => {
     return [
       ...steps,
       { order: 4, actionType: "capture_heap_dump", target: "deployment/orders-api", params: {}, rationale: "r", runbookRef: null, dependsOn: [] },
-      { order: 5, actionType: "add_incident_note", target: "incident/INC-9999", params: { text: "nota em outro incidente" }, rationale: "r", runbookRef: "orders-5xx-after-deploy#mitigacao", dependsOn: [] },
+      { order: 5, actionType: "add_incident_note", target: "incident/INC-9999", params: { text: "note on another incident" }, rationale: "r", runbookRef: "orders-5xx-after-deploy#mitigation", dependsOn: [] },
     ];
   });
   const out = await createGateNode(gd(c))(state);
@@ -70,11 +70,11 @@ test("unknown type, failed dry run, dependents and scope", async () => {
     [1, 2, "ready"], [2, 3, "rejected_by_dry_run"], [3, 2, "cancelled"], [4, 4, "blocked_unknown"], [5, 3, "awaiting_approval"],
   ]);
   const [, rollback, block, unknown, outOfScope] = out.actions!;
-  assert.match(rollback!.dryRun!.failureReason!, /v9\.9\.9 não existe/);
+  assert.match(rollback!.dryRun!.failureReason!, /v9\.9\.9 is not in the deploy history/);
   assert.equal(rollback!.approvalId, null);
   assert.equal(block!.dryRun, null);
-  assert.deepEqual(unknown!.classificationReasons, ["tipo fora do catálogo: negar por padrão"]);
-  assert.ok(outOfScope!.classificationReasons.includes("alvo fora do escopo do incidente"));
+  assert.deepEqual(unknown!.classificationReasons, ["type not in catalog: deny by default"]);
+  assert.ok(outOfScope!.classificationReasons.includes("target outside the incident scope"));
   assert.deepEqual(c.store.listApprovals({ incidentId: bb.incidentId }).map((a) => a.actionId), [outOfScope!.id]);
   const events = c.store.listAudit(bb.incidentId).map((e) => e.event);
   assert.deepEqual(events.slice(1), ["action_ready", "action_dry_run_failed", "action_cancelled", "action_blocked_unknown", "approval_requested"]);
@@ -84,7 +84,7 @@ test("exhausted revisions raise every step to tier 3", async () => {
   const { c, bb } = await stateAtGate("deploy-5xx-rollback");
   const out = await createGateNode(gd(c))({ ...bb, audit: { ...bb.audit!, verdict: "revise" } });
   assert.deepEqual(out.actions!.map((a) => [a.tier, a.status]), [[3, "awaiting_approval"], [3, "awaiting_approval"], [3, "awaiting_approval"]]);
-  assert.ok(out.actions!.every((a) => a.classificationReasons.includes("revisões do plano esgotadas")));
+  assert.ok(out.actions!.every((a) => a.classificationReasons.includes("plan revisions exhausted")));
   assert.equal(c.store.listApprovals({ incidentId: bb.incidentId }).length, 3);
   const handoff = gateEvents(c, bb.incidentId).find((e) => e.type === "handoff")!;
   assert.ok(handoff.type === "handoff" && handoff.payload.brief.includes("APR-0001, APR-0002, APR-0003"));

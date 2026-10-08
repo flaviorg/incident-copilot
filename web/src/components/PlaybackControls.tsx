@@ -14,20 +14,20 @@ export function PlaybackControls({ state, playing, onStep, onPlay, onPause, step
   const total = common.events.length + (state.branch && branches ? branches[state.branch].events.length : 0);
   const canStep = !state.pausedAtGate && !state.finished;
   const where = state.finished
-    ? "reprodução concluída"
+    ? "replay finished"
     : state.pausedAtGate
-      ? "parado no portão de aprovação: decida para continuar"
+      ? "stopped at the approval gate: decide to continue"
       : playing
-        ? "reproduzindo"
-        : "pausado";
+        ? "playing"
+        : "paused";
   return (
-    <div className="playback" role="group" aria-label="Controles da reprodução">
+    <div className="playback" role="group" aria-label="Replay controls">
       <div className="playback-buttons">
-        <button type="button" ref={stepRef} onClick={onStep} disabled={!canStep || playing}>Avançar</button>
-        <button type="button" onClick={onPlay} disabled={!canStep || playing}>Reproduzir</button>
-        <button type="button" onClick={onPause} disabled={!playing}>Pausar</button>
+        <button type="button" ref={stepRef} onClick={onStep} disabled={!canStep || playing}>Step</button>
+        <button type="button" onClick={onPlay} disabled={!canStep || playing}>Play</button>
+        <button type="button" onClick={onPause} disabled={!playing}>Pause</button>
       </div>
-      <p className="playback-status" aria-live="polite">{`Evento ${state.cursor} de ${total} · ${where}`}</p>
+      <p className="playback-status" aria-live="polite">{`Event ${state.cursor} of ${total} · ${where}`}</p>
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { ApprovalSchema } from "./approval.ts";
 import { IncidentMetricsSchema } from "./metrics.ts";
 import { PostmortemDocSchema } from "./postmortem.ts";
 
-export const DEMO_LABEL = "Reprodução de execução gravada com provedor fake roteirizado";
+export const DEMO_LABEL = "Replay of a recorded run with a scripted fake provider";
 
 export const RecordingBranchSchema = z.object({
   events: z.array(TraceEventSchema),

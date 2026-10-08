@@ -41,13 +41,13 @@ function statusOf(e: unknown): number | null {
 /** 429 -> rate_limit; 5xx ou rede -> server_error; aborto -> aborted; falha de parse da saída -> invalid_output. */
 function classifyProviderError(e: unknown, signal: AbortSignal): { kind: LlmErrorKind; message: string } {
   const name = (e as { name?: unknown })?.name;
-  if (signal.aborted || name === "AbortError" || name === "TimeoutError") return { kind: "aborted", message: "chamada abortada" };
+  if (signal.aborted || name === "AbortError" || name === "TimeoutError") return { kind: "aborted", message: "call aborted" };
   const status = statusOf(e);
-  if (status === 429) return { kind: "rate_limit", message: "o provedor respondeu HTTP 429 (limite de taxa)" };
-  if (status !== null && status >= 500) return { kind: "server_error", message: `o provedor respondeu HTTP ${status}` };
-  if (name === "OutputParserException") return { kind: "invalid_output", message: "a saída do modelo não pôde ser interpretada" };
-  if (status !== null) return { kind: "server_error", message: `o provedor respondeu HTTP ${status}` };
-  return { kind: "server_error", message: "falha de rede ou do provedor" };
+  if (status === 429) return { kind: "rate_limit", message: "the provider answered HTTP 429 (rate limit)" };
+  if (status !== null && status >= 500) return { kind: "server_error", message: `the provider answered HTTP ${status}` };
+  if (name === "OutputParserException") return { kind: "invalid_output", message: "the model output could not be parsed" };
+  if (status !== null) return { kind: "server_error", message: `the provider answered HTTP ${status}` };
+  return { kind: "server_error", message: "network or provider failure" };
 }
 
 export class OpenRouterProvider implements LlmProvider {
@@ -79,8 +79,8 @@ export class OpenRouterProvider implements LlmProvider {
       const res = await chat.invoke([{ role: "system", content: prompt.system }, { role: "user", content: prompt.buildUser(input) }], { signal: ctx.signal });
       const parsed = prompt.outputSchema.safeParse(res.parsed);
       if (!parsed.success) {
-        const where = parsed.error.issues.map((i) => i.path.map(String).join(".") || "(raiz)").join(", ");
-        return llmFailure("invalid_output", `saída do modelo não passa no schema de ${prompt.version} em ${where}`, this.model);
+        const where = parsed.error.issues.map((i) => i.path.map(String).join(".") || "(root)").join(", ");
+        return llmFailure("invalid_output", `model output does not match the ${prompt.version} schema at ${where}`, this.model);
       }
       const usage = { promptTokens: res.raw.usage_metadata?.input_tokens ?? 0, completionTokens: res.raw.usage_metadata?.output_tokens ?? 0 };
       return {

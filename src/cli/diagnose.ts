@@ -29,8 +29,8 @@ export async function runDiagnoseCommand(argv: string[], io: CliIO): Promise<num
       { requestId: null },
     );
     const bb = { ...blackboard, runId: c.ids.run() };
-    io.out(`incident-copilot · diagnose · provedor: ${config.llmProvider === "fake" ? "fake roteirizado (sem rede, sem chave)" : `openrouter (${config.openrouterModel})`}`);
-    io.out(`cenário ${scenarioId} · ${incident.service ?? `conta ${bb.alert.account ?? "?"}`} · ${incident.severity} · ${incident.id}`);
+    io.out(`incident-copilot · diagnose · provider: ${config.llmProvider === "fake" ? "scripted fake (no network, no key)" : `openrouter (${config.openrouterModel})`}`);
+    io.out(`scenario ${scenarioId} · ${incident.service ?? `account ${bb.alert.account ?? "?"}`} · ${incident.severity} · ${incident.id}`);
     io.out("");
     const node = createTelemetryNode({ llm: c.llm, tools: c.tools, scenarios: c.scenarios, trace: c.trace, clock: c.clock, limits: c.limits });
     const out = await node(bb, { signal: AbortSignal.timeout(config.runTimeoutMs), configurable: { requestId: null } });
@@ -40,13 +40,13 @@ export async function runDiagnoseCommand(argv: string[], io: CliIO): Promise<num
     }
     io.out("");
     if (out.escalation) {
-      io.err(`o analista não concluiu: ${ESCALATION_LABELS[out.escalation.reason]} (${out.escalation.detail})`);
+      io.err(`the analyst did not conclude: ${ESCALATION_LABELS[out.escalation.reason]} (${out.escalation.detail})`);
       return 1;
     }
     const d = out.diagnosis!;
-    io.out(`diagnóstico: ${d.category} (${CATEGORY_LABELS[d.category]}) · confiança ${CONFIDENCE_LABELS[d.confidence]}${d.capReached ? " · teto de passos atingido" : ""}`);
-    io.out(`hipótese: ${d.hypothesis}`);
-    for (const ev of d.evidence) io.out(`  evidência ${ev.source} ${ev.ref}: ${ev.summary}`);
+    io.out(`diagnosis: ${d.category} (${CATEGORY_LABELS[d.category]}) · confidence ${CONFIDENCE_LABELS[d.confidence]}${d.capReached ? " · step cap reached" : ""}`);
+    io.out(`hypothesis: ${d.hypothesis}`);
+    for (const ev of d.evidence) io.out(`  evidence ${ev.source} ${ev.ref}: ${ev.summary}`);
     return 0;
   } finally {
     c.close();

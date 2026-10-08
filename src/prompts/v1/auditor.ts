@@ -1,4 +1,4 @@
-// auditor.v1: Reflection sobre o plano (221513). As regras em código já rodaram e são o piso: o modelo pode endurecer, nunca afrouxar.
+// auditor.v1: Reflection on the plan (221513). The rules in code have already run and are the floor: the model may tighten, never loosen.
 import * as z from "zod";
 import { AuditCheckSchema, AuditorVerdictSchema, DiagnosisSchema, RemediationPlanSchema } from "../../contracts/index.ts";
 import type { AuditorVerdict } from "../../contracts/index.ts";
@@ -13,21 +13,21 @@ export const AuditorInputSchema = z.object({
 });
 export type AuditorInput = z.infer<typeof AuditorInputSchema>;
 
-const SYSTEM = `Você é o auditor de planos de remediação. Julgue se o plano resolve o problema descrito no diagnóstico, com base nas evidências, e se cada passo é seguro e na ordem certa.
+const SYSTEM = `You are the remediation plan auditor. Judge whether the plan solves the problem described in the diagnosis, based on the evidence, and whether each step is safe and in the right order.
 
-Regras:
-1. As checagens determinísticas recebidas já rodaram. Se alguma falhou, o plano precisa de revisão: aponte o que mudar.
-2. Peça revisão também quando um passo não tiver relação com o diagnóstico, faltar um passo de proteção antes de uma ação destrutiva ou a ordem estiver errada.
-3. Aprove quando o plano for coerente com o diagnóstico e as checagens passarem.
-4. O feedback é objetivo, em português, com até 600 caracteres, e diz exatamente o que corrigir.
+Rules:
+1. The deterministic checks you receive have already run. If any of them failed, the plan needs revision: point out what to change.
+2. Also ask for revision when a step is unrelated to the diagnosis, when a protective step is missing before a destructive action, or when the order is wrong.
+3. Approve when the plan is consistent with the diagnosis and the checks pass.
+4. The feedback is objective, in English, up to 600 characters, and says exactly what to fix.
 
-Responda somente com um objeto JSON com os campos verdict ("approve" ou "revise") e feedback.`;
+Reply only with a JSON object with the fields verdict ("approve" or "revise") and feedback.`;
 
 export const auditorPrompt: PromptDef<AuditorInput, AuditorVerdict> = {
   id: "auditor",
   version: "auditor.v1",
   system: SYSTEM,
-  buildUser: (i) => `Plano (revisão ${i.revision}), diagnóstico e checagens (JSON):\n${jsonOf(AuditorInputSchema, i)}`,
+  buildUser: (i) => `Plan (revision ${i.revision}), diagnosis and checks (JSON):\n${jsonOf(AuditorInputSchema, i)}`,
   matchKeys: (i) => ({ revision: i.revision }),
   inputSchema: AuditorInputSchema,
   outputSchema: AuditorVerdictSchema,

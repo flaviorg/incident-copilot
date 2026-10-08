@@ -35,7 +35,7 @@ type Evaluated = { action: GatedAction; event: AuditEvent; summary: string };
 export function createGateNode(d: GateDeps): NodeFn {
   return async (state, config) => {
     const ctx = runContextOf(state, config);
-    if (state.plan === null || state.audit === null) throw new Error("portão acionado sem plano auditado (a guarda do supervisor deveria impedir)");
+    if (state.plan === null || state.audit === null) throw new Error("gate invoked without an audited plan (the supervisor guard should prevent this)");
     const revisionsExhausted = state.audit.verdict === "revise";
     const scope = { service: state.alert.service, account: state.alert.account, incidentId: state.incidentId };
     const steps: PlanStep[] = [...state.plan.steps].sort((a, b) => a.order - b.order);
@@ -51,16 +51,16 @@ export function createGateNode(d: GateDeps): NodeFn {
         tier: cls.tier, classificationReasons: cls.reasons, status: "proposed", dryRun: null, approvalId: null,
         proposedBy: "remediation_planner", executedAt: null, resultSummary: null,
       };
-      const head = `${step.actionType} faixa ${cls.tier}`;
+      const head = `${step.actionType} tier ${cls.tier}`;
       if (cls.tier === 4 || !isExecutable(step.actionType)) {
         const forbidden = cls.known;
         action.status = forbidden ? "blocked_forbidden" : "blocked_unknown";
-        evaluated.push({ action, event: forbidden ? "action_blocked_forbidden" : "action_blocked_unknown", summary: `${head}: bloqueado sem dry run (${cls.reasons.join("; ")})` });
+        evaluated.push({ action, event: forbidden ? "action_blocked_forbidden" : "action_blocked_unknown", summary: `${head}: blocked without dry run (${cls.reasons.join("; ")})` });
         continue;
       }
       if (!cls.paramsOk || cls.params === null) {
         action.status = "rejected_invalid_params";
-        evaluated.push({ action, event: "action_rejected_invalid_params", summary: `${head}: parâmetros inválidos, esperado ${EXECUTABLE_ACTIONS[step.actionType].paramsText}; sem dry run` });
+        evaluated.push({ action, event: "action_rejected_invalid_params", summary: `${head}: invalid parameters, expected ${EXECUTABLE_ACTIONS[step.actionType].paramsText}; no dry run` });
         continue;
       }
       const blocker = step.dependsOn.find((n) => {
@@ -70,8 +70,8 @@ export function createGateNode(d: GateDeps): NodeFn {
       if (blocker !== undefined) {
         const dep = evaluated.find((e) => e.action.order === blocker);
         action.status = "cancelled";
-        const why = dep ? ACTION_STATUS_LABELS[dep.action.status] : "inexistente no plano";
-        evaluated.push({ action, event: "action_cancelled", summary: `${head}: cancelado, depende do passo ${blocker} (${why})` });
+        const why = dep ? ACTION_STATUS_LABELS[dep.action.status] : "not in the plan";
+        evaluated.push({ action, event: "action_cancelled", summary: `${head}: cancelled, depends on step ${blocker} (${why})` });
         continue;
       }
       const validated = { actionType: step.actionType, target: step.target, params: cls.params };
@@ -84,10 +84,10 @@ export function createGateNode(d: GateDeps): NodeFn {
         continue;
       }
       world = d.infra.apply(world, validated);
-      const deps = step.dependsOn.length > 0 ? `, depende do passo ${step.dependsOn.join(", ")}` : "";
+      const deps = step.dependsOn.length > 0 ? `, depends on step ${step.dependsOn.join(", ")}` : "";
       if (cls.tier === 2) {
         action.status = "ready";
-        evaluated.push({ action, event: "action_ready", summary: `${head}: dry run ok (${dry.changes.join("; ")}) → pronto, executa após as decisões${deps}` });
+        evaluated.push({ action, event: "action_ready", summary: `${head}: dry run ok (${dry.changes.join("; ")}) → ready, runs after the decisions${deps}` });
       } else {
         action.status = "awaiting_approval";
         evaluated.push({ action, event: "approval_requested", summary: `${head}: dry run ok (${dry.changes.join("; ")})${deps}` });
@@ -109,12 +109,12 @@ export function createGateNode(d: GateDeps): NodeFn {
         d.persist.approval(approval);
         a.approvalId = approval.id;
         pending.push(approval.id);
-        summary += ` → aguardando ${approval.id}`;
+        summary += ` → awaiting ${approval.id}`;
       }
       d.trace.emit(ctx, "gate", { type: "action", payload: { tool: a.actionType, args: actionArgs(a), tier: a.tier } });
       d.trace.emit(ctx, "gate", { type: "observation", payload: { tool: a.actionType, ok: ACCEPTED.includes(a.status), summary, evidenceRef: null } });
       if (a.tier === 4) {
-        d.trace.emit(ctx, "gate", { type: "critique", payload: { by: "gate", verdict: "blocked", feedback: `${a.actionType} em ${a.target}: ${a.classificationReasons.join("; ")}` } });
+        d.trace.emit(ctx, "gate", { type: "critique", payload: { by: "gate", verdict: "blocked", feedback: `${a.actionType} on ${a.target}: ${a.classificationReasons.join("; ")}` } });
       }
       d.persist.action(a);
       d.persist.audit({
@@ -138,14 +138,14 @@ export function createGateNode(d: GateDeps): NodeFn {
         type: "handoff",
         payload: {
           from: "gate", to: "human",
-          brief: `aguardando aprovação de ${pending.join(", ")}`,
-          reason: `${pending.length} passo${pending.length === 1 ? "" : "s"} de faixa 3 com dry run ok exige${pending.length === 1 ? "" : "m"} decisão humana; nada executa antes de todas as decisões`,
+          brief: `awaiting approval of ${pending.join(", ")}`,
+          reason: `${pending.length} tier 3 step${pending.length === 1 ? "" : "s"} with a passing dry run require${pending.length === 1 ? "s" : ""} a human decision; nothing runs before all decisions`,
         },
       });
     } else if (ready > 0) {
       d.trace.emit(ctx, "gate", {
         type: "handoff",
-        payload: { from: "gate", to: "executor", brief: `${ready} ${ready === 1 ? "ação pronta" : "ações prontas"}, sem aprovação pendente`, reason: "nenhum passo do lote exige decisão humana" },
+        payload: { from: "gate", to: "executor", brief: `${ready} ${ready === 1 ? "action ready" : "actions ready"}, no pending approval`, reason: "no step in the batch requires a human decision" },
       });
     }
     return { actions, phase: pending.length > 0 ? "awaiting_approval" : "executing" };

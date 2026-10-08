@@ -22,7 +22,7 @@ test("runbooks node ranks orders-5xx first for the deploy diagnosis", async () =
   assert.equal(buildRunbookQuery(bb).service, "orders-api");
   const out = await createRunbooksNode(rd(c))(bb);
   assert.equal(out.runbookMatches![0]!.runbookId, "orders-5xx-after-deploy");
-  assert.equal(out.runbookMatches![0]!.section, "mitigacao");
+  assert.equal(out.runbookMatches![0]!.section, "mitigation");
   assert.ok(out.runbookMatches!.length <= 3);
   assert.ok(!out.runbookMatches!.some((m) => m.runbookId === "postgres-connection-exhaustion"));
   assert.equal(out.runbookSearchDone, true);
@@ -30,13 +30,13 @@ test("runbooks node ranks orders-5xx first for the deploy diagnosis", async () =
   const trace = c.store.listTrace(bb.incidentId);
   assert.deepEqual(trace.map((e) => e.type), ["action", "observation", "handoff"]);
   assert.ok(trace[0]!.type === "action" && trace[0]!.payload.tool === "search_runbooks" && trace[0]!.payload.tier === 1);
-  assert.match(c.store.listTrace(bb.incidentId, { type: "observation" })[0]!.payload.summary, /orders-5xx-after-deploy@[0-9a-f]{6} §mitigacao \(escore normalizado 0,\d\d\)/);
+  assert.match(c.store.listTrace(bb.incidentId, { type: "observation" })[0]!.payload.summary, /orders-5xx-after-deploy@[0-9a-f]{6} §mitigation \(normalized score 0\.\d\d\)/);
 });
 
 test("cost diagnosis finds the cloud cost runbook including its mitigation section", async () => {
   const c = createTestContainer();
   const out = await createRunbooksNode(rd(c))(withDiagnosis(c, "cost-anomaly", costDiagnosis()));
-  assert.deepEqual(out.runbookMatches!.map((m) => `${m.runbookId}#${m.section}`), ["cloud-cost-anomaly#diagnostico", "cloud-cost-anomaly#mitigacao"]);
+  assert.deepEqual(out.runbookMatches!.map((m) => `${m.runbookId}#${m.section}`), ["cloud-cost-anomaly#diagnosis", "cloud-cost-anomaly#mitigation"]);
 });
 
 test("runbooks node records a refusal when nothing passes the threshold", async () => {
@@ -44,7 +44,7 @@ test("runbooks node records a refusal when nothing passes the threshold", async 
   const out = await createRunbooksNode(rd(c))(withDiagnosis(c, "deploy-5xx-rollback", tlsDiagnosis(), { service: "billing-api", rule: "certificado tls expirado" }));
   assert.deepEqual(out.runbookMatches, []);
   assert.equal(out.runbookSearchDone, true);
-  assert.match(c.store.listTrace(incidentIdOf(c), { type: "observation" }).at(-1)!.payload.summary, /recusa/);
+  assert.match(c.store.listTrace(incidentIdOf(c), { type: "observation" }).at(-1)!.payload.summary, /refusal/);
 });
 
 test("planner produces revision 0 and then revision 1 with the auditor feedback", async () => {
@@ -55,13 +55,13 @@ test("planner produces revision 0 and then revision 1 with the auditor feedback"
   assert.equal(out0.planRevision, 0);
   assert.equal(out0.audit, null);
   assert.equal(out0.plan!.steps.some((s) => s.actionType === "create_volume_snapshot"), false);
-  const s1: Blackboard = { ...s0, ...out0, audit: reviseAudit("faltou snapshot antes do delete_volume") };
+  const s1: Blackboard = { ...s0, ...out0, audit: reviseAudit("missing snapshot before delete_volume") };
   const out1 = await planner(s1);
   assert.equal(out1.planRevision, 1);
   assert.equal(out1.plan!.steps.some((s) => s.actionType === "create_volume_snapshot"), true);
   const calls = c.fake.calls().filter((x) => x.prompt === "planner.v1");
   assert.deepEqual(calls.map((x) => x.matchKeys), [{ revision: 0 }, { revision: 1 }]);
-  assert.match(calls[1]!.user, /faltou snapshot antes do delete_volume/);
+  assert.match(calls[1]!.user, /missing snapshot before delete_volume/);
   assert.match(calls[0]!.user, /rollback_deployment/); // o catálogo chega como texto
   const plans = c.store.listTrace(s0.incidentId, { type: "plan" });
   assert.deepEqual(plans.map((e) => e.payload.revision), [0, 1]);
@@ -75,7 +75,7 @@ test("auditor: rule failure plus LLM revise gives revise", async () => {
   assert.equal(out.audit!.checks.find((x) => !x.passed)!.rule, "snapshot_before_delete");
   const critique = c.store.listTrace(incidentIdOf(c), { type: "critique" }).at(-1)!;
   assert.deepEqual([critique.payload.by, critique.payload.verdict], ["auditor", "revise"]);
-  assert.match(critique.payload.feedback, /regras falhas: snapshot_before_delete/);
+  assert.match(critique.payload.feedback, /failed rules: snapshot_before_delete/);
   assert.equal(c.store.listTrace(incidentIdOf(c), { type: "handoff" }).at(-1)!.payload.to, "remediation_planner");
 });
 
@@ -94,8 +94,8 @@ test("auditor: LLM approve over a failing rule is overridden and recorded", asyn
   assert.equal(out.audit!.overridden, true);
   assert.equal(out.audit!.llmVerdict, "approve");
   const cr = c.store.listTrace(incidentIdOf(c), { type: "critique" }).at(-1)!;
-  assert.match(cr.payload.feedback, /sobrescrito/);
-  assert.equal(cr.type === "critique" && cr.payload.overridden, true, "a sobrescrita fica estruturada no trace, para o /stats contar");
+  assert.match(cr.payload.feedback, /overridden/);
+  assert.equal(cr.type === "critique" && cr.payload.overridden, true, "the override is structured in the trace, so /stats can count it");
 });
 
 test("auditor without LLM falls back to the rules without escalating", async () => {

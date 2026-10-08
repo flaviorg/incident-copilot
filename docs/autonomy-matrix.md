@@ -1,41 +1,41 @@
-# Matriz de Autonomia
+# Autonomy Matrix
 
-> Arquivo gerado a partir de `src/domain/autonomy/catalog.ts` por `node scripts/gen-autonomy-doc.ts` (também roda em `npm run regen`). Não edite à mão: o teste `docs-matrix.unit.test.ts` falha se este arquivo divergir do catálogo.
+> File generated from `src/domain/autonomy/catalog.ts` by `node scripts/gen-autonomy-doc.ts` (also runs in `npm run regen`). Do not edit by hand: the `docs-matrix.unit.test.ts` test fails if this file diverges from the catalog.
 
-A faixa de cada passo vem do catálogo e de regras de contexto que só sobem a faixa, nunca descem. A saída do modelo não tem campo de faixa.
+The tier of each step comes from the catalog and from context rules that only raise the tier, never lower it. The model output has no tier field.
 
-## Faixas
+## Tiers
 
-| Faixa | Regra | O que entra |
+| Tier | Rule | What belongs here |
 |---|---|---|
-| Faixa 1: decide sozinho | Leitura, risco zero | Ferramentas `query_metrics`, `query_logs`, `list_deploys`, `audit_cloud_inventory` |
-| Faixa 2: decide e registra | Mudança reversível ou sem efeito no serviço, com auditoria | `add_incident_note`, `block_image_tag`, `tag_resource_for_review`, `create_volume_snapshot` |
-| Faixa 3: exige aprovação humana | Destrutivo ou alto impacto | `rollback_deployment`, `release_elastic_ip`, `delete_volume`, `resize_instance` |
-| Faixa 4: proibido por construção | Expor dados, apagar auditoria ou backup, desligar controle | `delete_audit_log`, `disable_security_scanner`, `export_user_data`, `run_arbitrary_command`, `delete_backups` e qualquer tipo fora do catálogo (negar por padrão) |
+| Tier 1: decides alone | Read-only, zero risk | Tools `query_metrics`, `query_logs`, `list_deploys`, `audit_cloud_inventory` |
+| Tier 2: decides and records | Reversible change or no effect on the service, with audit | `add_incident_note`, `block_image_tag`, `tag_resource_for_review`, `create_volume_snapshot` |
+| Tier 3: requires human approval | Destructive or high impact | `rollback_deployment`, `release_elastic_ip`, `delete_volume`, `resize_instance` |
+| Tier 4: forbidden by construction | Exposing data, deleting audit or backup, disabling controls | `delete_audit_log`, `disable_security_scanner`, `export_user_data`, `run_arbitrary_command`, `delete_backups` and any type not in the catalog (deny by default) |
 
-## Catálogo de ações executáveis
+## Executable action catalog
 
-| Faixa | Tipo | Alvo | Parâmetros | Mitiga | Reversível | Duração simulada |
+| Tier | Type | Target | Parameters | Mitigates | Reversible | Simulated duration |
 |---|---|---|---|---|---|---|
-| 2 | `add_incident_note` | `incident/<serviço ou conta do incidente>` | `{ text: string }` | não | não | 1 s |
-| 2 | `block_image_tag` | `image/<serviço>:<tag>` | `{}` | não | sim | 5 s |
-| 2 | `tag_resource_for_review` | `<volume, ip ou instance>/<conta>/<id>` | `{ reason: string }` | não | sim | 2 s |
-| 2 | `create_volume_snapshot` | `volume/<conta>/<id>` | `{}` | não | sim | 30 s |
-| 3 | `rollback_deployment` | `deployment/<serviço>` | `{ toVersion: string }` | sim | sim | 90 s |
-| 3 | `release_elastic_ip` | `ip/<conta>/<id>` | `{}` | sim | não | 5 s |
-| 3 | `delete_volume` | `volume/<conta>/<id>` | `{}` | sim | não | 20 s |
-| 3 | `resize_instance` | `instance/<conta>/<id>` | `{ toType: string }` | sim | sim | 300 s |
+| 2 | `add_incident_note` | `incident/<incident service or account>` | `{ text: string }` | no | no | 1 s |
+| 2 | `block_image_tag` | `image/<service>:<tag>` | `{}` | no | yes | 5 s |
+| 2 | `tag_resource_for_review` | `<volume, ip or instance>/<account>/<id>` | `{ reason: string }` | no | yes | 2 s |
+| 2 | `create_volume_snapshot` | `volume/<account>/<id>` | `{}` | no | yes | 30 s |
+| 3 | `rollback_deployment` | `deployment/<service>` | `{ toVersion: string }` | yes | yes | 90 s |
+| 3 | `release_elastic_ip` | `ip/<account>/<id>` | `{}` | yes | no | 5 s |
+| 3 | `delete_volume` | `volume/<account>/<id>` | `{}` | yes | no | 20 s |
+| 3 | `resize_instance` | `instance/<account>/<id>` | `{ toType: string }` | yes | yes | 300 s |
 
-Parâmetros fora do schema do catálogo levam o passo a `rejected_invalid_params`, sem dry run.
+Parameters outside the catalog schema move the step to `rejected_invalid_params`, without a dry run.
 
-## Regras de contexto (sobem para faixa 3)
+## Context rules (raise to tier 3)
 
-- alvo fora do escopo do incidente: o alvo não é o próprio incidente nem pertence ao serviço ou à conta do incidente (raio de impacto).
-- passo sem runbook de referência: o passo não cita um trecho de runbook (`runbookRef` nulo).
-- revisões do plano esgotadas: o plano chegou ao portão com as revisões do auditor esgotadas e veredito final `revise`.
+- target outside the incident scope: the target is neither the incident itself nor owned by the incident service or account (blast radius).
+- step without a reference runbook: the step does not cite a runbook passage (null `runbookRef`).
+- plan revisions exhausted: the plan reached the remediation gate with the auditor revisions exhausted and a final `revise` verdict.
 
-## Faixa 4 por construção
+## Tier 4 by construction
 
-1. O registro de executores é tipado por `ExecutableActionType`, e os tipos proibidos não pertencem a ele: não existe código que os execute.
-2. `classifyAction` devolve faixa 4 para proibidos e desconhecidos, e o portão bloqueia sem dry run e sem fila de aprovação.
-3. A tabela `audit_log` tem gatilhos que abortam `UPDATE` e `DELETE`, e o store não tem método de remoção.
+1. The executor registry is typed by `ExecutableActionType`, and the forbidden types do not belong to it: no code exists that executes them.
+2. `classifyAction` returns tier 4 for forbidden and unknown types, and the remediation gate blocks them without a dry run and without an approval queue.
+3. The `audit_log` table has triggers that abort `UPDATE` and `DELETE`, and the store has no delete method.

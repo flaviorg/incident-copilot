@@ -16,8 +16,6 @@
 
 A LangGraph supervisor coordinates telemetry, runbook, planning and audit agents. Risky actions go through an autonomy matrix with human approval, and forbidden ones never run, even when the model proposes them. MTTR and savings are computed from data, not by the LLM. It runs offline with a scripted fake LLM; plug in OpenRouter with two environment variables (API key and model).
 
-> **Note on language.** The documentation under `docs/`, `specs/` and the CLI output are written in Brazilian Portuguese (this is a portfolio project for a Brazilian course). Terminal output blocks below are real program output and are kept verbatim.
-
 <p align="center">
   <a href="https://flaviorg.github.io/incident-copilot/">
     <img src="docs/media/demo.gif" alt="War Room: conversation between agents, approval gate and numbers" width="720">
@@ -71,18 +69,18 @@ flowchart LR
   subgraph EQUIPE [LangGraph graph]
     SUP{{supervisor}}
     subgraph ESP [Specialists]
-      TEL[telemetry analyst<br/>ReAct, cap 12]
-      RB[runbook retriever<br/>BM25]
-      PL[planner] --> AU[auditor<br/>Reflection + rules in code]
+      TEL["telemetry analyst<br/>ReAct, cap 12"]
+      RB["runbook retriever<br/>BM25"]
+      PL[planner] --> AU["auditor<br/>Reflection + rules in code"]
     end
-    GT[remediation gate<br/>catalog tier + dry run]
-    HUM([human approves<br/>tier 3])
-    EX[executor] --> VE[verifier<br/>canary]
-    RP[reporter<br/>post-mortem + numeric guard]
+    GT["remediation gate<br/>catalog tier + dry run"]
+    HUM(["human approves<br/>tier 3"])
+    EX[executor] --> VE["verifier<br/>canary"]
+    RP["reporter<br/>post-mortem + numeric guard"]
     ESC[escalation]
   end
 
-  DB[(SQLite<br/>blackboard, trace,<br/>chained audit)]
+  DB[("SQLite<br/>blackboard, trace,<br/>chained audit")]
 
   CLI & API & MCP --> SUP
   SUP --> TEL & RB & PL
@@ -132,38 +130,38 @@ npm install
 npm run demo
 ```
 
-The demo forces the fake provider even if your shell has `OPENROUTER_API_KEY` (only `--live` uses the real model). Real output, abridged (the CLI prints in Brazilian Portuguese):
+The demo forces the fake provider even if your shell has `OPENROUTER_API_KEY` (only `--live` uses the real model). Real output, abridged:
 
 ```text
 $ npm run demo
-incident-copilot · demo · provedor: fake roteirizado (sem rede, sem chave)
-cenário deploy-5xx-rollback · serviço orders-api · sev1
+incident-copilot · demo · provider: scripted fake (no network, no key)
+scenario deploy-5xx-rollback · service orders-api · sev1
 
-09:42:30  INC-0001 aberto: "Taxa de 5xx acima de 5% no orders-api" (impacto desde 09:40:30)
-09:42:50  supervisor → analista de telemetria: Correlacione 5xx e latência do orders-api com o deploy v3.8.0
+09:42:30  INC-0001 opened: "5xx rate above 5% in orders-api" (impact since 09:40:30)
+09:42:50  supervisor → telemetry analyst: Correlate orders-api 5xx errors and latency with the v3.8.0 deploy
 (...)
-09:44:19  analista de telemetria → supervisor: diagnóstico bad_deploy (deploy com defeito, confiança alta, 3 evidências)
+09:44:19  telemetry analyst → supervisor: diagnosis bad_deploy (faulty deploy, high confidence, 3 pieces of evidence)
 (...)
-09:45:39  auditor → supervisor: plano revisão 0 aprovado (5 de 5 regras ok)
+09:45:39  auditor → supervisor: plan revision 0 approved (5 of 5 rules ok)
 (...)
-09:46:05    obs   rollback_deployment faixa 3: dry run ok (deployment/orders-api: v3.8.0 -> v3.7.2 (6 réplicas)) → aguardando APR-0001
+09:46:05    obs   rollback_deployment tier 3: dry run ok (deployment/orders-api: v3.8.0 -> v3.7.2 (6 replicas)) → awaiting APR-0001
 (...)
-09:46:05  portão de remediação → humano: aguardando aprovação de APR-0001
-09:49:05  operador demo aprovou APR-0001 (token verificado, valor omitido)
+09:46:05  remediation gate → human: awaiting approval of APR-0001
+09:49:05  demo operator approved APR-0001 (token verified, value omitted)
 (...)
-09:51:41  canário: aprovado (canário saudável: 5xx 0,5% ≤ 5%; P99 205 ms ≤ 270 ms)
-09:51:41  verificador → supervisor: canário saudável; incidente mitigado
+09:51:41  canary: approved (healthy canary: 5xx 0.5% ≤ 5%; P99 205 ms ≤ 270 ms)
+09:51:41  verifier → supervisor: healthy canary; incident mitigated
 
-desfecho: resolvido (canário saudável)
+outcome: resolved (healthy canary)
 
-MTTR                    11,2 min        medido (linha do tempo simulada, 09:40:30 → 09:51:41)
-  aguardando aprovação  3,0 min         medido (soma das aprovações decididas)
-MTTD                    2,0 min         medido
-Minutos economizados    33,8 a 83,8     ilustrativo (linha de base sintética de 45 a 95 min)
-ROI                     18,9x a 48,2x   ilustrativo (premissas em data/business-assumptions.json)
-Custo de LLM            US$ 0,00        medido (12 chamadas, 14014 tokens)
+MTTR                    11.2 min        measured (simulated timeline, 09:40:30 → 09:51:41)
+  awaiting approval     3.0 min         measured (sum of decided approvals)
+MTTD                    2.0 min         measured
+Minutes saved           33.8 to 83.8    illustrative (synthetic baseline of 45 to 95 min)
+ROI                     18.9x to 48.2x  illustrative (assumptions in data/business-assumptions.json)
+LLM cost                US$ 0.00        measured (12 calls, 13956 tokens)
 
-trace 41 eventos (thought 4 · action 10 · observation 10 · plan 1 · critique 2 · answer 2 · handoff 12)
+trace 41 events (thought 4 · action 10 · observation 10 · plan 1 · critique 2 · answer 2 · handoff 12)
 post-mortem: reports/INC-0001-postmortem.md
 ```
 
@@ -200,23 +198,23 @@ The full output of both scenarios, line by line, is in [`docs/demo-output.md`](d
 With a fresh database and a local token of 16 or more characters exported in the shell as `APPROVAL_TOKEN` (the value does not appear in any output):
 
 ```text
-$ curl -s -X POST localhost:3000/incidents -H 'content-type: application/json' -d '{"scenarioId":"deploy-5xx-rollback"}' | jq -c '{id: .incident.id, status: .incident.status, pendentes: [.approvals[] | select(.status=="pending") | .id]}'
-{"id":"INC-0001","status":"awaiting_approval","pendentes":["APR-0001"]}
+$ curl -s -X POST localhost:3000/incidents -H 'content-type: application/json' -d '{"scenarioId":"deploy-5xx-rollback"}' | jq -c '{id: .incident.id, status: .incident.status, pending: [.approvals[] | select(.status=="pending") | .id]}'
+{"id":"INC-0001","status":"awaiting_approval","pending":["APR-0001"]}
 
-$ curl -s -X POST localhost:3000/approvals/APR-0001/decision -H 'content-type: application/json' -H 'X-Approval-Token: errado-errado-errado' -d '{"decision":"approve","approver":"ana"}' | jq -c .error
-{"code":"invalid_token","message":"token de aprovação inválido ou ausente","requestId":"af8556c4-46a9-49aa-85c2-a28c89248c29"}
+$ curl -s -X POST localhost:3000/approvals/APR-0001/decision -H 'content-type: application/json' -H 'X-Approval-Token: wrong-wrong-wrong' -d '{"decision":"approve","approver":"ana"}' | jq -c .error
+{"code":"invalid_token","message":"invalid or missing approval token","requestId":"f7495050-dc02-429f-b9b5-05b7e82b2bf2"}
 
-$ curl -s -X POST localhost:3000/approvals/APR-0001/decision -H 'content-type: application/json' -H "X-Approval-Token: $APPROVAL_TOKEN" -d '{"text":"sim, mas espera","approver":"ana"}' | jq -c .error.code
+$ curl -s -X POST localhost:3000/approvals/APR-0001/decision -H 'content-type: application/json' -H "X-Approval-Token: $APPROVAL_TOKEN" -d '{"text":"yes, but wait","approver":"ana"}' | jq -c .error.code
 "ambiguous_decision"
 
 $ curl -s -X POST localhost:3000/approvals/APR-0001/decision -H 'content-type: application/json' -H "X-Approval-Token: $APPROVAL_TOKEN" -d '{"decision":"approve","approver":"ana"}' | jq -c '.incident.incident.status'
 "resolved"
 
 $ curl -s 'localhost:3000/incidents/INC-0001/postmortem?format=json' | jq -c .numericGuard
-{"passed":false,"rejectedNumbers":["11,2"],"usedTemplate":true}
+{"passed":false,"rejectedNumbers":["11.2"],"usedTemplate":true}
 ```
 
-The last command shows the [numeric guard](#numbers-without-invention) at work: with the system clock, the scripted narrative cites "11,2" (the MTTR of the simulated timeline), the real MTTR was different (about 2 min in this example), and the post-mortem came out through the deterministic template.
+The last command shows the [numeric guard](#numbers-without-invention) at work: with the system clock, the scripted narrative cites "11.2" (the MTTR of the simulated timeline), the real MTTR was different (about 2 min in this example), and the post-mortem came out through the deterministic template.
 
 </details>
 
@@ -390,7 +388,7 @@ The default provider is a **scripted fake**: each answer from the "model" is wri
 - **Spontaneous Reflection.** In the `cost-anomaly` demo, the auditor sends the plan back because the **rule in code** `snapshot_before_delete` rejects revision 0. The feedback text is scripted.
 - **Real times and costs.** The clock is simulated and the fake costs US$ 0.00.
 
-The War Room says this on every screen: "Reprodução de execução gravada com provedor fake roteirizado" ("replay of a recorded run with a scripted fake provider").
+The War Room says this on every screen: "Replay of a recorded run with a scripted fake provider".
 
 </details>
 
@@ -402,7 +400,7 @@ Measured on 2026-10-04, with no `.env`, after deleting everything that is genera
 | Criterion | Command | Time | Target |
 |---|---|---|---|
 | S1 | `rm -rf node_modules web/node_modules web/dist web/public/demo reports` and then `npm ci && npm --prefix web ci && npm run verify` | 17.7 s (wall clock), exit code 0 | under 3 min |
-| S2 | `npm run demo` with a fake `OPENROUTER_API_KEY` in the environment | 0.455 s, exit code 0, header "provedor: fake roteirizado" | under 10 s |
+| S2 | `npm run demo` with a fake `OPENROUTER_API_KEY` in the environment | 0.455 s, exit code 0, header "provider: scripted fake" | under 10 s |
 
 `npm ci` took about 1 s at the root and 0.6 s in `web/`, because the machine's npm cache already had the packages. On a machine without that cache, the download counts and the S1 time depends on the network.
 

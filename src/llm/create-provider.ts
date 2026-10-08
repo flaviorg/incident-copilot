@@ -19,7 +19,7 @@ export function createLlmProvider(
     const fake = new FakeLlmProvider({ fixtures: d.fixtures });
     return { provider: record(resilient(fake, { fallback: null, attempts: 2, timeoutMs: c.llmTimeoutMs })), fake };
   }
-  if (!c.openrouterApiKey || !c.openrouterModel) throw new Error("provedor openrouter sem chave ou modelo (a config deveria ter falhado antes)");
+  if (!c.openrouterApiKey || !c.openrouterModel) throw new Error("openrouter provider without a key or model (the config should have failed earlier)");
   const make = (model: string) => new OpenRouterProvider({ apiKey: c.openrouterApiKey!, model, baseUrl: c.llmBaseUrl, prices: d.prices });
   const fallback = c.openrouterModelFallback ? make(c.openrouterModelFallback) : null;
   return { provider: record(resilient(make(c.openrouterModel), { fallback, attempts: 2, timeoutMs: c.llmTimeoutMs })), fake: null };

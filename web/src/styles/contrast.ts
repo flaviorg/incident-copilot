@@ -10,7 +10,7 @@ function parseHex(hex: string): [number, number, number] {
   let h = hex.trim().replace(/^#/, "");
   if (h.length === 3 || h.length === 4) h = h.slice(0, 3).split("").map((c) => c + c).join("");
   if (h.length === 8) h = h.slice(0, 6);
-  if (!/^[0-9a-fA-F]{6}$/.test(h)) throw new Error(`cor hexadecimal inválida: ${hex}`);
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) throw new Error(`invalid hex color: ${hex}`);
   return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
 }
 
@@ -40,6 +40,6 @@ export function tokenHex(css: string, theme: "light" | "dark", name: string): st
   const light = at === -1 ? css : css.slice(0, at);
   const dark = at === -1 ? "" : css.slice(at);
   const value = (theme === "dark" ? find(dark, name) : null) ?? find(light, name);
-  if (value === null) throw new Error(`token ${name} ausente no tema ${theme}`);
+  if (value === null) throw new Error(`token ${name} missing from the ${theme} theme`);
   return value;
 }

@@ -167,7 +167,7 @@ export class SqliteIncidentStore {
     this.txDepth = 1;
     try {
       const result = fn();
-      if (result instanceof Promise) throw new TypeError("transaction() aceita só funções síncronas");
+      if (result instanceof Promise) throw new TypeError("transaction() only accepts synchronous functions");
       this.db.exec("COMMIT");
       return result;
     } catch (e) {
@@ -233,7 +233,7 @@ export class SqliteIncidentStore {
   updateIncidentStatus(id: string, status: IncidentStatus, patch: IncidentStatusPatch): void {
     this.transaction(() => {
       const row = this.s("getIncident").get(id) as IncidentRow | undefined;
-      if (!row) throw new NotFoundError("not_found", `incidente não encontrado: ${id}`);
+      if (!row) throw new NotFoundError("not_found", `incident not found: ${id}`);
       const resolvedAt = patch.resolvedAt !== undefined ? patch.resolvedAt : row.resolved_at;
       let reason = row.escalation_reason;
       let detail = row.escalation_detail;
@@ -258,7 +258,7 @@ export class SqliteIncidentStore {
 
   loadBlackboard(incidentId: string): { blackboard: Blackboard; version: number } {
     const row = this.s("loadBlackboard").get(incidentId) as { json: string; version: number } | undefined;
-    if (!row) throw new NotFoundError("not_found", `blackboard não encontrado: ${incidentId}`);
+    if (!row) throw new NotFoundError("not_found", `blackboard not found: ${incidentId}`);
     return { blackboard: BlackboardSchema.parse(JSON.parse(row.json)), version: Number(row.version) };
   }
 
@@ -269,7 +269,7 @@ export class SqliteIncidentStore {
       ? this.s("insertBlackboard").run(incidentId, json)
       : this.s("updateBlackboard").run(json, incidentId, expectedVersion);
     if (Number(result.changes) !== 1) {
-      throw new ConflictError("version_conflict", `o blackboard de ${incidentId} mudou desde a versão ${expectedVersion}`);
+      throw new ConflictError("version_conflict", `the blackboard of ${incidentId} changed since version ${expectedVersion}`);
     }
     return expectedVersion + 1;
   }
@@ -332,7 +332,7 @@ export class SqliteIncidentStore {
     const ap = ApprovalSchema.parse({ ...next, version: expectedVersion + 1 });
     const result = this.s("updateApproval").run(ap.status, ap.decidedAt, ap.version, JSON.stringify(ap), id, expectedVersion);
     if (Number(result.changes) !== 1) {
-      throw new ConflictError("version_conflict", `a aprovação ${id} mudou desde a versão ${expectedVersion}`);
+      throw new ConflictError("version_conflict", `approval ${id} changed since version ${expectedVersion}`);
     }
   }
 

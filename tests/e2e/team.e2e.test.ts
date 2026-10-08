@@ -103,11 +103,11 @@ test("low confidence after two runs escalates as low_confidence_diagnosis", asyn
   const fixture = patchFixture(base, {
     replace: { "tel-4": { output: weak } },
     insertBefore: {
-      "sup-2": [turn("sup-2b", { hasDiagnosis: true }, { next: "telemetry_analyst", brief: "Confirme a correlação com o deploy", reason: "Diagnóstico com confiança baixa" })],
+      "sup-2": [turn("sup-2b", { hasDiagnosis: true }, { next: "telemetry_analyst", brief: "Confirm the correlation with the deploy", reason: "Low-confidence diagnosis" })],
     },
     append: [
-      turn("tel2-1", { run: 2, step: 1 }, { kind: "action", thought: "Confiro a latência P99 no mesmo intervalo.", tool: "query_metrics", args: { service: "orders-api", metric: "p99_latency_ms", window: "30m" } }, "telemetry-react.v1"),
-      turn("tel2-2", { run: 2, step: 2 }, { ...weak, thought: "Ainda sem sinal que confirme a causa." }, "telemetry-react.v1"),
+      turn("tel2-1", { run: 2, step: 1 }, { kind: "action", thought: "I check the P99 latency over the same interval.", tool: "query_metrics", args: { service: "orders-api", metric: "p99_latency_ms", window: "30m" } }, "telemetry-react.v1"),
+      turn("tel2-2", { run: 2, step: 2 }, { ...weak, thought: "Still no signal that confirms the cause." }, "telemetry-react.v1"),
     ],
   });
   const c = createTestContainer({ fixture });
@@ -148,14 +148,14 @@ test("every supervisor decision and specialist return has a handoff", async () =
 test("incident status is derived and persisted; reads go through the service", async () => {
   // Teto de equipe 3: escala antes do portão, então o desfecho não depende das tarefas 27 a 29.
   const c = createTestContainer({ limits: { teamMaxIterations: 3 } });
-  const v = await c.incidents.open({ scenarioId: "deploy-5xx-rollback", title: "Pico de 5xx" }, { requestId: "req-1" });
+  const v = await c.incidents.open({ scenarioId: "deploy-5xx-rollback", title: "5xx spike" }, { requestId: "req-1" });
   assert.equal(v.incident.status, "escalated");
   assert.equal(v.incident.escalation!.reason, "team_cap_reached");
-  assert.equal(v.incident.title, "Pico de 5xx");
+  assert.equal(v.incident.title, "5xx spike");
   // Texto para pessoas: motivo e detalhe numa frase só, pontuada.
   const answer = c.store.listTrace(v.incident.id, { type: "answer" }).find((e) => e.payload.kind === "escalation")!;
-  assert.equal(answer.payload.text, "Incidente escalado para humanos: teto de iterações da equipe atingido (supervisor acionado 4 vezes; o teto da equipe é 3).");
-  assert.match(c.incidents.postmortem(v.incident.id).summary, /^Incidente escalado para humanos: teto de iterações da equipe atingido \([^)]+\)\. Este relatório é parcial/);
+  assert.equal(answer.payload.text, "Incident escalated to humans: team iteration cap reached (supervisor invoked 4 times; the team cap is 3).");
+  assert.match(c.incidents.postmortem(v.incident.id).summary, /^Incident escalated to humans: team iteration cap reached \([^)]+\)\. This report is partial/);
   assert.equal(c.store.getIncident(v.incident.id)!.status, "escalated");
   assert.deepEqual(c.incidents.get(v.incident.id), v);
   assert.deepEqual(c.incidents.list({ status: "escalated", limit: 5 }).map((s) => s.id), [v.incident.id]);

@@ -16,7 +16,7 @@ export type AuditorRuleId = (typeof AUDITOR_RULE_IDS)[number];
 
 /** Janela do deploy suspeito antes do início do impacto. */
 const RECENT_DEPLOY_WINDOW_MIN = 60;
-const NOT_APPLICABLE = "não se aplica";
+const NOT_APPLICABLE = "not applicable";
 
 const targetId = (target: string): string => target.split("/").filter(Boolean).at(-1) ?? target;
 
@@ -38,8 +38,8 @@ function combine(rule: AuditorRuleId, steps: PlanStep[], check: (s: PlanStep) =>
   const results = steps.map((s) => ({ s, r: check(s) })).filter((x): x is { s: PlanStep; r: StepResult } => x.r !== null);
   if (results.length === 0) return { rule, passed: true, detail: NOT_APPLICABLE };
   const bad = results.filter((x) => !x.r.ok);
-  if (bad.length === 0) return { rule, passed: true, detail: clip(results.map((x) => `passo ${x.s.order}: ${x.r.detail}`).join("; ")) };
-  return { rule, passed: false, detail: clip(bad.map((x) => `passo ${x.s.order}: ${x.r.detail}`).join("; ")) };
+  if (bad.length === 0) return { rule, passed: true, detail: clip(results.map((x) => `step ${x.s.order}: ${x.r.detail}`).join("; ")) };
+  return { rule, passed: false, detail: clip(bad.map((x) => `step ${x.s.order}: ${x.r.detail}`).join("; ")) };
 }
 
 export function runAuditorRules(plan: RemediationPlan, e: AuditEvidence): AuditCheck[] {
@@ -51,30 +51,30 @@ export function runAuditorRules(plan: RemediationPlan, e: AuditEvidence): AuditC
     const id = targetId(s.target);
     const snap = steps.find((o) => o.actionType === "create_volume_snapshot" && targetId(o.target) === id && o.order < s.order && s.dependsOn.includes(o.order));
     return snap
-      ? { ok: true, detail: `snapshot de ${id} no passo ${snap.order}` }
-      : { ok: false, detail: `delete_volume de ${id} sem create_volume_snapshot do mesmo alvo em passo anterior listado em dependsOn` };
+      ? { ok: true, detail: `snapshot of ${id} in step ${snap.order}` }
+      : { ok: false, detail: `delete_volume of ${id} without a create_volume_snapshot of the same target in an earlier step listed in dependsOn` };
   });
 
   const resize = combine("resize_requires_low_cpu", steps, (s) => {
     if (s.actionType !== "resize_instance") return null;
     const id = targetId(s.target);
     const inst = e.inventory?.instances.find((i) => i.id === id);
-    if (!inst) return { ok: false, detail: `instância ${id} não encontrada no inventário` };
+    if (!inst) return { ok: false, detail: `instance ${id} not found in the inventory` };
     const toType = typeof s.params.toType === "string" ? s.params.toType : null;
     const from = sizeRank(inst.type);
     const to = toType ? sizeRank(toType) : null;
-    if (from !== null && to !== null && to >= from) return { ok: true, detail: `${inst.type} -> ${toType} não reduz o tamanho` };
+    if (from !== null && to !== null && to >= from) return { ok: true, detail: `${inst.type} -> ${toType} does not reduce the size` };
     return inst.avgCpuPct14d <= IDLE_CPU_MAX_PCT
-      ? { ok: true, detail: `CPU média de 14 dias de ${id} = ${inst.avgCpuPct14d}%` }
-      : { ok: false, detail: `CPU média de 14 dias de ${id} = ${inst.avgCpuPct14d}%, acima de ${IDLE_CPU_MAX_PCT}%` };
+      ? { ok: true, detail: `14-day average CPU of ${id} = ${inst.avgCpuPct14d}%` }
+      : { ok: false, detail: `14-day average CPU of ${id} = ${inst.avgCpuPct14d}%, above ${IDLE_CPU_MAX_PCT}%` };
   });
 
   const release = combine("release_requires_unassociated", steps, (s) => {
     if (s.actionType !== "release_elastic_ip") return null;
     const id = targetId(s.target);
     const ip = e.inventory?.publicIps.find((i) => i.id === id);
-    if (!ip) return { ok: false, detail: `IP ${id} não encontrado no inventário` };
-    return ip.associatedWith === null ? { ok: true, detail: `IP ${id} sem associação` } : { ok: false, detail: `IP ${id} associado a ${ip.associatedWith}` };
+    if (!ip) return { ok: false, detail: `IP ${id} not found in the inventory` };
+    return ip.associatedWith === null ? { ok: true, detail: `IP ${id} not associated` } : { ok: false, detail: `IP ${id} associated with ${ip.associatedWith}` };
   });
 
   const rollback = combine("rollback_requires_recent_deploy", steps, (s) => {
@@ -88,19 +88,19 @@ export function runAuditorRules(plan: RemediationPlan, e: AuditEvidence): AuditC
         return at <= impact && at >= impact - RECENT_DEPLOY_WINDOW_MIN * 60_000;
       })
       .sort((a, b) => b.at.localeCompare(a.at))[0];
-    if (!recent) return { ok: false, detail: `nenhum deploy de ${service} até ${RECENT_DEPLOY_WINDOW_MIN} min antes do início do impacto` };
+    if (!recent) return { ok: false, detail: `no deploy of ${service} within ${RECENT_DEPLOY_WINDOW_MIN} min before the start of impact` };
     const toVersion = s.params.toVersion;
     return toVersion === recent.previousVersion
-      ? { ok: true, detail: `rollback de ${recent.version} para a versão anterior ${recent.previousVersion}` }
-      : { ok: false, detail: `toVersion ${String(toVersion)} difere da versão anterior ao deploy ${recent.version} (${recent.previousVersion})` };
+      ? { ok: true, detail: `rollback from ${recent.version} to the previous version ${recent.previousVersion}` }
+      : { ok: false, detail: `toVersion ${String(toVersion)} differs from the version before deploy ${recent.version} (${recent.previousVersion})` };
   });
 
   const deps = combine("depends_on_valid", steps, (s) => {
     if (s.dependsOn.length === 0) return null;
     const bad = s.dependsOn.filter((d) => !(d < s.order && orders.has(d)));
     return bad.length === 0
-      ? { ok: true, detail: `depende de ${s.dependsOn.join(", ")}` }
-      : { ok: false, detail: `dependsOn aponta para passo inexistente ou posterior: ${bad.join(", ")}` };
+      ? { ok: true, detail: `depends on ${s.dependsOn.join(", ")}` }
+      : { ok: false, detail: `dependsOn points to a missing or later step: ${bad.join(", ")}` };
   });
 
   return [snapshot, resize, release, rollback, deps];

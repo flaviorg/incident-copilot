@@ -8,9 +8,9 @@ const target = projectPath("docs", "autonomy-matrix.md");
 const next = renderAutonomyMatrix();
 const before = existsSync(target) ? readFileSync(target, "utf8") : null;
 if (before === next) {
-  console.log("docs/autonomy-matrix.md já está atualizado");
+  console.log("docs/autonomy-matrix.md is already up to date");
 } else {
   mkdirSync(dirname(target), { recursive: true });
   writeFileSync(target, next);
-  console.log(`docs/autonomy-matrix.md ${before === null ? "criado" : "atualizado"}`);
+  console.log(`docs/autonomy-matrix.md ${before === null ? "created" : "updated"}`);
 }

@@ -57,7 +57,7 @@ export class StatsService {
 
   private stmt(name: string): StatementSync {
     const s = this.q[name];
-    if (!s) throw new Error(`consulta inexistente: ${name}`);
+    if (!s) throw new Error(`unknown query: ${name}`);
     return s;
   }
 

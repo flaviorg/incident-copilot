@@ -3,7 +3,7 @@ import { ConfidenceSchema, RootCauseCategorySchema } from "./enums.ts";
 
 export const EvidenceSchema = z.object({
   source: z.enum(["metrics", "logs", "deploys", "inventory"]),
-  ref: z.string().describe("Referência estável ao sinal, ex.: metrics:orders-api:http_5xx_rate@09:40-09:55"),
+  ref: z.string().describe("Stable reference to the signal, e.g. metrics:orders-api:http_5xx_rate@09:40-09:55"),
   summary: z.string().max(300),
 });
 

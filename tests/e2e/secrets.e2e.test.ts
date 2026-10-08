@@ -60,9 +60,9 @@ test("no secret value appears in any output surface", async () => {
     if (previousKey === undefined) delete process.env.OPENROUTER_API_KEY;
     else process.env.OPENROUTER_API_KEY = previousKey;
   }
-  assert.equal(recorded.approvalTokens.length, 2, "um token por ramo (aprovar e rejeitar)");
+  assert.equal(recorded.approvalTokens.length, 2, "one token per branch (approve and reject)");
   assert.ok(recorded.approvalTokens.every((t) => t.length >= 16));
-  assert.equal(recorded.recording.branches?.approved.approvals[0]?.status, "approved", "as decisões usaram o token do gravador");
+  assert.equal(recorded.recording.branches?.approved.approvals[0]?.status, "approved", "the decisions used the recorder token");
 
   const surfaces = [
     { name: "http", text: http.join("\n") },
@@ -75,7 +75,7 @@ test("no secret value appears in any output surface", async () => {
   ];
   assert.equal(surfaces.length, 7);
   for (const s of surfaces) assert.ok(s.text.length > 0, s.name);
-  assert.ok(m.stderr.length > 0, "o servidor MCP escreveu logs em stderr");
+  assert.ok(m.stderr.length > 0, "the MCP server wrote logs to stderr");
   assert.deepEqual(findSecretOccurrences(surfaces, [TOKEN, KEY, ...recorded.approvalTokens]), []);
   c.close();
 });

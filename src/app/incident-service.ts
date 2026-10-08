@@ -64,11 +64,11 @@ export class IncidentService {
       i,
       ctx,
     );
-    this.d.logger.info("incidente aberto", { requestId: ctx.requestId, incidentId: incident.id, event: "incident_opened", scenarioId: i.scenarioId });
+    this.d.logger.info("incident opened", { requestId: ctx.requestId, incidentId: incident.id, event: "incident_opened", scenarioId: i.scenarioId });
     const final = await this.run(incident.id, ctx);
     const view = this.get(incident.id);
-    if (final.escalation?.reason === "llm_unavailable") throw new LlmUnavailableError(`modelo indisponível no incidente ${incident.id}: ${final.escalation.detail}`);
-    if (final.escalation?.reason === "timeout") throw new RunTimeoutError(`a execução do incidente ${incident.id} passou de ${this.d.runTimeoutMs} ms`);
+    if (final.escalation?.reason === "llm_unavailable") throw new LlmUnavailableError(`model unavailable for incident ${incident.id}: ${final.escalation.detail}`);
+    if (final.escalation?.reason === "timeout") throw new RunTimeoutError(`the run of incident ${incident.id} exceeded ${this.d.runTimeoutMs} ms`);
     return view;
   }
 
@@ -80,7 +80,7 @@ export class IncidentService {
     this.requireIncident(incidentId);
     const { blackboard } = this.d.store.loadBlackboard(incidentId);
     if (blackboard.phase !== "resume") {
-      throw new ConflictError("incident_not_accepting", `o incidente ${incidentId} não está aguardando retomada (fase ${blackboard.phase})`);
+      throw new ConflictError("incident_not_accepting", `incident ${incidentId} is not waiting to resume (phase ${blackboard.phase})`);
     }
     await this.run(incidentId, ctx);
     return this.get(incidentId);
@@ -115,7 +115,7 @@ export class IncidentService {
         if (action) {
           action.status = "expired";
           store.upsertAction(action);
-          this.cancelDependents(actions, action, "expirada", now, ctx, { type: "expire" });
+          this.cancelDependents(actions, action, "expired", now, ctx, { type: "expire" });
         }
       }
       const pendingLeft = this.pendingCount(incidentId, now);
@@ -133,7 +133,7 @@ export class IncidentService {
   applyDecision(approval: Approval, next: Approval, ctx: RunCtx = { requestId: null }): { pendingLeft: number } {
     const { store, clock } = this.d;
     const decided = next.status;
-    if (decided !== "approved" && decided !== "rejected") throw new TypeError(`applyDecision espera approved ou rejected, recebeu ${decided}`);
+    if (decided !== "approved" && decided !== "rejected") throw new TypeError(`applyDecision expects approved or rejected, got ${decided}`);
     return store.transaction(() => {
       const incidentId = approval.incidentId;
       this.requireIncident(incidentId);
@@ -144,7 +144,7 @@ export class IncidentService {
       const action = actions.find((a) => a.id === approval.actionId);
       store.appendAudit({
         incidentId,
-        actor: `human:${next.approver ?? "desconhecido"}`,
+        actor: `human:${next.approver ?? "unknown"}`,
         event: next.status === "approved" ? "approval_approved" : "approval_rejected",
         tier: action?.tier ?? 3,
         details: {
@@ -157,7 +157,7 @@ export class IncidentService {
         action.status = decided;
         store.upsertAction(action);
         if (decided === "rejected") {
-          this.cancelDependents(actions, action, "rejeitada", now, ctx, { type: "reject", approver: next.approver ?? "desconhecido", source: next.decisionSource === "text" ? "text" : "structured" });
+          this.cancelDependents(actions, action, "rejected", now, ctx, { type: "reject", approver: next.approver ?? "unknown", source: next.decisionSource === "text" ? "text" : "structured" });
         }
       }
       const pendingLeft = this.pendingCount(incidentId, now);
@@ -175,7 +175,7 @@ export class IncidentService {
    */
   private requireNoRunInProgress(incidentId: string): void {
     if (this.d.store.listRuns(incidentId).some((r) => r.endedAt === null)) {
-      throw new ConflictError("incident_not_accepting", `o incidente ${incidentId} tem uma execução em andamento; tente de novo quando ela terminar`);
+      throw new ConflictError("incident_not_accepting", `incident ${incidentId} has a run in progress; try again when it finishes`);
     }
   }
 
@@ -188,7 +188,7 @@ export class IncidentService {
   private closeApproval(a: Approval, ev: Parameters<typeof transition>[1], now: Date): Approval {
     let next = transition(a, ev, now);
     if (next instanceof ApprovalTransitionError && next.code === "expired") next = transition(a, { type: "expire" }, now);
-    if (next instanceof ApprovalTransitionError) throw new ConflictError("approval_not_pending", `a aprovação ${a.id} não está pendente`);
+    if (next instanceof ApprovalTransitionError) throw new ConflictError("approval_not_pending", `approval ${a.id} is not pending`);
     this.d.store.transitionApproval(a.id, next, a.version);
     return next;
   }
@@ -212,7 +212,7 @@ export class IncidentService {
       for (const a of actions) {
         if (!a.dependsOn.includes(parent.order) || !CANCELLABLE.includes(a.status)) continue;
         a.status = "cancelled";
-        a.resultSummary = `cancelada: depende do passo ${parent.order} (${parent === root ? why : ACTION_STATUS_LABELS.cancelled})`;
+        a.resultSummary = `cancelled: depends on step ${parent.order} (${parent === root ? why : ACTION_STATUS_LABELS.cancelled})`;
         store.upsertAction(a);
         store.appendAudit({
           incidentId: a.incidentId, actor: "system:approval-service", event: "action_cancelled", tier: a.tier,
@@ -220,7 +220,7 @@ export class IncidentService {
         });
         const own = a.approvalId ? store.getApproval(a.approvalId) : null;
         if (own && own.status === "pending") {
-          const comment = `cancelada em cascata: depende de ${root.approvalId ?? `passo ${root.order}`} (${why})`;
+          const comment = `cancelled in cascade: depends on ${root.approvalId ?? `step ${root.order}`} (${why})`;
           const next = this.closeApproval(own, cascade.type === "reject" ? { type: "reject", approver: cascade.approver, comment, source: cascade.source } : { type: "expire" }, now);
           store.appendAudit({
             incidentId: a.incidentId, actor: "system:approval-service", event: next.status === "rejected" ? "approval_rejected" : "approval_expired", tier: a.tier,
@@ -242,7 +242,7 @@ export class IncidentService {
    */
   proposeExternalAction(input: ProposeRemediationInput, actor: string): ProposeRemediationResult {
     const parsed = parseWithIssues(ProposeRemediationInputSchema, input);
-    if (!parsed.success) throw new ValidationError(`entrada inválida: ${parsed.issues.map((x) => x.path).join(", ")}`, parsed.issues);
+    if (!parsed.success) throw new ValidationError(`invalid input: ${parsed.issues.map((x) => x.path).join(", ")}`, parsed.issues);
     const i = parsed.data;
     const { store, clock, ids } = this.d;
     const incident = this.requireIncident(i.incidentId);
@@ -253,7 +253,7 @@ export class IncidentService {
       { actionType: i.actionType, target: i.target, params: i.params, runbookRef: i.runbookRef ?? null },
       { scope: { service: blackboard.alert.service, account: blackboard.alert.account, incidentId: i.incidentId }, revisionsExhausted: false },
     );
-    const head = `${i.actionType} faixa ${cls.tier}`;
+    const head = `${i.actionType} tier ${cls.tier}`;
     let status: GatedAction["status"];
     let event: AuditEvent;
     let summary: string;
@@ -262,28 +262,28 @@ export class IncidentService {
     if (cls.tier === 4 || !isExecutable(i.actionType)) {
       status = cls.known ? "blocked_forbidden" : "blocked_unknown";
       event = cls.known ? "action_blocked_forbidden" : "action_blocked_unknown";
-      summary = `${head}: bloqueado sem dry run (${cls.reasons.join("; ")})`;
+      summary = `${head}: blocked without dry run (${cls.reasons.join("; ")})`;
       refusal = cls.known
-        ? { code: "action_forbidden", message: `ação recusada: ${i.actionType} é proibida por construção (faixa 4)` }
-        : { code: "action_unknown", message: `ação recusada: ${i.actionType} está fora do catálogo (negar por padrão)` };
+        ? { code: "action_forbidden", message: `action refused: ${i.actionType} is forbidden by construction (tier 4)` }
+        : { code: "action_unknown", message: `action refused: ${i.actionType} is not in the catalog (deny by default)` };
     } else if (!cls.paramsOk || cls.params === null) {
       const expected = EXECUTABLE_ACTIONS[i.actionType].paramsText;
       status = "rejected_invalid_params";
       event = "action_rejected_invalid_params";
-      summary = `${head}: parâmetros inválidos, esperado ${expected}; sem dry run`;
-      refusal = { code: "invalid_params", message: `parâmetros inválidos para ${i.actionType}: esperado ${expected}` };
+      summary = `${head}: invalid parameters, expected ${expected}; no dry run`;
+      refusal = { code: "invalid_params", message: `invalid parameters for ${i.actionType}: expected ${expected}` };
     } else {
       dryRun = this.d.infra.dryRun(blackboard.world, { actionType: i.actionType, target: i.target, params: cls.params });
       clock.tick(DRY_RUN_SEC);
       if (!dryRun.ok) {
         status = "rejected_by_dry_run";
         event = "action_dry_run_failed";
-        summary = `${head}: dry run falhou (${dryRun.failureReason})`;
-        refusal = { code: "dry_run_failed", message: `dry run falhou: ${dryRun.failureReason ?? "motivo não informado"}` };
+        summary = `${head}: dry run failed (${dryRun.failureReason})`;
+        refusal = { code: "dry_run_failed", message: `dry run failed: ${dryRun.failureReason ?? "reason not provided"}` };
       } else if (cls.tier === 2) {
         status = "ready";
         event = "action_ready";
-        summary = `${head}: dry run ok (${dryRun.changes.join("; ")}) → pronto, executa com o lote após as decisões`;
+        summary = `${head}: dry run ok (${dryRun.changes.join("; ")}) → ready, runs with the batch after the decisions`;
       } else {
         status = "awaiting_approval";
         event = "approval_requested";
@@ -308,7 +308,7 @@ export class IncidentService {
         };
         store.createApproval(approval);
         action.approvalId = approval.id;
-        summary += ` → aguardando ${approval.id}`;
+        summary += ` → waiting for ${approval.id}`;
       }
       store.saveBlackboard(i.incidentId, { ...blackboard, actions: [...blackboard.actions, action] }, version);
       store.upsertAction(action);
@@ -316,7 +316,7 @@ export class IncidentService {
       this.d.trace.emit(ctx, "mcp_client", { type: "action", payload: { tool: action.actionType, args: actionArgs(action), tier: action.tier } });
       this.d.trace.emit(ctx, "mcp_client", { type: "observation", payload: { tool: action.actionType, ok: refusal === null, summary, evidenceRef: null } });
       if (action.tier === 4) {
-        this.d.trace.emit(ctx, "gate", { type: "critique", payload: { by: "gate", verdict: "blocked", feedback: `${action.actionType} em ${action.target}: ${action.classificationReasons.join("; ")}` } });
+        this.d.trace.emit(ctx, "gate", { type: "critique", payload: { by: "gate", verdict: "blocked", feedback: `${action.actionType} on ${action.target}: ${action.classificationReasons.join("; ")}` } });
       }
       store.appendAudit({
         incidentId: i.incidentId,
@@ -333,7 +333,7 @@ export class IncidentService {
       });
       return { actionId: action.id, tier: action.tier, status: action.status, classificationReasons: action.classificationReasons, dryRun, approvalId: action.approvalId };
     });
-    this.d.logger.info("proposta externa registrada", { incidentId: i.incidentId, event, actionId: result.actionId, tier: result.tier, status: result.status });
+    this.d.logger.info("external proposal recorded", { incidentId: i.incidentId, event, actionId: result.actionId, tier: result.tier, status: result.status });
     if (refusal) throw new UnprocessableError(refusal.code, refusal.message);
     return result;
   }
@@ -341,7 +341,7 @@ export class IncidentService {
   /** Só incidente aguardando aprovação recebe proposta (spec 5.4, regra 1). */
   private requireAcceptingProposals(incident: Incident, bb: Blackboard): void {
     if (incident.status !== "awaiting_approval" || bb.phase !== "awaiting_approval") {
-      throw new ConflictError("incident_not_accepting", "o incidente não aceita propostas neste estado");
+      throw new ConflictError("incident_not_accepting", "the incident does not accept proposals in this state");
     }
   }
 
@@ -369,7 +369,7 @@ export class IncidentService {
   postmortem(id: string): PostmortemDoc {
     this.requireIncident(id);
     const pm = this.d.store.loadBlackboard(id).blackboard.postmortem;
-    if (pm === null) throw new ConflictError("postmortem_not_ready", `o post-mortem do incidente ${id} ainda não foi gerado`);
+    if (pm === null) throw new ConflictError("postmortem_not_ready", `the post-mortem of incident ${id} has not been generated yet`);
     return pm;
   }
 
@@ -379,7 +379,7 @@ export class IncidentService {
 
   private requireIncident(id: string) {
     const incident = this.d.store.getIncident(id);
-    if (!incident) throw new NotFoundError("not_found", `incidente não encontrado: ${id}`);
+    if (!incident) throw new NotFoundError("not_found", `incident not found: ${id}`);
     return incident;
   }
 
@@ -397,10 +397,10 @@ export class IncidentService {
     const startedAt = clock.now().toISOString();
     const t0 = Date.now();
     store.recordRun({ id: runId, incidentId, startedAt, endedAt: null, outcome: null });
-    log.info("execução iniciada", { event: "run_started", phase: blackboard.phase });
+    log.info("run started", { event: "run_started", phase: blackboard.phase });
     /** Fecha a linha em runs com o nome do erro (nunca fica sem fim) e devolve o erro para quem relança. */
     const failRun = (e: unknown, msg: string): unknown => {
-      store.recordRun({ id: runId, incidentId, startedAt, endedAt: clock.now().toISOString(), outcome: `erro: ${(e as Error)?.name ?? "desconhecido"}`.slice(0, 60) });
+      store.recordRun({ id: runId, incidentId, startedAt, endedAt: clock.now().toISOString(), outcome: `error: ${(e as Error)?.name ?? "unknown"}`.slice(0, 60) });
       log.error(msg, { event: "run_failed", error: (e as Error)?.name, latencyMs: Date.now() - t0 });
       return e;
     };
@@ -418,21 +418,21 @@ export class IncidentService {
       for await (const state of stream) {
         last = state;
         if (!signal.aborted && Date.now() - t0 > this.d.runTimeoutMs) {
-          deadline.abort(new DOMException(`a execução passou de ${this.d.runTimeoutMs} ms`, "TimeoutError"));
+          deadline.abort(new DOMException(`the run exceeded ${this.d.runTimeoutMs} ms`, "TimeoutError"));
         }
         if (signal.aborted) throw signal.reason;
       }
     } catch (e) {
       if (e instanceof GraphRecursionError) {
-        stop = { reason: "recursion_limit", detail: `a invocação passou do limite de ${limits.recursionLimit} supersteps do grafo` };
+        stop = { reason: "recursion_limit", detail: `the invocation exceeded the graph limit of ${limits.recursionLimit} supersteps` };
       } else if (signal.aborted) {
-        stop = { reason: "timeout", detail: `a execução passou de ${this.d.runTimeoutMs} ms` };
+        stop = { reason: "timeout", detail: `the run exceeded ${this.d.runTimeoutMs} ms` };
       } else {
-        throw failRun(e, "execução interrompida por erro");
+        throw failRun(e, "run interrupted by an error");
       }
     }
     if (stop) {
-      log.warn("execução escalada fora do grafo", { event: "run_escalated", reason: stop.reason });
+      log.warn("run escalated outside the graph", { event: "run_escalated", reason: stop.reason });
       last = { ...last, escalation: stop };
       last = { ...last, ...(await this.d.direct.escalation(last, config)) };
       last = { ...last, ...(await this.d.direct.reporter(last, config)) };
@@ -442,10 +442,10 @@ export class IncidentService {
     try {
       status = this.persist(incidentId, last, version, ctx);
     } catch (e) {
-      throw failRun(e, "gravação final da execução falhou");
+      throw failRun(e, "final save of the run failed");
     }
     store.recordRun({ id: runId, incidentId, startedAt, endedAt: clock.now().toISOString(), outcome: status });
-    log.info("execução terminada", { event: "run_finished", outcome: status, latencyMs: Date.now() - t0 });
+    log.info("run finished", { event: "run_finished", outcome: status, latencyMs: Date.now() - t0 });
     return last;
   }
 

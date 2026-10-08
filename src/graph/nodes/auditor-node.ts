@@ -15,7 +15,7 @@ import type { NodeFn } from "../run-context.ts";
 export function createAuditorNode(d: { llm: LlmProvider; trace: TraceSink; scenarios: ScenarioRepository; limits: Limits }): NodeFn {
   return async (state, config) => {
     const ctx = runContextOf(state, config);
-    if (state.plan === null || state.diagnosis === null) throw new Error("auditor acionado sem plano ou sem diagnóstico");
+    if (state.plan === null || state.diagnosis === null) throw new Error("auditor invoked without a plan or a diagnosis");
     const scenario = d.scenarios.get(state.scenarioId, { offsetSec: state.timeOffsetSec });
     const checks = runAuditorRules(state.plan, {
       inventory: state.world.inventory ?? scenario.inventory,
@@ -26,9 +26,9 @@ export function createAuditorNode(d: { llm: LlmProvider; trace: TraceSink; scena
     const llmVerdict = r.success ? r.data.verdict : null;
     const { verdict, overridden } = combineAuditorVerdict(checks, llmVerdict);
     const failed = checks.filter((c) => !c.passed).map((c) => c.rule);
-    let feedback = r.success ? r.data.feedback : `modelo indisponível (${r.error.kind}); veredito pelas regras`;
-    if (failed.length > 0) feedback += ` | regras falhas: ${failed.join(", ")}`;
-    if (overridden) feedback += " | veredito do modelo sobrescrito pelas regras";
+    let feedback = r.success ? r.data.feedback : `model unavailable (${r.error.kind}); verdict by the rules`;
+    if (failed.length > 0) feedback += ` | failed rules: ${failed.join(", ")}`;
+    if (overridden) feedback += " | model verdict overridden by the rules";
     feedback = clip(feedback, 600);
 
     d.trace.emit(ctx, "auditor", { type: "critique", payload: { by: "auditor", verdict, feedback, overridden } }, llmInfoOf(auditorPrompt, r));
@@ -39,8 +39,8 @@ export function createAuditorNode(d: { llm: LlmProvider; trace: TraceSink; scena
       payload: {
         from: "auditor",
         to: backToPlanner ? "remediation_planner" : "supervisor",
-        brief: backToPlanner ? clip(`revise o plano: ${feedback}`, 400) : `plano revisão ${state.planRevision} ${verdict === "approve" ? "aprovado" : "com revisões esgotadas"} (${passed} de ${checks.length} regras ok)`,
-        reason: overridden ? "regras em código reprovaram o plano apesar do modelo" : `veredito ${verdict === "approve" ? "aprovado" : "revisar"}`,
+        brief: backToPlanner ? clip(`revise the plan: ${feedback}`, 400) : `plan revision ${state.planRevision} ${verdict === "approve" ? "approved" : "with revisions exhausted"} (${passed} of ${checks.length} rules ok)`,
+        reason: overridden ? "rules in code rejected the plan despite the model" : `verdict ${verdict === "approve" ? "approved" : "revise"}`,
       },
     });
     return { audit: { verdict, feedback, checks, llmVerdict, overridden }, phase: "planning" };

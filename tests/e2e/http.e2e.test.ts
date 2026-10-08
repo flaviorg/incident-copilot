@@ -132,7 +132,7 @@ test("decision codes: 401, 422, 400, 200, 409", async () => {
   assert.deepEqual((await get(a, "/approvals")).json().map((x: { id: string }) => x.id), ["APR-0001"]);
   assert.equal((await post(a, "/approvals/APR-0001/decision", { decision: "approve", approver: "ana" })).statusCode, 401);
   const wrong = await post(a, "/approvals/APR-0001/decision", { decision: "approve", approver: "ana" }, { "x-approval-token": "errado-errado-errado" });
-  assert.deepEqual([wrong.statusCode, wrong.json().error.code, wrong.json().error.message], [401, "invalid_token", "token de aprovação inválido ou ausente"]);
+  assert.deepEqual([wrong.statusCode, wrong.json().error.code, wrong.json().error.message], [401, "invalid_token", "invalid or missing approval token"]);
   const ambiguous = await post(a, "/approvals/APR-0001/decision", { text: "sim, mas espera", approver: "ana" }, { "x-approval-token": TOKEN });
   assert.deepEqual([ambiguous.statusCode, ambiguous.json().error.code], [422, "ambiguous_decision"]);
   const both = await post(a, "/approvals/APR-0001/decision", { decision: "approve", text: "sim", approver: "ana" }, { "x-approval-token": TOKEN });
@@ -255,7 +255,7 @@ test("the audit trail returned by the API can be verified by the client (prevHas
       // incidentId vem da URL; o resto do corpo do hash vem da própria resposta.
       const body = { id: r.id, ts: r.ts, incidentId, actor: r.actor, event: r.event, tier: r.tier, details: r.details };
       assert.equal(r.hash, sha256Hex(r.prevHash + "\n" + canonicalJson(body)), r.id);
-      if (i > 0) assert.equal(r.prevHash, rows[i - 1]!.hash, `${r.id} encadeia na linha anterior do mesmo incidente`);
+      if (i > 0) assert.equal(r.prevHash, rows[i - 1]!.hash, `${r.id} chains to the previous row of the same incident`);
     }
   }
 });

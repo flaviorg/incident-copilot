@@ -38,7 +38,7 @@ const EXCERPT_MAX = 400;
 function requireList(data: Record<string, string | string[]>, key: string, file: string): string[] {
   const v = data[key];
   if (!Array.isArray(v) || v.length === 0) {
-    throw new ValidationError(`runbook ${file}: frontmatter sem lista "${key}"`, [{ path: `${file}:${key}`, message: "lista obrigatória" }]);
+    throw new ValidationError(`runbook ${file}: frontmatter without list "${key}"`, [{ path: `${file}:${key}`, message: "list required" }]);
   }
   return v;
 }
@@ -46,7 +46,7 @@ function requireList(data: Record<string, string | string[]>, key: string, file:
 function requireString(data: Record<string, string | string[]>, key: string, file: string): string {
   const v = data[key];
   if (typeof v !== "string" || v.trim() === "") {
-    throw new ValidationError(`runbook ${file}: frontmatter sem "${key}"`, [{ path: `${file}:${key}`, message: "texto obrigatório" }]);
+    throw new ValidationError(`runbook ${file}: frontmatter without "${key}"`, [{ path: `${file}:${key}`, message: "text required" }]);
   }
   return v;
 }
@@ -95,7 +95,7 @@ export class RunbookRepository {
       }
     }
     flush();
-    if (sections.length === 0) throw new ValidationError(`runbook ${file}: nenhuma seção "## "`, [{ path: file, message: "sem seções" }]);
+    if (sections.length === 0) throw new ValidationError(`runbook ${file}: no "## " section`, [{ path: file, message: "no sections" }]);
     return sections;
   }
 

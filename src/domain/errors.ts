@@ -45,7 +45,7 @@ export class UnprocessableError extends Error {
 
 export class AuthError extends Error {
   readonly code = "invalid_token";
-  constructor(message = "token de aprovação inválido ou ausente") {
+  constructor(message = "invalid or missing approval token") {
     super(message);
     this.name = "AuthError";
   }
@@ -53,7 +53,7 @@ export class AuthError extends Error {
 
 export class LockedError extends Error {
   readonly code = "approvals_locked";
-  constructor(message = "decisões bloqueadas temporariamente por excesso de tentativas de token") {
+  constructor(message = "decisions temporarily locked after too many token attempts") {
     super(message);
     this.name = "LockedError";
   }
@@ -61,7 +61,7 @@ export class LockedError extends Error {
 
 export class ApprovalsDisabledError extends Error {
   readonly code = "approvals_disabled";
-  constructor(message = "aprovações desativadas: APPROVAL_TOKEN não configurado") {
+  constructor(message = "approvals disabled: APPROVAL_TOKEN is not configured") {
     super(message);
     this.name = "ApprovalsDisabledError";
   }
@@ -98,8 +98,8 @@ export class UnscriptedLlmCallError extends Error {
     matchKeys: Record<string, unknown>; turnsTotal: number; turnsConsumed: number;
   }) {
     super(
-      `chamada de LLM sem turno roteirizado: cenário ${d.scenarioId}, prompt ${d.prompt}, chamada nº ${d.callNumber}, ` +
-      `chaves ${JSON.stringify(d.matchKeys)}, digest ${d.inputDigest}, turnos deste prompt ${d.turnsConsumed}/${d.turnsTotal} consumidos`,
+      `LLM call without a scripted turn: scenario ${d.scenarioId}, prompt ${d.prompt}, call #${d.callNumber}, ` +
+      `keys ${JSON.stringify(d.matchKeys)}, digest ${d.inputDigest}, turns of this prompt ${d.turnsConsumed}/${d.turnsTotal} consumed`,
     );
     this.name = "UnscriptedLlmCallError";
     this.scenarioId = d.scenarioId;
@@ -119,7 +119,7 @@ export class FixturePromptDriftError extends Error {
   readonly expected: string | null;
   readonly actual: string;
   constructor(d: { prompt: string; expected: string | null; actual: string }) {
-    super(`o prompt ${d.prompt} mudou desde a fixture (registrado ${d.expected ?? "ausente"}, atual ${d.actual}); rode npm run fixtures:rehash e revise o diff`);
+    super(`prompt ${d.prompt} changed since the fixture (recorded ${d.expected ?? "missing"}, current ${d.actual}); run npm run fixtures:rehash and review the diff`);
     this.name = "FixturePromptDriftError";
     this.prompt = d.prompt;
     this.expected = d.expected;

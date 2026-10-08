@@ -31,7 +31,7 @@ function inputOf(bb: Blackboard): SupervisorInput {
       hasAudit: bb.audit !== null,
       verified: bb.verification?.healthy === true,
     },
-    diagnosisSummary: d ? `${d.category} (${CATEGORY_LABELS[d.category]}), confiança ${CONFIDENCE_LABELS[d.confidence]}: ${d.hypothesis}` : null,
+    diagnosisSummary: d ? `${d.category} (${CATEGORY_LABELS[d.category]}), ${CONFIDENCE_LABELS[d.confidence]} confidence: ${d.hypothesis}` : null,
     lastHandoffs: bb.supervisor.history.slice(-3).map((h) => ({ from: h.from, to: h.to, brief: h.brief })),
   };
 }
@@ -60,7 +60,7 @@ export function createSupervisorNode(d: { llm: LlmProvider; trace: TraceSink; li
     if (g.coerced) {
       d.trace.emit(ctx, "supervisor", {
         type: "critique",
-        payload: { by: "supervisor_guard", verdict: "coerced", feedback: `escolha ${r.data.next} recusada: ${g.reason}; seguindo ${g.next}` },
+        payload: { by: "supervisor_guard", verdict: "coerced", feedback: `choice ${r.data.next} refused: ${g.reason}; following ${g.next}` },
       });
     }
     d.trace.emit(ctx, "supervisor", { type: "handoff", payload: { from: "supervisor", to: g.next, brief: r.data.brief, reason: r.data.reason } }, llmInfoOf(supervisorPrompt, r));

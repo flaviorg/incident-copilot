@@ -140,7 +140,7 @@ test("rejection cascades to a dependent step that was waiting for its own approv
   assert.deepEqual(r.incident.actions.map((a) => a.status), ["succeeded", "rejected", "cancelled"]);
   const cascaded = c.store.getApproval("APR-0002")!;
   assert.equal(cascaded.status, "rejected");
-  assert.match(cascaded.comment!, /cascata.*APR-0001/);
+  assert.match(cascaded.comment!, /cascade.*APR-0001/);
   assert.equal(r.incident.incident.escalation!.reason, "mitigation_rejected");
   await assert.rejects(approveAs(c, "bia", "APR-0002"), (e) => e instanceof ConflictError && e.code === "approval_not_pending");
 });
@@ -153,7 +153,7 @@ test("failed dry run, open breaker, full limiter and failing canary end as the s
     const base = readFixture("fixtures/llm/deploy-5xx-rollback.json");
     const plan = structuredClone(base.turns.find((t) => t.id === "plan-0")!.output) as RemediationPlan;
     plan.steps[1]!.params = { toVersion: "v9.9.9" };
-    const audit = { verdict: "approve", feedback: "Plano segue o runbook." };
+    const audit = { verdict: "approve", feedback: "Plan follows the runbook." };
     const fixture = patchFixture(base, {
       replace: { "plan-0": { output: plan } },
       insertBefore: { "sup-4": [turn("plan-1", { revision: 1 }, plan, "planner.v1"), turn("aud-1", { revision: 1 }, audit, "auditor.v1"),
@@ -238,7 +238,7 @@ test("a decision sent while the opening run is still going is refused and the in
   });
   const v = await c.incidents.open({ scenarioId: DEPLOY }, { requestId: null });
   assert.ok(during instanceof ConflictError && during.code === "incident_not_accepting", String(during));
-  assert.match((during as ConflictError).message, /execução em andamento/);
+  assert.match((during as ConflictError).message, /run in progress/);
   assert.equal(v.incident.status, "awaiting_approval");
   assert.equal(c.store.getApproval("APR-0001")!.status, "pending");
   assert.ok(!c.store.listAudit(v.incident.id).some((e) => e.event === "approval_approved" || e.event === "action_executed"));
@@ -260,7 +260,7 @@ test("a run whose final save fails still records its end", async () => {
   const runs = c.store.listRuns(incidentIdOfStore(c));
   assert.equal(runs.length, 1);
   assert.notEqual(runs[0]!.endedAt, null);
-  assert.equal(runs[0]!.outcome, "erro: ConflictError");
+  assert.equal(runs[0]!.outcome, "error: ConflictError");
 });
 
 const incidentIdOfStore = (c: TestContainer) => c.store.listIncidents({ limit: 1 })[0]!.id;

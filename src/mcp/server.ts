@@ -29,14 +29,14 @@ let closed = false;
 const shutdown = async (why: string) => {
   if (closed) return;
   closed = true;
-  c.logger.info("mcp encerrando", { reason: why });
+  c.logger.info("mcp shutting down", { reason: why });
   await server.close().catch(() => {});
   c.close();
 };
-transport.onclose = () => void shutdown("transporte fechado");
-process.stdin.once("end", () => void shutdown("stdin encerrado"));
+transport.onclose = () => void shutdown("transport closed");
+process.stdin.once("end", () => void shutdown("stdin ended"));
 process.once("SIGINT", () => void shutdown("SIGINT"));
 process.once("SIGTERM", () => void shutdown("SIGTERM"));
 
 await server.connect(transport);
-c.logger.info("mcp pronto", { server: "incident-copilot", transport: "stdio", provider: config.llmProvider });
+c.logger.info("mcp ready", { server: "incident-copilot", transport: "stdio", provider: config.llmProvider });

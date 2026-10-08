@@ -40,8 +40,8 @@ export type ReporterDeps = {
 
 const EXECUTED: readonly GatedAction["status"][] = ["succeeded", "reverted"];
 const TEMPLATE = "template";
-const APPROVAL_STATUS_LABELS: Record<Approval["status"], string> = { pending: "pendente", approved: "aprovada", rejected: "rejeitada", expired: "expirada" };
-const VERDICT_LABELS: Record<string, string> = { approve: "aprovado", revise: "pede revisão", reject: "reprovado", coerced: "escolha corrigida", blocked: "bloqueado" };
+const APPROVAL_STATUS_LABELS: Record<Approval["status"], string> = { pending: "pending", approved: "approved", rejected: "rejected", expired: "expired" };
+const VERDICT_LABELS: Record<string, string> = { approve: "approved", revise: "asks for revision", reject: "rejected", coerced: "choice corrected", blocked: "blocked" };
 
 /** resolvedAt = horário do último canário saudável no trace; sem ele, agora. */
 function resolvedAtOf(events: TraceEvent[], now: Date): string {
@@ -52,27 +52,27 @@ function resolvedAtOf(events: TraceEvent[], now: Date): string {
 /** Linha do tempo determinística: só texto gerado por código (sem brief do LLM), a partir do trace e das aprovações. */
 function buildTimeline(bb: Blackboard, events: TraceEvent[], approvals: Approval[], impactStartedAt: string): { ts: string; text: string }[] {
   const items: { ts: string; text: string }[] = [
-    { ts: impactStartedAt, text: "início do impacto: primeira amostra acima do limiar do alerta" },
-    { ts: bb.alert.detectedAt, text: `alerta disparado: ${bb.alert.rule}` },
+    { ts: impactStartedAt, text: "impact start: first sample above the alert threshold" },
+    { ts: bb.alert.detectedAt, text: `alert fired: ${bb.alert.rule}` },
   ];
   for (const e of events) {
     if (e.type === "handoff") items.push({ ts: e.ts, text: `${AGENT_LABELS[e.payload.from]} → ${AGENT_LABELS[e.payload.to]}` });
-    else if (e.type === "plan") items.push({ ts: e.ts, text: `plano revisão ${e.payload.revision} com ${e.payload.steps.length} passos` });
+    else if (e.type === "plan") items.push({ ts: e.ts, text: `plan revision ${e.payload.revision} with ${e.payload.steps.length} ${e.payload.steps.length === 1 ? "step" : "steps"}` });
     else if (e.type === "critique" && e.payload.by === "auditor") items.push({ ts: e.ts, text: `auditor: ${VERDICT_LABELS[e.payload.verdict]}` });
-    else if (e.type === "critique" && e.payload.by === "canary") items.push({ ts: e.ts, text: `canário: ${e.payload.feedback}` });
-    else if (e.type === "critique" && e.payload.by === "gate") items.push({ ts: e.ts, text: `portão: ${VERDICT_LABELS[e.payload.verdict]}` });
+    else if (e.type === "critique" && e.payload.by === "canary") items.push({ ts: e.ts, text: `canary: ${e.payload.feedback}` });
+    else if (e.type === "critique" && e.payload.by === "gate") items.push({ ts: e.ts, text: `gate: ${VERDICT_LABELS[e.payload.verdict]}` });
     else if (e.type === "observation" && (e.agent === "executor" || e.agent === "verifier")) {
-      items.push({ ts: e.ts, text: `${AGENT_LABELS[e.agent]}: ${e.payload.tool} ${e.payload.ok ? "concluída" : "não concluída"}` });
+      items.push({ ts: e.ts, text: `${AGENT_LABELS[e.agent]}: ${e.payload.tool} ${e.payload.ok ? "completed" : "not completed"}` });
     } else if (e.type === "answer" && e.payload.kind === "escalation") {
-      items.push({ ts: e.ts, text: `escalado: ${bb.escalation ? ESCALATION_LABELS[bb.escalation.reason] : "motivo não registrado"}` });
+      items.push({ ts: e.ts, text: `escalated: ${bb.escalation ? ESCALATION_LABELS[bb.escalation.reason] : "reason not recorded"}` });
     }
   }
   for (const a of approvals) {
     const action = bb.actions.find((x) => x.id === a.actionId);
-    items.push({ ts: a.requestedAt, text: `aprovação ${a.id} pedida${action ? ` para ${action.actionType}` : ""}` });
+    items.push({ ts: a.requestedAt, text: `approval ${a.id} requested${action ? ` for ${action.actionType}` : ""}` });
     if (a.decidedAt) {
-      const by = a.decisionSource === "expiry" ? "por expiração" : a.approver ? `por ${a.approver}` : "";
-      items.push({ ts: a.decidedAt, text: `aprovação ${a.id} ${APPROVAL_STATUS_LABELS[a.status]} ${by}`.trim() });
+      const by = a.decisionSource === "expiry" ? "by expiry" : a.approver ? `by ${a.approver}` : "";
+      items.push({ ts: a.decidedAt, text: `approval ${a.id} ${APPROVAL_STATUS_LABELS[a.status]} ${by}`.trim() });
     }
   }
   return items.map((t, i) => ({ ...t, i })).sort((x, y) => x.ts.localeCompare(y.ts) || x.i - y.i).map(({ ts, text }) => ({ ts, text }));
@@ -87,12 +87,12 @@ function peakErrorRate(s: LoadedScenario, from: string, to: string): number | nu
 }
 
 function factsOf(m: IncidentMetrics, peak: number | null): string[] {
-  const f = [`MTTD: ${formatForNarrative(m.mttdMin)} min (medido)`];
-  if (m.mttrMin !== null) f.push(`MTTR: ${formatForNarrative(m.mttrMin)} min (medido, do início do impacto à verificação)`);
-  f.push(`tempo aguardando aprovação humana: ${formatForNarrative(m.timeAwaitingApprovalMin)} min (medido)`);
-  if (peak !== null) f.push(`pico da taxa de erro 5xx: ${formatForNarrative(peak * 100)}% (medido)`);
-  if (m.monthlySavingsUsd > 0) f.push(`economia mensal das ações executadas: US$ ${formatForNarrative(m.monthlySavingsUsd, 2)} (derivado)`);
-  f.push(`linha de base sintética de MTTR: ${formatForNarrative(m.baselineMttrMin.low)} a ${formatForNarrative(m.baselineMttrMin.high)} min (premissa ilustrativa)`);
+  const f = [`MTTD: ${formatForNarrative(m.mttdMin)} min (measured)`];
+  if (m.mttrMin !== null) f.push(`MTTR: ${formatForNarrative(m.mttrMin)} min (measured, from impact start to verification)`);
+  f.push(`time waiting for human approval: ${formatForNarrative(m.timeAwaitingApprovalMin)} min (measured)`);
+  if (peak !== null) f.push(`peak 5xx error rate: ${formatForNarrative(peak * 100)}% (measured)`);
+  if (m.monthlySavingsUsd > 0) f.push(`monthly savings from executed actions: US$ ${formatForNarrative(m.monthlySavingsUsd, 2)} (derived)`);
+  f.push(`synthetic MTTR baseline: ${formatForNarrative(m.baselineMttrMin.low)} to ${formatForNarrative(m.baselineMttrMin.high)} min (illustrative assumption)`);
   return f;
 }
 
@@ -127,7 +127,7 @@ export function createReporterNode(d: ReporterDeps): NodeFn {
     const peak = peakErrorRate(scenario, metrics.impactStartedAt, resolvedAt ?? now.toISOString());
     const pmActions: PostmortemDoc["actions"] = state.actions.map((a) => {
       const ap = a.approvalId ? approvals.find((x) => x.id === a.approvalId) : undefined;
-      const decidedBy = ap?.decisionSource === "expiry" ? "expiração" : (ap?.approver ?? null);
+      const decidedBy = ap?.decisionSource === "expiry" ? "expiry" : (ap?.approver ?? null);
       return { actionType: a.actionType, tier: a.tier, status: a.status, decidedBy };
     });
     const status: PostmortemDoc["status"] = resolved ? "final" : "partial";
@@ -165,7 +165,7 @@ export function createReporterNode(d: ReporterDeps): NodeFn {
         });
         const check = checkNarrative([r.data.summary, r.data.rootCauseNarrative, ...r.data.prevention].join("\n"), allowed);
         if (!check.passed) {
-          d.trace.emit(ctx, "reporter", { type: "critique", payload: { by: "numeric_guard", verdict: "reject", feedback: `números sem origem: ${check.rejected.join(", ")}` } }, llmInfoOf(postmortemPrompt, r));
+          d.trace.emit(ctx, "reporter", { type: "critique", payload: { by: "numeric_guard", verdict: "reject", feedback: `numbers without a source: ${check.rejected.join(", ")}` } }, llmInfoOf(postmortemPrompt, r));
           narrative = template();
           numericGuard = { passed: false, rejectedNumbers: check.rejected, usedTemplate: true };
         } else {

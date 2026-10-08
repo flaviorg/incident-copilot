@@ -38,6 +38,6 @@ export function fixtureFiles(root = PROJECT_ROOT): string[] {
 
 if (import.meta.main) {
   const changes = rehashFixtures(fixtureFiles(), ALL_PROMPTS);
-  if (changes.length === 0) console.log("nenhum hash mudou");
-  for (const c of changes) console.log(`${relative(PROJECT_ROOT, c.file)} ${c.prompt} ${c.old ?? "(ausente)"} -> ${c.next}`);
+  if (changes.length === 0) console.log("no hash changed");
+  for (const c of changes) console.log(`${relative(PROJECT_ROOT, c.file)} ${c.prompt} ${c.old ?? "(missing)"} -> ${c.next}`);
 }

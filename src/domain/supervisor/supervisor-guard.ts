@@ -17,13 +17,13 @@ const needsTelemetry = (bb: Blackboard, limits: Limits) =>
  */
 export function preEscalation(bb: Blackboard, limits: Limits): { reason: EscalationReason; detail: string } | null {
   if (bb.supervisor.iterations > limits.teamMaxIterations) {
-    return { reason: "team_cap_reached", detail: `supervisor acionado ${bb.supervisor.iterations} vezes; o teto da equipe é ${limits.teamMaxIterations}` };
+    return { reason: "team_cap_reached", detail: `supervisor invoked ${bb.supervisor.iterations} times; the team cap is ${limits.teamMaxIterations}` };
   }
   if (bb.diagnosis?.capReached) {
-    return { reason: "react_cap_low_confidence", detail: `o analista atingiu o teto de ${limits.reactMaxSteps} passos sem conclusão` };
+    return { reason: "react_cap_low_confidence", detail: `the analyst reached the cap of ${limits.reactMaxSteps} steps without a conclusion` };
   }
   if (bb.diagnosis?.confidence === "low" && bb.telemetryRuns >= limits.maxTelemetryRuns) {
-    return { reason: "low_confidence_diagnosis", detail: `diagnóstico ainda com confiança baixa depois de ${bb.telemetryRuns} rodadas do analista` };
+    return { reason: "low_confidence_diagnosis", detail: `diagnosis still at low confidence after ${bb.telemetryRuns} analyst rounds` };
   }
   return null;
 }
@@ -33,26 +33,26 @@ function violation(target: SupervisorTarget, bb: Blackboard, limits: Limits): st
   switch (target) {
     case "telemetry_analyst":
       if (needsTelemetry(bb, limits)) return null;
-      if (bb.diagnosis?.capReached) return "o analista já atingiu o teto de passos";
-      if (bb.diagnosis?.confidence === "low") return `o analista já rodou ${bb.telemetryRuns} vezes, o máximo permitido`;
-      return "já existe diagnóstico com confiança média ou alta";
+      if (bb.diagnosis?.capReached) return "the analyst already reached the step cap";
+      if (bb.diagnosis?.confidence === "low") return `the analyst already ran ${bb.telemetryRuns} times, the maximum allowed`;
+      return "a diagnosis with medium or high confidence already exists";
     case "runbook_retriever":
-      if (!confident(bb)) return "falta diagnóstico com confiança média ou alta";
-      if (bb.runbookSearchDone) return "a busca de runbooks já foi feita e não se repete";
+      if (!confident(bb)) return "missing a diagnosis with medium or high confidence";
+      if (bb.runbookSearchDone) return "the runbook search was already done and is not repeated";
       return null;
     case "remediation_planner":
-      if (!confident(bb)) return "falta diagnóstico com confiança média ou alta";
-      if (!bb.runbookSearchDone) return "a busca de runbooks ainda não foi feita";
-      if (bb.plan !== null) return "já existe plano";
+      if (!confident(bb)) return "missing a diagnosis with medium or high confidence";
+      if (!bb.runbookSearchDone) return "the runbook search has not been done yet";
+      if (bb.plan !== null) return "a plan already exists";
       return null;
     case "gate":
-      if (bb.plan === null) return "não há plano";
-      if (bb.audit === null) return "o plano ainda não foi auditado";
-      if (bb.actions.length > 0) return "o portão já processou este plano";
+      if (bb.plan === null) return "there is no plan";
+      if (bb.audit === null) return "the plan has not been audited yet";
+      if (bb.actions.length > 0) return "the remediation gate already processed this plan";
       return null;
     case "reporter":
       if (bb.verification?.healthy === true || bb.escalation !== null) return null;
-      return "a recuperação ainda não foi verificada";
+      return "recovery has not been verified yet";
   }
 }
 

@@ -46,7 +46,7 @@ export class FakeLlmProvider implements LlmProvider {
 
   constructor(o: { fixtures: FixtureFile[] }) {
     for (const f of o.fixtures) {
-      if (this.files.has(f.scenarioId)) throw new Error(`fixture duplicada para o cenário ${f.scenarioId}`);
+      if (this.files.has(f.scenarioId)) throw new Error(`duplicate fixture for scenario ${f.scenarioId}`);
       this.files.set(f.scenarioId, f);
     }
   }
@@ -96,19 +96,19 @@ export class FakeLlmProvider implements LlmProvider {
     // Regra 6: atraso abortável pelo sinal da chamada.
     if (found.delayMs !== undefined && found.delayMs > 0) {
       const finished = await sleep(found.delayMs, ctx.signal);
-      if (!finished) return llmFailure("aborted", `chamada abortada durante o atraso simulado do turno ${found.id}`, FAKE_MODEL);
+      if (!finished) return llmFailure("aborted", `call aborted during the simulated delay of turn ${found.id}`, FAKE_MODEL);
     } else if (ctx.signal.aborted) {
-      return llmFailure("aborted", `chamada abortada antes da resposta do turno ${found.id}`, FAKE_MODEL);
+      return llmFailure("aborted", `call aborted before the response of turn ${found.id}`, FAKE_MODEL);
     }
 
     // Regra 5: falha simulada.
-    if (found.error) return llmFailure(found.error.kind, `falha simulada pela fixture (turno ${found.id})`, FAKE_MODEL);
+    if (found.error) return llmFailure(found.error.kind, `failure simulated by the fixture (turn ${found.id})`, FAKE_MODEL);
 
     // Regra 4: a saída passa pelo schema como se viesse do modelo.
     const parsed = prompt.outputSchema.safeParse(found.output);
     if (!parsed.success) {
-      const where = parsed.error.issues.map((i) => i.path.map(String).join(".") || "(raiz)").join(", ");
-      return llmFailure("invalid_output", `saída do turno ${found.id} não passa no schema de ${prompt.version} em ${where}`, FAKE_MODEL);
+      const where = parsed.error.issues.map((i) => i.path.map(String).join(".") || "(root)").join(", ");
+      return llmFailure("invalid_output", `output of turn ${found.id} does not match the ${prompt.version} schema at ${where}`, FAKE_MODEL);
     }
 
     // Regra 7: uso do turno ou estimado; custo 0.
@@ -130,7 +130,7 @@ export class FakeLlmProvider implements LlmProvider {
       if (o.scenarioId !== undefined && f.scenarioId !== o.scenarioId) continue;
       for (const t of f.turns) if (!this.consumed.has(turnKey(f.scenarioId, t.id)) && !except.has(t.id)) left.push(t.id);
     }
-    if (left.length > 0) throw new Error(`turnos de fixture não consumidos: ${left.join(", ")}`);
+    if (left.length > 0) throw new Error(`fixture turns not consumed: ${left.join(", ")}`);
   }
 
   /** Registro de entradas (regra 9, só teste). */

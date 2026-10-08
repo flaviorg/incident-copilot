@@ -44,9 +44,9 @@ test("unknown scenario", () => {
   assert.throws(() => repo.get("nope"), (e) => e instanceof NotFoundError && e.code === "scenario_not_found");
   assert.throws(() => repo.get("../fixtures"), (e) => e instanceof NotFoundError && e.code === "scenario_not_found");
   // A mensagem só repete um id bem formado; o resto (caminho, aspas, texto enorme) não volta para quem chamou.
-  assert.throws(() => repo.get("nope"), { message: "cenário não encontrado: nope" });
-  assert.throws(() => repo.get("../fixtures"), { message: "cenário não encontrado (id fora do formato)" });
-  assert.throws(() => repo.get("x".repeat(65)), { message: "cenário não encontrado (id fora do formato)" });
+  assert.throws(() => repo.get("nope"), { message: "scenario not found: nope" });
+  assert.throws(() => repo.get("../fixtures"), { message: "scenario not found (id out of format)" });
+  assert.throws(() => repo.get("x".repeat(65)), { message: "scenario not found (id out of format)" });
 });
 
 test("invalid scenario file names the file and the field", () => {
@@ -60,7 +60,7 @@ test("invalid scenario file names the file and the field", () => {
     writeFileSync(join(tmp, "broken", "signals.json"), JSON.stringify({ start: "2026-10-04T00:00:00.000Z", durationSec: 60, resolutionSec: 30, series: {} }));
     assert.throws(() => new ScenarioRepository({ rootDir: tmp }).get("broken"),
       (e) => e instanceof ValidationError && /scenario\.json/.test(e.message) && /alert/.test(e.message));
-    writeFileSync(join(tmp, "broken", "scenario.json"), "{ não é json");
+    writeFileSync(join(tmp, "broken", "scenario.json"), "{ not json");
     assert.throws(() => new ScenarioRepository({ rootDir: tmp }).get("broken"),
       (e) => e instanceof ValidationError && /scenario\.json/.test(e.message));
   } finally {
@@ -69,8 +69,8 @@ test("invalid scenario file names the file and the field", () => {
 });
 
 test("transform is applied", () => {
-  const r = new ScenarioRepository({ rootDir: "fixtures/scenarios", transform: (s) => ({ ...s, summary: { ...s.summary, title: "título trocado" } }) });
-  assert.equal(r.get("deploy-5xx-rollback").summary.title, "título trocado");
+  const r = new ScenarioRepository({ rootDir: "fixtures/scenarios", transform: (s) => ({ ...s, summary: { ...s.summary, title: "replaced title" } }) });
+  assert.equal(r.get("deploy-5xx-rollback").summary.title, "replaced title");
 });
 
 test("SimulatedClock ticks and aligns; SystemClock does not tick", () => {

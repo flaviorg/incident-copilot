@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "scenarioId": "deploy-5xx-rollback",
   "promptHashes": {
-    "supervisor.v1": "sha256:f45bf8a54925bd700e25b547f937ef117d20b04481f7ff6f79282eb0ec5f5079",
-    "telemetry-react.v1": "sha256:ff2dca7f412cf4d3b9b8c332192bfca06fec99e8d111bbb223a4d9762e13d715",
-    "planner.v1": "sha256:cda4e9c0ecc4e06f434a71cf0ff0ce677b361546674b0aed6ac71b96bba096b5",
-    "auditor.v1": "sha256:9810ccb2343e7142aebbc25b42c173dd209e18b9263d62bbdb2ed5ac101c86d5",
-    "postmortem.v1": "sha256:cf433bc53207974b67b94ea94e72202cc47cbbd896fa94254c4666077fa39e14"
+    "supervisor.v1": "sha256:a24255b023aa0ef32a43ca948d5b986cbf2793c8800d26e3a7a3ef94a7ec1bca",
+    "telemetry-react.v1": "sha256:fcb01add11343d95372a338d7c1665bb069ecc739483b3f19cb203051f9cdc26",
+    "planner.v1": "sha256:d78ea090bba8a5f1bd03fa5dab7603256621697afa2b298a3e5e77ebfe44545b",
+    "auditor.v1": "sha256:b3962f64bb97da3181b544047156221ed186ef35d27277398e5d37155519c7ce",
+    "postmortem.v1": "sha256:6db385526780cf1020cf6b246fffe293dc345957a173ca658e636b6c9c2932da"
   },
   "turns": [
     {
@@ -16,10 +16,10 @@
         "kind": "final"
       },
       "output": {
-        "summary": "O rollback resolveu o incidente e houve 20% de melhoria na estabilidade.",
-        "rootCauseNarrative": "Deploy com defeito no formatador de preços.",
+        "summary": "The rollback resolved the incident and there was a 20% improvement in stability.",
+        "rootCauseNarrative": "Faulty deploy in the price formatter.",
         "prevention": [
-          "Rollout gradual com canário."
+          "Gradual rollout with a canary."
         ]
       }
     }

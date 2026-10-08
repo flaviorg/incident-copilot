@@ -40,8 +40,8 @@ const RUNNABLE: readonly GatedAction["status"][] = ["ready", "approved"];
 
 function escalationDetail(actions: GatedAction[]): string {
   const mitigating = actions.filter((a) => isMitigating(a.actionType));
-  if (mitigating.length === 0) return "nenhuma ação mitigadora executada: o lote não tinha ação mitigadora";
-  return clip(`nenhuma ação mitigadora executada: ${mitigating.map((a) => `${a.actionType} ${ACTION_STATUS_LABELS[a.status]}`).join(", ")}`, 400);
+  if (mitigating.length === 0) return "no mitigating action executed: the batch had no mitigating action";
+  return clip(`no mitigating action executed: ${mitigating.map((a) => `${a.actionType} ${ACTION_STATUS_LABELS[a.status]}`).join(", ")}`, 400);
 }
 
 export function createExecutorNode(d: ExecutionDeps): NodeFn {
@@ -56,8 +56,8 @@ export function createExecutorNode(d: ExecutionDeps): NodeFn {
         type: "handoff",
         payload: {
           from: "human", to: "executor",
-          brief: `decisões registradas: ${count("approved")} aprovada(s), ${count("rejected")} rejeitada(s), ${count("expired")} expirada(s)`,
-          reason: "todas as aprovações do lote foram decididas; a execução do lote pode começar",
+          brief: `decisions recorded: ${count("approved")} approved, ${count("rejected")} rejected, ${count("expired")} expired`,
+          reason: "all approvals in the batch were decided; batch execution can start",
         },
       });
     }
@@ -82,7 +82,7 @@ export function createExecutorNode(d: ExecutionDeps): NodeFn {
       if (blocker !== undefined) {
         const dep = actions.find((x) => x.order === blocker);
         a.status = "cancelled";
-        a.resultSummary = `cancelada: depende do passo ${blocker} (${dep ? ACTION_STATUS_LABELS[dep.status] : "inexistente"})`;
+        a.resultSummary = `cancelled: depends on step ${blocker} (${dep ? ACTION_STATUS_LABELS[dep.status] : "nonexistent"})`;
         observe(a, false, a.resultSummary);
         d.persist.action(a);
         audit(a, "action_cancelled", { dependsOn: a.dependsOn });
@@ -90,7 +90,7 @@ export function createExecutorNode(d: ExecutionDeps): NodeFn {
       }
       if (!d.guards.breaker.canExecute(now)) {
         a.status = "blocked_circuit_open";
-        a.resultSummary = "não executada: circuit breaker aberto";
+        a.resultSummary = "not executed: circuit breaker open";
         observe(a, false, a.resultSummary);
         d.persist.action(a);
         audit(a, "action_blocked_circuit_open");
@@ -99,13 +99,13 @@ export function createExecutorNode(d: ExecutionDeps): NodeFn {
       const permit = d.guards.limiter.tryAcquire(a.actionType, a.target, now);
       if (!permit.ok) {
         a.status = "throttled";
-        a.resultSummary = permit.reason === "global" ? "não executada: limite global de execuções por minuto" : "não executada: a mesma ação já rodou neste alvo há pouco";
+        a.resultSummary = permit.reason === "global" ? "not executed: global limit of executions per minute" : "not executed: the same action already ran on this target recently";
         observe(a, false, a.resultSummary);
         d.persist.action(a);
         audit(a, "action_throttled", { limit: permit.reason });
         continue;
       }
-      if (!isExecutable(a.actionType)) throw new Error(`ação ${a.id} (${a.actionType}) pronta sem estar no catálogo: defeito do portão`);
+      if (!isExecutable(a.actionType)) throw new Error(`action ${a.id} (${a.actionType}) ready without being in the catalog: gate defect`);
 
       d.trace.emit(ctx, "executor", { type: "action", payload: { tool: a.actionType, args: actionArgs(a), tier: a.tier } });
       const r = d.infra.execute(world, { actionType: a.actionType, target: a.target, params: a.params }, scenario);
@@ -126,7 +126,7 @@ export function createExecutorNode(d: ExecutionDeps): NodeFn {
         if (d.guards.breaker.recordFailure(d.clock.now())) {
           d.persist.audit({
             incidentId: state.incidentId, actor: "system:circuit-breaker", event: "circuit_opened", tier: null,
-            details: { cause: `falha de execução de ${a.actionType} em ${a.target}`, requestId: ctx.requestId },
+            details: { cause: `execution failure of ${a.actionType} on ${a.target}`, requestId: ctx.requestId },
           });
         }
       }

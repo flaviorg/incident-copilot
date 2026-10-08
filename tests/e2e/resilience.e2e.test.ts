@@ -27,7 +27,7 @@ test("504 run_timeout with a real abort", async () => {
   const t0 = Date.now();
   const r = await post(buildServer(c), "/incidents", { scenarioId: "deploy-5xx-rollback" });
   assert.deepEqual([r.statusCode, r.json().error.code], [504, "run_timeout"]);
-  assert.ok(Date.now() - t0 < 1000, "a resposta não espera o turno lento terminar");
+  assert.ok(Date.now() - t0 < 1000, "the response does not wait for the slow turn to finish");
   assert.equal(c.incidents.get("INC-0001").incident.escalation!.reason, "timeout");
   assert.equal(c.incidents.postmortem("INC-0001").status, "partial");
 });
@@ -53,5 +53,5 @@ test("RUN_TIMEOUT_MS is a ceiling even when the run never yields to the event lo
   assert.deepEqual([r.statusCode, r.json().error.code], [504, "run_timeout"]);
   assert.equal(c.incidents.get("INC-0001").incident.escalation!.reason, "timeout");
   assert.equal(c.incidents.postmortem("INC-0001").status, "partial");
-  assert.ok(c.logs.some((l) => l.includes("\"run_escalated\"")), "o escalonamento fora do grafo fica no log");
+  assert.ok(c.logs.some((l) => l.includes("\"run_escalated\"")), "the escalation outside the graph is logged");
 });

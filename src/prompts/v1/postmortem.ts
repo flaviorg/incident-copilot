@@ -1,5 +1,5 @@
-// postmortem.v1: o modelo só redige a narrativa de um incidente resolvido; os números vêm calculados e um guarda
-// numérico descarta a narrativa que trouxer número sem origem (corrige o ROI inventado da 213441).
+// postmortem.v1: the model only writes the narrative of a resolved incident; the numbers come precomputed and a numeric
+// guard discards a narrative that brings a number with no source (fixes the invented ROI from 213441).
 import * as z from "zod";
 import { ActionStatusSchema, DiagnosisSchema, PostmortemNarrativeSchema } from "../../contracts/index.ts";
 import type { PostmortemNarrative } from "../../contracts/index.ts";
@@ -16,23 +16,23 @@ export const PostmortemInputSchema = z.object({
 });
 export type PostmortemInput = z.infer<typeof PostmortemInputSchema>;
 
-const SYSTEM = `Você redige a narrativa de um post-mortem sem culpa: descreve o sistema e as decisões, nunca pessoas.
+const SYSTEM = `You write the narrative of a blameless post-mortem: describe the system and the decisions, never people.
 
-Regras:
-1. Use somente números que aparecem nos fatos, na linha do tempo ou nas evidências do diagnóstico. Não invente porcentagens, durações, valores nem contagens.
-2. Um guarda numérico confere cada número; se algum não tiver origem, a narrativa é descartada e um texto padrão entra no lugar.
-3. "summary": o que aconteceu, o impacto e como foi resolvido (até 800 caracteres).
-4. "rootCauseNarrative": a causa raiz e as evidências que a sustentam (até 1200 caracteres).
-5. "prevention": de 1 a 6 ações de prevenção concretas, cada uma com até 200 caracteres.
-6. Escreva em português.
+Rules:
+1. Use only numbers that appear in the facts, the timeline or the diagnosis evidence. Do not invent percentages, durations, amounts or counts.
+2. A numeric guard checks every number; if any has no source, the narrative is discarded and a standard text takes its place.
+3. "summary": what happened, the impact and how it was resolved (up to 800 characters).
+4. "rootCauseNarrative": the root cause and the evidence that supports it (up to 1200 characters).
+5. "prevention": 1 to 6 concrete prevention actions, each up to 200 characters.
+6. Write in English, with a decimal point and no thousands separators (11.2, not 11,2).
 
-Responda somente com um objeto JSON com os campos summary, rootCauseNarrative e prevention.`;
+Reply only with a JSON object with the fields summary, rootCauseNarrative and prevention.`;
 
 export const postmortemPrompt: PromptDef<PostmortemInput, PostmortemNarrative> = {
   id: "postmortem",
   version: "postmortem.v1",
   system: SYSTEM,
-  buildUser: (i) => `Fatos calculados, linha do tempo, diagnóstico e ações (JSON):\n${jsonOf(PostmortemInputSchema, i)}`,
+  buildUser: (i) => `Computed facts, timeline, diagnosis and actions (JSON):\n${jsonOf(PostmortemInputSchema, i)}`,
   matchKeys: (i) => ({ kind: i.kind }),
   inputSchema: PostmortemInputSchema,
   outputSchema: PostmortemNarrativeSchema,

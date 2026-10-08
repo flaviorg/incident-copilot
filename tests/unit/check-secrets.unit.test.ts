@@ -20,7 +20,7 @@ test("the repository is clean", () => {
 
 test("findings carry path and line, never the value", () => {
   const value = "sk-or-v1-" + "b".repeat(32);
-  const found = scanText(["primeira linha", `chave: ${value}`].join("\n"), "docs/x.md");
+  const found = scanText(["first line", `key: ${value}`].join("\n"), "docs/x.md");
   assert.deepEqual(found.map((f) => [f.path, f.line]), [["docs/x.md", 2]]);
   assert.ok(!JSON.stringify(found).includes(value));
 });

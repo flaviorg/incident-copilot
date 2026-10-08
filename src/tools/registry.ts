@@ -28,7 +28,7 @@ export interface ToolRegistry {
 }
 
 const MAX_OBSERVATION_CHARS = 600;
-const TRUNCATED_SUFFIX = " (truncado)";
+const TRUNCATED_SUFFIX = " (truncated)";
 
 export function truncateSummary(text: string, max = MAX_OBSERVATION_CHARS): string {
   if (text.length <= max) return text;
@@ -40,7 +40,7 @@ export function scenarioScope(s: LoadedScenario): string | null {
   return s.file.service ?? s.file.account;
 }
 
-export const NO_DATA = "serviço sem dados neste cenário";
+export const NO_DATA = "no data for this service in this scenario";
 
 export function createToolRegistry(o: { prices: CloudPrices }): ToolRegistry {
   const tools: Tool<unknown>[] = [
@@ -54,21 +54,21 @@ export function createToolRegistry(o: { prices: CloudPrices }): ToolRegistry {
   return {
     names: () => tools.map((t) => t.name),
     describeForPrompt: () =>
-      tools.map((t) => `- ${t.name}: ${t.description}\n  parâmetros (JSON Schema): ${JSON.stringify(z.toJSONSchema(t.paramsSchema))}`).join("\n"),
+      tools.map((t) => `- ${t.name}: ${t.description}\n  parameters (JSON Schema): ${JSON.stringify(z.toJSONSchema(t.paramsSchema))}`).join("\n"),
     run(name, args, ctx) {
       const tool = byName.get(name);
       if (!tool) {
-        return { ok: false, summary: truncateSummary(`ferramenta desconhecida: ${name}. Disponíveis: ${[...byName.keys()].join(", ")}`), evidenceRef: null };
+        return { ok: false, summary: truncateSummary(`unknown tool: ${name}. Available: ${[...byName.keys()].join(", ")}`), evidenceRef: null };
       }
       const parsed = parseWithIssues(tool.paramsSchema, args);
       if (!parsed.success) {
-        return { ok: false, summary: truncateSummary(`argumentos inválidos para ${name}: ${formatIssues(parsed.issues)}`), evidenceRef: null };
+        return { ok: false, summary: truncateSummary(`invalid arguments for ${name}: ${formatIssues(parsed.issues)}`), evidenceRef: null };
       }
       try {
         const r = tool.run(parsed.data, ctx);
         return { ...r, summary: truncateSummary(r.summary) };
       } catch (e) {
-        return { ok: false, summary: truncateSummary(`falha ao executar ${name}: ${(e as Error).message}`), evidenceRef: null };
+        return { ok: false, summary: truncateSummary(`failed to run ${name}: ${(e as Error).message}`), evidenceRef: null };
       }
     },
   };

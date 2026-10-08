@@ -1,22 +1,22 @@
 ---
 id: postgres-connection-exhaustion
-title: Esgotamento de conexões com o Postgres
+title: Postgres connection exhaustion
 service: [orders-api, payments-api]
 category: [dependency_failure, capacity]
 ---
 
-## Sintomas
+## Symptoms
 
-Erros 5xx intermitentes e latência alta em serviços que dependem do Postgres. Os logs mostram timeouts ao obter conexão do pool ou recusas por excesso de conexões. O uso do pool fica perto do máximo configurado.
+Intermittent 5xx errors and high latency in services that depend on Postgres. The logs show timeouts while acquiring a connection from the pool or refusals due to too many connections. Pool usage stays close to the configured maximum.
 
-## Diagnóstico
+## Diagnosis
 
-Confira o número de conexões ativas no banco e o tamanho máximo do pool de cada serviço. Verifique se há consultas lentas segurando conexões ou se um aumento de réplicas multiplicou as conexões sem ajuste do pool. Se o problema começou junto com uma mudança, revise a configuração do pool nessa mudança.
+Check the number of active connections in the database and the maximum pool size of each service. See whether slow queries are holding connections or whether an increase in replicas multiplied the connections without a pool adjustment. If the problem started together with a change, review the pool configuration in that change.
 
-## Mitigação
+## Mitigation
 
-Reduza o pool por réplica ou coloque um pooler de conexões na frente do banco. Encerre consultas presas que seguram conexões por muito tempo. Escale o banco só depois de confirmar que o gargalo é de capacidade.
+Shrink the pool per replica or put a connection pooler in front of the database. Kill stuck queries that hold connections for a long time. Scale the database only after confirming that the bottleneck is capacity.
 
-## Prevenção
+## Prevention
 
-Monitore o uso do pool e alerte acima de 80%. Defina timeouts de consulta e de obtenção de conexão. Faça testes de carga com o número real de réplicas de produção.
+Monitor pool usage and alert above 80%. Set query and connection-acquisition timeouts. Run load tests with the real number of production replicas.

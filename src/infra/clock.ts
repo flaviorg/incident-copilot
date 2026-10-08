@@ -27,7 +27,7 @@ export class SimulatedClock implements Clock {
     return new Date(this.currentMs);
   }
   tick(seconds: number): void {
-    if (!Number.isFinite(seconds) || seconds < 0) throw new RangeError(`tick inválido: ${seconds}`);
+    if (!Number.isFinite(seconds) || seconds < 0) throw new RangeError(`invalid tick: ${seconds}`);
     this.currentMs += Math.round(seconds * 1000);
   }
   alignTo(scenarioDetectedAt: Date): Date {

@@ -45,7 +45,7 @@ A War Room precisa de `npm run web:install` uma vez, antes de `typecheck:web`, `
 - **Fixture muda junto com prompt.** Mudou um `system` em `src/prompts/v1`? Rode `npm run fixtures:rehash`. Mudou entrada ou fluxo? Ajuste os turnos. Detalhes em `docs/fake-provider.md`.
 - **Golden só muda de propósito.** Rode `npm run regen` e revise o diff antes de aceitar.
 - **Não teste texto livre de LLM por igualdade.** Afirme estrutura, enums, estado e números.
-- **Idiomas.** Identificadores em inglês; texto para pessoas em pt-BR.
+- **Idiomas.** Identificadores e texto para pessoas (CLI, API, MCP, post-mortem, War Room, prompts e roteiros do fake) em inglês, com números no formato en-US; `docs/` e `specs/` podem ficar em pt-BR.
 - **Dependência nova exige justificativa** e versão exata.
 - **Não publique nada.** Sem `git push`, `npm publish`, repositório remoto ou disparo do Pages sem aval do dono. Não rode `npm run setup:hooks` enquanto a pasta estiver dentro de outro repositório Git.
 - **Falha real vira nota.** Registre em `docs/incidents/notes.md`, com data, sintoma e causa. Nunca invente.

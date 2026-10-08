@@ -42,11 +42,11 @@ export function loadDataFile<T>(path: string, schema: z.ZodType<T>): T {
   try {
     raw = JSON.parse(readFileSync(path, "utf8"));
   } catch (e) {
-    throw new ValidationError(`arquivo de dados ${file} ilegível ou não é JSON (${(e as Error).message})`, [{ path: file, message: "JSON inválido" }]);
+    throw new ValidationError(`data file ${file} unreadable or not JSON (${(e as Error).message})`, [{ path: file, message: "invalid JSON" }]);
   }
   const r = parseWithIssues(schema, raw);
   if (!r.success) {
-    throw new ValidationError(`arquivo de dados ${file} inválido em ${formatIssues(r.issues)}`, r.issues.map((i) => ({ path: `${file}:${i.path}`, message: i.message })));
+    throw new ValidationError(`data file ${file} invalid at ${formatIssues(r.issues)}`, r.issues.map((i) => ({ path: `${file}:${i.path}`, message: i.message })));
   }
   return r.data;
 }

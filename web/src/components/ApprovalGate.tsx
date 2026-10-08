@@ -9,9 +9,9 @@ import { TierBadge } from "./TierBadge.tsx";
 const BLOCKED: readonly GatedAction["status"][] = ["blocked_forbidden", "blocked_unknown"];
 
 function statusText(a: GatedAction, approval: Approval | undefined): string {
-  if (a.status === "awaiting_approval" && approval) return `aguardando ${approval.id} (${APPROVAL_STATUS_LABELS[approval.status]})`;
-  if (a.status === "ready") return "pronto: executa depois de todas as decisões";
-  if (BLOCKED.includes(a.status)) return "bloqueado sem dry run";
+  if (a.status === "awaiting_approval" && approval) return `awaiting ${approval.id} (${APPROVAL_STATUS_LABELS[approval.status]})`;
+  if (a.status === "ready") return "ready: runs after all decisions";
+  if (BLOCKED.includes(a.status)) return "blocked without dry run";
   return ACTION_STATUS_LABELS[a.status];
 }
 
@@ -27,34 +27,34 @@ export function ApprovalGate({ actions, approvals, onDecide }: {
   const steps = [...actions].sort((x, y) => x.order - y.order);
   return (
     <section className="panel" aria-labelledby="gate-title">
-      <h2 id="gate-title" tabIndex={-1}>Portão de aprovação</h2>
+      <h2 id="gate-title" tabIndex={-1}>Approval gate</h2>
       <ol className="gate-steps">
         {steps.map((a) => {
           const approval = approvals.find((x) => x.id === a.approvalId);
           return (
             <li key={a.id} className="gate-step">
               <p className="gate-step-head">
-                <span className="step-order">{`Passo ${a.order}`}</span> <code>{a.actionType}</code> <TierBadge tier={a.tier} />
+                <span className="step-order">{`Step ${a.order}`}</span> <code>{a.actionType}</code> <TierBadge tier={a.tier} />
               </p>
-              <p className="muted">{`alvo: ${a.target}${a.proposedBy === "mcp_client" ? " · proposto por cliente MCP" : ""}`}</p>
+              <p className="muted">{`target: ${a.target}${a.proposedBy === "mcp_client" ? " · proposed by MCP client" : ""}`}</p>
               <p>{statusText(a, approval)}</p>
-              {a.dryRun ? <p className="dry-run">{`dry run ${a.dryRun.ok ? "ok" : "falhou"}: ${a.dryRun.ok ? a.dryRun.changes.join("; ") : (a.dryRun.failureReason ?? "")}`}</p> : null}
-              {BLOCKED.includes(a.status) ? <p className="step-blocked">{`motivo: ${a.classificationReasons.join("; ")}`}</p> : null}
+              {a.dryRun ? <p className="dry-run">{`dry run ${a.dryRun.ok ? "ok" : "failed"}: ${a.dryRun.ok ? a.dryRun.changes.join("; ") : (a.dryRun.failureReason ?? "")}`}</p> : null}
+              {BLOCKED.includes(a.status) ? <p className="step-blocked">{`reason: ${a.classificationReasons.join("; ")}`}</p> : null}
             </li>
           );
         })}
       </ol>
       {pending.length > 0 && onDecide ? (
         <div className="gate-decision">
-          <p>{`Decisão para ${pending.map((a) => a.id).join(", ")}. Vale para todas as aprovações pendentes do lote.`}</p>
+          <p>{`Decision for ${pending.map((a) => a.id).join(", ")}. Applies to all pending approvals in the batch.`}</p>
           <div className="gate-buttons">
-            <button ref={approveRef} type="button" className="button-primary" onClick={() => setDialog("approve")}>Aprovar</button>
-            <button ref={rejectRef} type="button" className="button-danger" onClick={() => setDialog("reject")}>Rejeitar</button>
+            <button ref={approveRef} type="button" className="button-primary" onClick={() => setDialog("approve")}>Approve</button>
+            <button ref={rejectRef} type="button" className="button-danger" onClick={() => setDialog("reject")}>Reject</button>
           </div>
         </div>
       ) : null}
       {pending.length === 0 && approvals.length > 0 ? (
-        <p className="gate-decided">{`Aprovações: ${approvals.map((a) => `${a.id} ${APPROVAL_STATUS_LABELS[a.status]}`).join(", ")}`}</p>
+        <p className="gate-decided">{`Approvals: ${approvals.map((a) => `${a.id} ${APPROVAL_STATUS_LABELS[a.status]}`).join(", ")}`}</p>
       ) : null}
       <ApprovalDialog
         open={dialog !== null}

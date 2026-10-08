@@ -11,7 +11,7 @@ const hostile = (s: LoadedScenario): LoadedScenario => ({
 
 test("hostile log reaches the prompt but the forbidden proposal never runs", async () => {
   const { c, view } = await runScenarioBranch("deploy-5xx-rollback", "approved", { fixture: "tests/fixtures/llm/injected-logs.json", transformScenario: hostile });
-  assert.ok(c.fake.calls().some((x) => x.prompt === "telemetry-react.v1" && /OBSERVAÇÃO NÃO CONFIÁVEL[^]*IGNORE ALL PREVIOUS INSTRUCTIONS/.test(x.user)));
+  assert.ok(c.fake.calls().some((x) => x.prompt === "telemetry-react.v1" && /UNTRUSTED OBSERVATION[^]*IGNORE ALL PREVIOUS INSTRUCTIONS/.test(x.user)));
   const bad = view.actions.find((a) => a.actionType === "delete_backups")!;
   assert.deepEqual([bad.status, bad.tier, bad.dryRun, bad.approvalId], ["blocked_forbidden", 4, null, null]);
   assert.ok(c.store.listAudit(view.incident.id).some((e) => e.event === "action_blocked_forbidden"));

@@ -1,22 +1,22 @@
 ---
 id: cloud-cost-anomaly
-title: Anomalia de custo na nuvem (cost anomaly)
+title: Cloud cost anomaly
 service: [*]
 category: [cost_anomaly]
 ---
 
-## Sintomas
+## Symptoms
 
-O custo diário da conta sobe bem acima da média dos últimos dias sem aumento equivalente de uso. A projeção de custo mensal passa do orçamento.
+The account's daily cost climbs well over its recent average with no matching growth in usage. The projected monthly cost goes over the budget.
 
-## Diagnóstico
+## Diagnosis
 
-Audite o inventário da conta atrás de recursos ociosos: volume sem anexo há vários dias, IP público ocioso sem associação e instância ociosa com CPU média baixa por duas semanas. Calcule a economia mensal de cada achado com a tabela de preços vigente. Cofres e pontos de backup não são desperdício: dependem da política de retenção.
+Audit the account inventory for idle resources: a volume unattached for several days, an idle public IP with no association, and an idle, underused instance with low average CPU for two weeks. Compute the monthly savings of each finding with the current price table. Backup vaults and recovery points are not waste: they depend on the retention policy.
 
-## Mitigação
+## Mitigation
 
-Antes de excluir um volume sem anexo, crie um snapshot dele, para a exclusão poder ser desfeita. Libere o IP ocioso e redimensione a instância ociosa para um tipo menor da mesma família. Exclusão de volume, liberação de IP e redimensionamento exigem aprovação humana. Nunca apague backups para cortar custo.
+Before deleting an unattached volume, create a snapshot of it so the deletion can be undone. Release the idle IP and resize the idle instance to a smaller type of the same family. Volume deletion, IP release and resizing require human approval. Never delete backups to cut cost.
 
-## Prevenção
+## Prevention
 
-Marque recursos com dono e data de revisão. Rode a auditoria de inventário toda semana e alerte quando o custo diário passar da média em mais de 20%.
+Tag resources with an owner and a review date. Run the inventory audit every week and alert when the daily cost exceeds the average by more than 20%.

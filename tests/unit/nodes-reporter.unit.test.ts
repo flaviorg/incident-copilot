@@ -33,7 +33,7 @@ test("invented number falls back to the template with a numeric_guard critique",
   assert.equal(out.postmortem!.status, "final");
   assert.doesNotMatch(out.postmortem!.summary, /20%/);
   const cr = c.store.listTrace(incidentIdOf(c), { type: "critique" }).at(-1)!;
-  assert.deepEqual([cr.payload.by, cr.payload.verdict, cr.payload.feedback], ["numeric_guard", "reject", "números sem origem: 20%"]);
+  assert.deepEqual([cr.payload.by, cr.payload.verdict, cr.payload.feedback], ["numeric_guard", "reject", "numbers without a source: 20%"]);
 });
 
 test("valid narrative is kept", async () => {
@@ -44,7 +44,7 @@ test("valid narrative is kept", async () => {
   assert.deepEqual(pm.numericGuard, { passed: true, rejectedNumbers: [], usedTemplate: false });
   assert.deepEqual(pm.generatedBy, { provider: "fake", model: "fake/scripted", promptVersion: "postmortem.v1" });
   assert.equal(pm.status, "final");
-  assert.match(pm.summary, /11,2 min/);
+  assert.match(pm.summary, /11\.2 min/);
   assert.equal(out.phase, "done");
   // Números calculados, não redigidos pelo LLM.
   assert.equal(out.metrics!.resolvedAt, "2026-10-04T09:51:41.000Z");
@@ -57,7 +57,7 @@ test("valid narrative is kept", async () => {
   // Linha do tempo determinística, em ordem, com aprovação e canário.
   assert.ok(pm.timeline.every((t, i) => i === 0 || t.ts >= pm.timeline[i - 1]!.ts));
   assert.ok(pm.timeline.some((t) => /APR-0001.*ana/.test(t.text)));
-  assert.ok(pm.timeline.some((t) => /canário/.test(t.text)));
+  assert.ok(pm.timeline.some((t) => /canary/.test(t.text)));
   assert.equal(pm.impact.peakErrorRate !== null && pm.impact.peakErrorRate > 0.09, true);
   const answer = c.store.listTrace(incidentIdOf(c), { type: "answer" }).at(-1)!;
   assert.deepEqual([answer.agent, answer.payload.kind, answer.payload.text], ["reporter", "postmortem", pm.summary]);
@@ -83,19 +83,19 @@ test("escalated incident gets a partial report without calling the LLM", async (
   assert.equal(c.fake.calls().filter((x) => x.prompt === "postmortem.v1").length, 0);
   assert.deepEqual(out.postmortem!.generatedBy, { provider: "fake", model: "template", promptVersion: "template" });
   assert.deepEqual(out.postmortem!.numericGuard, { passed: true, rejectedNumbers: [], usedTemplate: true });
-  assert.deepEqual(out.postmortem!.escalation, { reason: "team_cap_reached", detail: "teste: team_cap_reached" });
+  assert.deepEqual(out.postmortem!.escalation, { reason: "team_cap_reached", detail: "test: team_cap_reached" });
   assert.equal(out.metrics!.mttrMin, null);
-  assert.match(out.postmortem!.summary, /escalado/);
+  assert.match(out.postmortem!.summary, /escalated/);
 });
 
 test("LLM metrics include the post-mortem call itself", async () => {
   const c = createTestContainer();
   const out = await createReporterNode(rpd(c))(verifiedDeployState(c));
   const calls = c.store.listLlmCalls(incidentIdOf(c));
-  assert.equal(calls.at(-1)!.promptVersion, "postmortem.v1", "a chamada da narrativa fica registrada");
+  assert.equal(calls.at(-1)!.promptVersion, "postmortem.v1", "the narrative call is recorded");
   const m = out.metrics!;
   assert.equal(m.llmCalls, calls.length);
   assert.equal(m.promptTokens, calls.reduce((s, x) => s + x.promptTokens, 0));
   assert.equal(m.completionTokens, calls.reduce((s, x) => s + x.completionTokens, 0));
-  assert.deepEqual(out.postmortem!.metrics, m, "o post-mortem guarda as mesmas métricas do blackboard");
+  assert.deepEqual(out.postmortem!.metrics, m, "the post-mortem keeps the same metrics as the blackboard");
 });

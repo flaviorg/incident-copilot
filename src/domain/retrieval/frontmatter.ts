@@ -3,7 +3,7 @@
 export class FrontmatterError extends Error {
   readonly line: number;
   constructor(message: string, line: number) {
-    super(`frontmatter inválido na linha ${line}: ${message}`);
+    super(`invalid frontmatter at line ${line}: ${message}`);
     this.name = "FrontmatterError";
     this.line = line;
   }
@@ -21,24 +21,24 @@ export function parseFrontmatter(md: string): { data: Record<string, string | st
   const lines = md.replace(/\r\n/g, "\n").split("\n");
   if (lines[0]?.trim() !== FENCE) return { data: {}, body: md };
   const close = lines.findIndex((l, i) => i > 0 && l.trim() === FENCE);
-  if (close === -1) throw new FrontmatterError("cerca de fechamento --- ausente", lines.length);
+  if (close === -1) throw new FrontmatterError("missing closing --- fence", lines.length);
 
   const data: Record<string, string | string[]> = {};
   for (let i = 1; i < close; i++) {
     const lineNo = i + 1;
     const line = lines[i]!;
     if (line.trim() === "" || line.trimStart().startsWith("#")) continue;
-    if (/^\s/.test(line)) throw new FrontmatterError("linha indentada (mapas aninhados não são aceitos)", lineNo);
+    if (/^\s/.test(line)) throw new FrontmatterError("indented line (nested maps are not accepted)", lineNo);
     const m = KEY_VALUE.exec(line);
     if (!m) throw new FrontmatterError("esperava 'chave: valor'", lineNo);
     const key = m[1]!;
     const raw = m[2]!.trim();
     if (key in data) throw new FrontmatterError(`chave repetida: ${key}`, lineNo);
-    if (raw.startsWith("{")) throw new FrontmatterError("mapas aninhados não são aceitos", lineNo);
+    if (raw.startsWith("{")) throw new FrontmatterError("nested maps are not accepted", lineNo);
     if (raw.startsWith("[")) {
-      if (!raw.endsWith("]")) throw new FrontmatterError("lista sem ] de fechamento", lineNo);
+      if (!raw.endsWith("]")) throw new FrontmatterError("list without a closing ]", lineNo);
       const inner = raw.slice(1, -1).trim();
-      if (inner.includes("[") || inner.includes("{")) throw new FrontmatterError("listas aninhadas não são aceitas", lineNo);
+      if (inner.includes("[") || inner.includes("{")) throw new FrontmatterError("nested lists are not accepted", lineNo);
       data[key] = inner === "" ? [] : inner.split(",").map((s) => unquote(s.trim())).filter((s) => s !== "");
     } else {
       data[key] = unquote(raw);

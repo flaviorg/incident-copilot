@@ -26,7 +26,7 @@ test("escalation set by any node wins", () => {
 test("supervisor routes to the target of its last decision", () => {
   assert.equal(afterSupervisor(bb({ supervisor: { iterations: 2, history: [decided("telemetry_analyst"), decided("runbook_retriever")] } })), "runbook_retriever");
   assert.equal(afterSupervisor(bb({ supervisor: { iterations: 1, history: [decided("reporter")] } })), "reporter");
-  assert.throws(() => afterSupervisor(bb()), /sem decisão/);
+  assert.throws(() => afterSupervisor(bb()), /neither a decision nor an escalation/);
 });
 
 test("auditor loops at most maxPlanRevisions times", () => {

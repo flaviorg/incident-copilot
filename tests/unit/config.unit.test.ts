@@ -43,9 +43,9 @@ test("the Node version is pinned where tools read it", () => {
   const engines = (JSON.parse(readFileSync("package.json", "utf8")) as { engines: { node: string } }).engines.node;
   const [eMajor, eMinor] = minor(engines);
   const [nMajor, nMinor] = minor(readFileSync(".nvmrc", "utf8"));
-  assert.ok(Number.isInteger(nMajor) && Number.isInteger(nMinor), ".nvmrc precisa de major.minor");
-  assert.ok(nMajor! > eMajor! || (nMajor === eMajor && nMinor! >= eMinor!), `.nvmrc abaixo de engines (${engines})`);
+  assert.ok(Number.isInteger(nMajor) && Number.isInteger(nMinor), ".nvmrc needs major.minor");
+  assert.ok(nMajor! > eMajor! || (nMajor === eMajor && nMinor! >= eMinor!), `.nvmrc below engines (${engines})`);
   assert.match(existsSync(".npmrc") ? readFileSync(".npmrc", "utf8") : "", /^engine-strict=true$/m);
   const [pMajor, pMinor] = minor(process.versions.node);
-  assert.ok(pMajor! > eMajor! || (pMajor === eMajor && pMinor! >= eMinor!), `Node ${process.versions.node} abaixo de engines`);
+  assert.ok(pMajor! > eMajor! || (pMajor === eMajor && pMinor! >= eMinor!), `Node ${process.versions.node} below engines`);
 });

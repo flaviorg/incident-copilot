@@ -3,7 +3,7 @@
 import { ReadToolNameSchema } from "../../contracts/index.ts";
 import { EXECUTABLE_ACTIONS, EXECUTABLE_ACTION_TYPES, FORBIDDEN_ACTIONS, REASONS } from "./catalog.ts";
 
-const yesNo = (b: boolean) => (b ? "sim" : "não");
+const yesNo = (b: boolean) => (b ? "yes" : "no");
 const code = (s: string) => `\`${s}\``;
 
 export function renderAutonomyMatrix(): string {
@@ -14,41 +14,41 @@ export function renderAutonomyMatrix(): string {
       return `| ${tier} | ${code(t)} | ${code(a.targetPattern)} | ${code(a.paramsText)} | ${yesNo(a.mitigates)} | ${yesNo(a.reversible)} | ${a.durationSec} s |`;
     });
   const lines = [
-    "# Matriz de Autonomia",
+    "# Autonomy Matrix",
     "",
-    "> Arquivo gerado a partir de `src/domain/autonomy/catalog.ts` por `node scripts/gen-autonomy-doc.ts` (também roda em `npm run regen`). Não edite à mão: o teste `docs-matrix.unit.test.ts` falha se este arquivo divergir do catálogo.",
+    "> File generated from `src/domain/autonomy/catalog.ts` by `node scripts/gen-autonomy-doc.ts` (also runs in `npm run regen`). Do not edit by hand: the `docs-matrix.unit.test.ts` test fails if this file diverges from the catalog.",
     "",
-    "A faixa de cada passo vem do catálogo e de regras de contexto que só sobem a faixa, nunca descem. A saída do modelo não tem campo de faixa.",
+    "The tier of each step comes from the catalog and from context rules that only raise the tier, never lower it. The model output has no tier field.",
     "",
-    "## Faixas",
+    "## Tiers",
     "",
-    "| Faixa | Regra | O que entra |",
+    "| Tier | Rule | What belongs here |",
     "|---|---|---|",
-    `| Faixa 1: decide sozinho | Leitura, risco zero | Ferramentas ${ReadToolNameSchema.options.map(code).join(", ")} |`,
-    `| Faixa 2: decide e registra | Mudança reversível ou sem efeito no serviço, com auditoria | ${byTier(2).map(code).join(", ")} |`,
-    `| Faixa 3: exige aprovação humana | Destrutivo ou alto impacto | ${byTier(3).map(code).join(", ")} |`,
-    `| Faixa 4: proibido por construção | Expor dados, apagar auditoria ou backup, desligar controle | ${FORBIDDEN_ACTIONS.map(code).join(", ")} e qualquer tipo fora do catálogo (negar por padrão) |`,
+    `| Tier 1: decides alone | Read-only, zero risk | Tools ${ReadToolNameSchema.options.map(code).join(", ")} |`,
+    `| Tier 2: decides and records | Reversible change or no effect on the service, with audit | ${byTier(2).map(code).join(", ")} |`,
+    `| Tier 3: requires human approval | Destructive or high impact | ${byTier(3).map(code).join(", ")} |`,
+    `| Tier 4: forbidden by construction | Exposing data, deleting audit or backup, disabling controls | ${FORBIDDEN_ACTIONS.map(code).join(", ")} and any type not in the catalog (deny by default) |`,
     "",
-    "## Catálogo de ações executáveis",
+    "## Executable action catalog",
     "",
-    "| Faixa | Tipo | Alvo | Parâmetros | Mitiga | Reversível | Duração simulada |",
+    "| Tier | Type | Target | Parameters | Mitigates | Reversible | Simulated duration |",
     "|---|---|---|---|---|---|---|",
     ...actionRows(2),
     ...actionRows(3),
     "",
-    "Parâmetros fora do schema do catálogo levam o passo a `rejected_invalid_params`, sem dry run.",
+    "Parameters outside the catalog schema move the step to `rejected_invalid_params`, without a dry run.",
     "",
-    "## Regras de contexto (sobem para faixa 3)",
+    "## Context rules (raise to tier 3)",
     "",
-    `- ${REASONS.outOfScope}: o alvo não é o próprio incidente nem pertence ao serviço ou à conta do incidente (raio de impacto).`,
-    `- ${REASONS.noRunbook}: o passo não cita um trecho de runbook (\`runbookRef\` nulo).`,
-    `- ${REASONS.revisionsExhausted}: o plano chegou ao portão com as revisões do auditor esgotadas e veredito final \`revise\`.`,
+    `- ${REASONS.outOfScope}: the target is neither the incident itself nor owned by the incident service or account (blast radius).`,
+    `- ${REASONS.noRunbook}: the step does not cite a runbook passage (null \`runbookRef\`).`,
+    `- ${REASONS.revisionsExhausted}: the plan reached the remediation gate with the auditor revisions exhausted and a final \`revise\` verdict.`,
     "",
-    "## Faixa 4 por construção",
+    "## Tier 4 by construction",
     "",
-    "1. O registro de executores é tipado por `ExecutableActionType`, e os tipos proibidos não pertencem a ele: não existe código que os execute.",
-    "2. `classifyAction` devolve faixa 4 para proibidos e desconhecidos, e o portão bloqueia sem dry run e sem fila de aprovação.",
-    "3. A tabela `audit_log` tem gatilhos que abortam `UPDATE` e `DELETE`, e o store não tem método de remoção.",
+    "1. The executor registry is typed by `ExecutableActionType`, and the forbidden types do not belong to it: no code exists that executes them.",
+    "2. `classifyAction` returns tier 4 for forbidden and unknown types, and the remediation gate blocks them without a dry run and without an approval queue.",
+    "3. The `audit_log` table has triggers that abort `UPDATE` and `DELETE`, and the store has no delete method.",
     "",
   ];
   return lines.join("\n");

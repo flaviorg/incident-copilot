@@ -1,7 +1,7 @@
 {
   "id": "deploy-5xx-rollback",
-  "title": "Taxa de 5xx acima de 5% no orders-api",
-  "summary": "Pico de 5xx e de latência logo após o deploy v3.8.0",
+  "title": "5xx rate above 5% in orders-api",
+  "summary": "5xx and latency spike right after the v3.8.0 deploy",
   "service": "orders-api",
   "account": null,
   "severity": "sev1",
@@ -10,7 +10,7 @@
     "signal": "http_5xx_rate",
     "threshold": 0.05,
     "detectedAt": "2026-10-04T09:42:30.000Z",
-    "rule": "5xx acima de 5% por 2 min"
+    "rule": "5xx above 5% for 2 min"
   },
   "baselines": { "p99_latency_ms": 180 },
   "canary": [

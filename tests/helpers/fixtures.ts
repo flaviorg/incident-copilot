@@ -33,7 +33,7 @@ export function patchFixture(base: FixtureFile, p: FixturePatch): FixtureFile {
   const out = structuredClone(base);
   const ids = new Set(out.turns.map((t) => t.id));
   const need = (id: string) => {
-    if (!ids.has(id)) throw new Error(`patchFixture: turno inexistente ${id}`);
+    if (!ids.has(id)) throw new Error(`patchFixture: unknown turn ${id}`);
   };
   for (const [id, patch] of Object.entries(p.replace ?? {})) {
     need(id);

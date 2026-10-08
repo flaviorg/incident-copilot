@@ -10,7 +10,7 @@ describe("design tokens", () => {
     for (const theme of ["light", "dark"] as const) {
       for (const [fg, bg] of pairs as [string, string][]) {
         const ratio = contrastRatio(tokenHex(css, theme, fg), tokenHex(css, theme, bg));
-        expect(ratio, `${theme}: ${fg} sobre ${bg} = ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);
+        expect(ratio, `${theme}: ${fg} on ${bg} = ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);
       }
     }
   });

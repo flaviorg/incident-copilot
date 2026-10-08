@@ -18,7 +18,7 @@ import { ScenarioRepository } from "../infra/scenarios/scenario-loader.ts";
 import { createContainer } from "./container.ts";
 import type { Container } from "./container.ts";
 
-const DEMO_RECORDER_APPROVER = "operador demo";
+const DEMO_RECORDER_APPROVER = "demo operator";
 
 export type RecordOptions = { fixturesDir?: string };
 type Branch = "approved" | "rejected";
@@ -78,9 +78,9 @@ export async function recordScenarioWithTokens(scenarioId: string, o: RecordOpti
     const rejected = await runBranch(scenarioId, "rejected", o);
     secrets.push(rejected.token);
     if (JSON.stringify(rejected.common) !== JSON.stringify(approved.common)) {
-      throw new Error(`gravação não determinística: o prefixo comum de ${scenarioId} difere entre as execuções`);
+      throw new Error(`non-deterministic recording: the common prefix of ${scenarioId} differs between runs`);
     }
-    if (!rejected.rest) throw new Error(`gravação inconsistente: a execução rejeitada de ${scenarioId} não chegou a uma decisão`);
+    if (!rejected.rest) throw new Error(`inconsistent recording: the rejected run of ${scenarioId} did not reach a decision`);
     branches = { approved: approved.rest, rejected: rejected.rest };
   }
   const recording: DemoRecording = {

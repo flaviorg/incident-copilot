@@ -15,14 +15,14 @@ export async function runToolCommand(argv: string[], io: CliIO): Promise<number>
     throw new UsageError((e as Error).message);
   }
   const name = parsed.positionals[0];
-  if (!name || parsed.positionals.length > 1) throw new UsageError("informe exatamente uma ferramenta: tool <nome> --scenario <id> [--args '<json>']");
+  if (!name || parsed.positionals.length > 1) throw new UsageError("name exactly one tool: tool <name> --scenario <id> [--args '<json>']");
   const scenarioId = parsed.values.scenario;
-  if (!scenarioId) throw new UsageError("faltou --scenario <id>");
+  if (!scenarioId) throw new UsageError("missing --scenario <id>");
   let args: unknown;
   try {
     args = JSON.parse(parsed.values.args ?? "{}");
   } catch {
-    throw new UsageError("--args precisa ser um JSON válido, por exemplo '{\"account\":\"data-platform\"}'");
+    throw new UsageError("--args must be valid JSON, for example '{\"account\":\"data-platform\"}'");
   }
 
   const config = loadConfig({ ...io.env, DB_PATH: ":memory:" }, { forceFake: true });

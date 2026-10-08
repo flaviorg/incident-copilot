@@ -1,14 +1,14 @@
 import * as z from "zod";
 import { MetricWindowSchema } from "../contracts/index.ts";
-import { formatNumberPt, formatTs, hhmm, windowSeconds } from "./format.ts";
+import { formatNumber, formatTs, hhmm, windowSeconds } from "./format.ts";
 import { NO_DATA } from "./registry.ts";
 import type { Tool } from "./registry.ts";
 
 const Params = z.object({
-  service: z.string().min(1).describe("Serviço cujos logs serão lidos"),
-  level: z.enum(["ERROR", "WARN"]).describe("Nível mínimo de interesse"),
-  window: MetricWindowSchema.describe("Janela que termina agora"),
-  limit: z.number().int().min(1).max(5).optional().describe("Máximo de grupos de mensagem (padrão 3)"),
+  service: z.string().min(1).describe("Service whose logs will be read"),
+  level: z.enum(["ERROR", "WARN"]).describe("Minimum level of interest"),
+  window: MetricWindowSchema.describe("Window ending now"),
+  limit: z.number().int().min(1).max(5).optional().describe("Maximum number of message groups (default 3)"),
 });
 
 const MAX_MESSAGE = 160;
@@ -16,7 +16,7 @@ const MAX_MESSAGE = 160;
 export function createQueryLogsTool(): Tool<z.infer<typeof Params>> {
   return {
     name: "query_logs",
-    description: "Use para ver as mensagens de erro ou aviso mais frequentes de um serviço, agrupadas, com contagem e versões.",
+    description: "Use to see a service's most frequent error or warning messages, grouped, with counts and versions.",
     paramsSchema: Params,
     run({ service, level, window, limit = 3 }, { scenario, now }) {
       const ofService = scenario.logs.filter((l) => l.service === service);
@@ -32,7 +32,7 @@ export function createQueryLogsTool(): Tool<z.infer<typeof Params>> {
       const long = windowSeconds(window) > 3600;
       const evidenceRef = `logs:${service}:${level}@${hhmm(fromIso, long)}-${hhmm(toIso, long)}`;
       if (inWindow.length === 0) {
-        return { ok: true, summary: `nenhuma linha ${level} de ${service} na janela de ${window}`, evidenceRef, data: { groups: [] } };
+        return { ok: true, summary: `no ${level} lines for ${service} in the ${window} window`, evidenceRef, data: { groups: [] } };
       }
       const groups = new Map<string, { message: string; count: number; versions: Set<string>; firstTs: string }>();
       for (const l of inWindow) {
@@ -47,9 +47,9 @@ export function createQueryLogsTool(): Tool<z.infer<typeof Params>> {
       const total = sorted.reduce((a, g) => a + g.count, 0);
       const parts = shown.map((g) => {
         const msg = g.message.length > MAX_MESSAGE ? g.message.slice(0, MAX_MESSAGE - 1) + "…" : g.message;
-        return `[${formatNumberPt(g.count, 0)}x, versões ${[...g.versions].sort().join(", ")}, desde ${formatTs(g.firstTs, long)}] ${msg}`;
+        return `[${formatNumber(g.count, 0)}x, versions ${[...g.versions].sort().join(", ")}, since ${formatTs(g.firstTs, long)}] ${msg}`;
       });
-      const summary = `${formatNumberPt(total, 0)} linhas ${level} de ${service} em ${window}, ${sorted.length} grupo(s); mais frequentes: ${parts.join(" | ")}`;
+      const summary = `${formatNumber(total, 0)} ${level} lines for ${service} over ${window}, ${sorted.length} ${sorted.length === 1 ? "group" : "groups"}; most frequent: ${parts.join(" | ")}`;
       return {
         ok: true,
         summary,

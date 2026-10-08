@@ -16,13 +16,13 @@ try {
 const c = createContainer(config);
 const app = buildServer(c);
 await app.listen({ host: config.host, port: config.port });
-c.logger.info("api ouvindo", { host: config.host, port: config.port, provider: config.llmProvider });
+c.logger.info("api listening", { host: config.host, port: config.port, provider: config.llmProvider });
 
 let closing = false;
 const shutdown = async (signal: string) => {
   if (closing) return;
   closing = true;
-  c.logger.info("api encerrando", { signal });
+  c.logger.info("api shutting down", { signal });
   await app.close();
   c.close();
 };

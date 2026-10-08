@@ -42,11 +42,11 @@ test("initial world: deployments with history, inventory and a frozen copy of it
 
 test("rollback dry run, execution, healthy signals and revert", () => {
   const dry = infra.dryRun(w0, rollback);
-  assert.deepEqual(dry, { ok: true, changes: ["deployment/orders-api: v3.8.0 -> v3.7.2 (6 réplicas)"], reversible: true, estimatedDurationSec: 90, failureReason: null });
+  assert.deepEqual(dry, { ok: true, changes: ["deployment/orders-api: v3.8.0 -> v3.7.2 (6 replicas)"], reversible: true, estimatedDurationSec: 90, failureReason: null });
   assert.equal(infra.facts(w0)["deployment.orders-api.version"], "v3.8.0"); // dry run não muda o mundo
   const { world: w1, result } = infra.execute(w0, rollback, deploy);
   assert.equal(result.ok, true);
-  assert.equal(result.summary, "deployment/orders-api: v3.8.0 -> v3.7.2 (6 réplicas)");
+  assert.equal(result.summary, "deployment/orders-api: v3.8.0 -> v3.7.2 (6 replicas)");
   assert.equal(infra.facts(w1)["deployment.orders-api.version"], "v3.7.2");
   assert.ok(Math.max(...infra.postActionSignals(w1, deploy).metrics.http_5xx_rate!) <= 0.05);
   assert.ok(Math.min(...infra.postActionSignals(w0, deploy).metrics.http_5xx_rate!) > 0.05);
@@ -57,27 +57,27 @@ test("rollback dry run, execution, healthy signals and revert", () => {
 });
 
 test("dry run failures", () => {
-  assert.match(infra.dryRun(w0, { actionType: "rollback_deployment", target: "deployment/orders-api", params: { toVersion: "v9.9.9" } }).failureReason!, /v9\.9\.9 não existe no histórico de deploys/);
-  assert.match(infra.dryRun(w0, { actionType: "rollback_deployment", target: "deployment/orders-api", params: { toVersion: "v3.8.0" } }).failureReason!, /já roda v3\.8\.0/);
-  assert.match(infra.dryRun(w0, { actionType: "rollback_deployment", target: "deployment/payments-api", params: { toVersion: "v1" } }).failureReason!, /alvo não encontrado/);
-  assert.match(infra.dryRun(w0, { actionType: "rollback_deployment", target: "image/orders-api:3.8.0", params: { toVersion: "v3.7.2" } }).failureReason!, /alvo não encontrado/);
-  assert.match(infra.dryRun(w0, { actionType: "block_image_tag", target: "image/orders-api:9.9.9", params: {} }).failureReason!, /9\.9\.9 não existe no histórico/);
+  assert.match(infra.dryRun(w0, { actionType: "rollback_deployment", target: "deployment/orders-api", params: { toVersion: "v9.9.9" } }).failureReason!, /version v9\.9\.9 is not in the deploy history/);
+  assert.match(infra.dryRun(w0, { actionType: "rollback_deployment", target: "deployment/orders-api", params: { toVersion: "v3.8.0" } }).failureReason!, /already runs v3\.8\.0/);
+  assert.match(infra.dryRun(w0, { actionType: "rollback_deployment", target: "deployment/payments-api", params: { toVersion: "v1" } }).failureReason!, /target not found/);
+  assert.match(infra.dryRun(w0, { actionType: "rollback_deployment", target: "image/orders-api:3.8.0", params: { toVersion: "v3.7.2" } }).failureReason!, /target not found/);
+  assert.match(infra.dryRun(w0, { actionType: "block_image_tag", target: "image/orders-api:9.9.9", params: {} }).failureReason!, /9\.9\.9 is not in the deploy history/);
   const attached = infra.dryRun(costWorld, { actionType: "delete_volume", target: "volume/data-platform/vol-0a77e9", params: {} });
-  assert.deepEqual([attached.ok, attached.failureReason], [false, "volume vol-0a77e9 anexado a i-0db51"]);
-  assert.match(infra.dryRun(costWorld, { actionType: "release_elastic_ip", target: "ip/data-platform/eipalloc-9999", params: {} }).failureReason!, /alvo não encontrado/);
-  assert.match(infra.dryRun(costWorld, { actionType: "resize_instance", target: "instance/data-platform/i-07ab3", params: { toType: "m9.huge" } }).failureReason!, /m9\.huge sem preço/);
-  assert.match(infra.dryRun(costWorld, { actionType: "create_volume_snapshot", target: "volume/data-platform/vol-nope", params: {} }).failureReason!, /alvo não encontrado/);
-  assert.match(infra.dryRun(costWorld, { actionType: "tag_resource_for_review", target: "volume/other/vol-0c41d2", params: { reason: "x" } }).failureReason!, /alvo não encontrado/);
+  assert.deepEqual([attached.ok, attached.failureReason], [false, "volume vol-0a77e9 attached to i-0db51"]);
+  assert.match(infra.dryRun(costWorld, { actionType: "release_elastic_ip", target: "ip/data-platform/eipalloc-9999", params: {} }).failureReason!, /target not found/);
+  assert.match(infra.dryRun(costWorld, { actionType: "resize_instance", target: "instance/data-platform/i-07ab3", params: { toType: "m9.huge" } }).failureReason!, /m9\.huge has no price/);
+  assert.match(infra.dryRun(costWorld, { actionType: "create_volume_snapshot", target: "volume/data-platform/vol-nope", params: {} }).failureReason!, /target not found/);
+  assert.match(infra.dryRun(costWorld, { actionType: "tag_resource_for_review", target: "volume/other/vol-0c41d2", params: { reason: "x" } }).failureReason!, /target not found/);
   for (const r of [attached]) assert.deepEqual([r.changes, r.estimatedDurationSec], [[], 20]);
 });
 
 test("apply accumulates effects for the sequential dry run of the gate", () => {
   const block: ValidatedStep = { actionType: "block_image_tag", target: "image/orders-api:3.8.0", params: {} };
   const w1 = infra.apply(w0, rollback);
-  assert.deepEqual(infra.dryRun(w1, rollback).failureReason, "deployment/orders-api já roda v3.7.2");
+  assert.deepEqual(infra.dryRun(w1, rollback).failureReason, "deployment/orders-api already runs v3.7.2");
   const w2 = infra.apply(w1, block);
   assert.deepEqual(w2.deployments["orders-api"]!.blockedTags, ["3.8.0"]);
-  assert.match(infra.dryRun(w2, block).failureReason!, /já está bloqueada/);
+  assert.match(infra.dryRun(w2, block).failureReason!, /is already blocked/);
   assert.deepEqual(w0.deployments["orders-api"]!.blockedTags, []); // efeito puro
   const note = infra.apply(w0, { actionType: "add_incident_note", target: "incident/orders-api", params: { text: "rollback pedido" } });
   assert.deepEqual(note.notes, ["rollback pedido"]);
@@ -89,7 +89,7 @@ test("apply accumulates effects for the sequential dry run of the gate", () => {
 
 test("cost actions lower the projected monthly cost by the finding savings", () => {
   const steps: ValidatedStep[] = [
-    { actionType: "tag_resource_for_review", target: "volume/data-platform/vol-0c41d2", params: { reason: "ocioso" } },
+    { actionType: "tag_resource_for_review", target: "volume/data-platform/vol-0c41d2", params: { reason: "idle" } },
     { actionType: "create_volume_snapshot", target: "volume/data-platform/vol-0c41d2", params: {} },
     { actionType: "delete_volume", target: "volume/data-platform/vol-0c41d2", params: {} },
     { actionType: "release_elastic_ip", target: "ip/data-platform/eipalloc-0f19", params: {} },
@@ -125,10 +125,10 @@ test("fault injection makes execute fail without changing the world", () => {
   const faulty = repo((s) => ({ ...s, file: { ...s.file, faults: { "rollback_deployment@deployment/orders-api": "fail" } } })).get("deploy-5xx-rollback");
   const r = infra.execute(w0, rollback, faulty);
   assert.equal(r.result.ok, false);
-  assert.match(r.result.summary, /falha injetada/);
+  assert.match(r.result.summary, /failure injected/);
   assert.equal(r.world, w0);
   // Dry run que passou no portão pode falhar na execução se o mundo mudou.
   const moved = infra.apply(w0, rollback);
   const again = infra.execute(moved, rollback, deploy);
-  assert.deepEqual([again.result.ok, again.result.summary], [false, "deployment/orders-api já roda v3.7.2"]);
+  assert.deepEqual([again.result.ok, again.result.summary], [false, "deployment/orders-api already runs v3.7.2"]);
 });

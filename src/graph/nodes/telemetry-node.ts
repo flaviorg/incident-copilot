@@ -15,7 +15,7 @@ import { lastBriefFor, runContextOf } from "../run-context.ts";
 import type { NodeFn } from "../run-context.ts";
 
 const TOOL_TICK_SEC = 3;
-const DEFAULT_BRIEF = "Investigue o alerta e devolva um diagnóstico com evidências.";
+const DEFAULT_BRIEF = "Investigate the alert and return a diagnosis with evidence.";
 
 const SOURCE_BY_TOOL: Record<ReadToolName, Evidence["source"]> = {
   query_metrics: "metrics",
@@ -27,7 +27,7 @@ const SOURCE_BY_TOOL: Record<ReadToolName, Evidence["source"]> = {
 export type TelemetryDeps = { llm: LlmProvider; tools: ToolRegistry; scenarios: ScenarioRepository; trace: TraceSink; clock: Clock; limits: Limits };
 
 function diagnosisHeadline(d: Pick<Diagnosis, "category" | "confidence" | "evidence">): string {
-  return `diagnóstico ${d.category} (${CATEGORY_LABELS[d.category]}, confiança ${CONFIDENCE_LABELS[d.confidence]}, ${d.evidence.length} evidência${d.evidence.length === 1 ? "" : "s"})`;
+  return `diagnosis ${d.category} (${CATEGORY_LABELS[d.category]}, ${CONFIDENCE_LABELS[d.confidence]} confidence, ${d.evidence.length} ${d.evidence.length === 1 ? "piece" : "pieces"} of evidence)`;
 }
 
 export function createTelemetryNode(d: TelemetryDeps): NodeFn {
@@ -50,12 +50,12 @@ export function createTelemetryNode(d: TelemetryDeps): NodeFn {
       const input: TelemetryReactInput = { alert: state.alert, brief, run, step, maxSteps, toolsDescription: d.tools.describeForPrompt(), history: [...history] };
       const r = await d.llm.generate(telemetryReactPrompt, input, ctx);
       if (!r.success) {
-        return { escalation: { reason: "llm_unavailable" as const, detail: clip(`analista de telemetria, passo ${step}: ${r.error.kind} (${r.error.message})`, 400) } };
+        return { escalation: { reason: "llm_unavailable" as const, detail: clip(`telemetry analyst, step ${step}: ${r.error.kind} (${r.error.message})`, 400) } };
       }
       const out = r.data;
       d.trace.emit(ctx, "telemetry_analyst", { type: "thought", payload: { text: out.thought } }, llmInfoOf(telemetryReactPrompt, r));
       if (out.kind === "final") {
-        return finish({ ...out.diagnosis, capReached: false }, `rodada ${run} concluída em ${step} passo${step === 1 ? "" : "s"}`);
+        return finish({ ...out.diagnosis, capReached: false }, `round ${run} completed in ${step} step${step === 1 ? "" : "s"}`);
       }
       d.trace.emit(ctx, "telemetry_analyst", { type: "action", payload: { tool: out.tool, args: out.args, tier: 1 } });
       const res = d.tools.run(out.tool, out.args, { scenario, world: state.world, now: d.clock.now() });
@@ -76,12 +76,12 @@ export function createTelemetryNode(d: TelemetryDeps): NodeFn {
       evidence.push({ source: "metrics", ref: `metrics:${scope}:${state.alert.signal}@alerta`, summary: clip(`alerta: ${state.alert.rule}`, 300) });
     }
     const diagnosis: Diagnosis = {
-      hypothesis: `Investigação interrompida no teto de ${maxSteps} passos sem conclusão`,
+      hypothesis: `Investigation stopped at the cap of ${maxSteps} steps without a conclusion`,
       category: "unknown",
       confidence: "low",
       evidence,
       capReached: true,
     };
-    return finish(diagnosis, `teto de ${maxSteps} passos atingido na rodada ${run}`);
+    return finish(diagnosis, `cap of ${maxSteps} steps reached in round ${run}`);
   };
 }

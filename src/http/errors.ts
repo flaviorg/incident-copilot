@@ -17,7 +17,7 @@ export type HttpError = {
   unexpected: boolean;
 };
 
-const INTERNAL_ERROR_MESSAGE = "erro interno";
+const INTERNAL_ERROR_MESSAGE = "internal error";
 
 const body = (code: string, message: string, requestId: string, issues?: { path: string; message: string }[]): ErrorBody => ({
   error: { code, message, requestId, ...(issues ? { issues } : {}) },
@@ -40,7 +40,7 @@ export function toHttpError(e: unknown, requestId: string): HttpError {
   if (e instanceof NotFoundError) return known(404, e.code, e.message);
   if (e instanceof ConflictError) return known(409, e.code, e.message);
   if (e instanceof UnprocessableError) return known(422, e.code, e.message);
-  if (e instanceof AuthError) return known(401, e.code, "token de aprovação inválido ou ausente");
+  if (e instanceof AuthError) return known(401, e.code, "invalid or missing approval token");
   if (e instanceof LockedError) return known(429, e.code, e.message);
   if (e instanceof ApprovalsDisabledError) return known(503, e.code, e.message);
   if (e instanceof LlmUnavailableError) return known(503, e.code, e.message);
@@ -48,20 +48,20 @@ export function toHttpError(e: unknown, requestId: string): HttpError {
 
   const f = fastifyError(e);
   if (f) {
-    if (f.code === "FST_ERR_CTP_BODY_TOO_LARGE") return known(413, "payload_too_large", "corpo da requisição acima de 64 KB");
-    if (f.code === "FST_ERR_CTP_INVALID_JSON_BODY" || f.code === "FST_ERR_CTP_EMPTY_JSON_BODY") return known(400, "invalid_json", "corpo JSON inválido");
-    if (f.code === "FST_ERR_CTP_INVALID_MEDIA_TYPE") return known(415, "unsupported_media_type", "content-type não suportado; use application/json");
-    if (f.statusCode >= 400 && f.statusCode < 500) return known(f.statusCode, "bad_request", "requisição inválida");
+    if (f.code === "FST_ERR_CTP_BODY_TOO_LARGE") return known(413, "payload_too_large", "request body larger than 64 KB");
+    if (f.code === "FST_ERR_CTP_INVALID_JSON_BODY" || f.code === "FST_ERR_CTP_EMPTY_JSON_BODY") return known(400, "invalid_json", "invalid JSON body");
+    if (f.code === "FST_ERR_CTP_INVALID_MEDIA_TYPE") return known(415, "unsupported_media_type", "unsupported content-type; use application/json");
+    if (f.statusCode >= 400 && f.statusCode < 500) return known(f.statusCode, "bad_request", "bad request");
   }
   // JSON malformado no parser padrão chega como SyntaxError com statusCode 400.
-  if (e instanceof SyntaxError && (e as { statusCode?: unknown }).statusCode === 400) return known(400, "invalid_json", "corpo JSON inválido");
+  if (e instanceof SyntaxError && (e as { statusCode?: unknown }).statusCode === 400) return known(400, "invalid_json", "invalid JSON body");
 
   return { status: 500, body: body("internal_error", INTERNAL_ERROR_MESSAGE, requestId), unexpected: true };
 }
 
-/** Valida corpo, params ou query com Zod (mensagens em pt-BR); falha vira ValidationError com issues { path, message }. */
+/** Valida corpo, params ou query com Zod (messages in English); falha vira ValidationError com issues { path, message }. */
 export function parseOr400<T>(schema: z.ZodType<T>, value: unknown): T {
   const r = parseWithIssues(schema, value);
-  if (!r.success) throw new ValidationError(`entrada inválida: ${formatIssues(r.issues)}`, r.issues);
+  if (!r.success) throw new ValidationError(`invalid input: ${formatIssues(r.issues)}`, r.issues);
   return r.data;
 }

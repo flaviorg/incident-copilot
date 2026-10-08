@@ -6,7 +6,7 @@ import { projectPath } from "../infra/paths.ts";
 import type { CliIO } from "./io.ts";
 import { UsageError } from "./io.ts";
 
-const kb = (bytes: number) => `${(bytes / 1024).toFixed(1).replace(".", ",")} KB`;
+const kb = (bytes: number) => `${(bytes / 1024).toFixed(1)} KB`;
 
 export async function runRecordDemoCommand(argv: string[], io: CliIO): Promise<number> {
   let out: string | undefined;
@@ -17,7 +17,7 @@ export async function runRecordDemoCommand(argv: string[], io: CliIO): Promise<n
   }
   const dir = out ? resolve(out) : projectPath("web", "public", "demo");
   const files = await recordAll(dir);
-  io.out(`gravações da War Room (${files.length} arquivos):`);
+  io.out(`War Room recordings (${files.length} files):`);
   for (const f of files) {
     const shown = relative(process.cwd(), f.file) || f.file;
     io.out(`  ${shown.padEnd(48)} ${kb(f.bytes)}`);

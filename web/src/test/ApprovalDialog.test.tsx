@@ -10,9 +10,9 @@ function Harness({ onConfirm = () => {} }: { onConfirm?: () => void }) {
   const opener = useRef<HTMLButtonElement>(null);
   return (
     <>
-      <button type="button">antes</button>
-      <button type="button" ref={opener} onClick={() => setOpen(true)}>Aprovar</button>
-      <button type="button">depois</button>
+      <button type="button">before</button>
+      <button type="button" ref={opener} onClick={() => setOpen(true)}>Approve</button>
+      <button type="button">after</button>
       <ApprovalDialog
         open={open}
         decision="approve"
@@ -32,7 +32,7 @@ describe("ApprovalDialog", () => {
   it("moves focus in, traps it, closes on Escape and returns focus", async () => {
     const user = userEvent.setup();
     render(<Harness />);
-    const opener = screen.getByRole("button", { name: "Aprovar" });
+    const opener = screen.getByRole("button", { name: "Approve" });
     await user.click(opener);
     const dialog = screen.getByRole("dialog");
     expect(dialog.getAttribute("aria-modal")).toBe("true");
@@ -54,22 +54,22 @@ describe("ApprovalDialog", () => {
     const user = userEvent.setup();
     const onConfirm = vi.fn();
     render(<Harness onConfirm={onConfirm} />);
-    await user.click(screen.getByRole("button", { name: "Aprovar" }));
-    const dialog = screen.getByRole("dialog", { name: /Aprovar/ });
-    expect(dialog.textContent).toContain("Simulação local: nenhuma ação real");
+    await user.click(screen.getByRole("button", { name: "Approve" }));
+    const dialog = screen.getByRole("dialog", { name: /Approve/ });
+    expect(dialog.textContent).toContain("Local simulation: no real action");
     expect(dialog.textContent).toContain("APR-0001");
-    await user.click(screen.getByRole("button", { name: "Confirmar" }));
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
     expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Aprovar" }));
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Approve" }));
   });
 
-  it("Cancelar closes without confirming", async () => {
+  it("Cancel closes without confirming", async () => {
     const user = userEvent.setup();
     const onConfirm = vi.fn();
     render(<Harness onConfirm={onConfirm} />);
-    await user.click(screen.getByRole("button", { name: "Aprovar" }));
-    await user.click(screen.getByRole("button", { name: "Cancelar" }));
+    await user.click(screen.getByRole("button", { name: "Approve" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onConfirm).not.toHaveBeenCalled();
     expect(screen.queryByRole("dialog")).toBeNull();
   });

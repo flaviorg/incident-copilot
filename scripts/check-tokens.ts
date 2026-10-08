@@ -39,9 +39,9 @@ export function scanTokens(root = projectPath("web", "src")): TokenViolation[] {
 if (import.meta.main) {
   const found = scanTokens();
   if (found.length > 0) {
-    for (const v of found) process.stderr.write(`${v.file}:${v.line}: cor literal ${v.literal} (use um token de web/src/styles/tokens.css)\n`);
+    for (const v of found) process.stderr.write(`${v.file}:${v.line}: literal color ${v.literal} (use a token from web/src/styles/tokens.css)\n`);
     process.exitCode = 1;
   } else {
-    process.stdout.write("check:tokens: nenhuma cor literal fora de web/src/styles/tokens.css\n");
+    process.stdout.write("check:tokens: no literal color outside web/src/styles/tokens.css\n");
   }
 }

@@ -17,7 +17,7 @@ export const FixtureTurnSchema = z
     usage: z.object({ promptTokens: z.number().int().nonnegative(), completionTokens: z.number().int().nonnegative() }).optional(),
     delayMs: z.number().int().nonnegative().optional(),
   })
-  .refine((t) => (t.output === undefined) !== (t.error === undefined), { message: "use exatamente um entre output e error", path: ["output"] });
+  .refine((t) => (t.output === undefined) !== (t.error === undefined), { message: "use exactly one of output and error", path: ["output"] });
 
 export const FixtureFileSchema = z
   .object({
@@ -29,7 +29,7 @@ export const FixtureFileSchema = z
   .superRefine((f, ctx) => {
     const seen = new Set<string>();
     f.turns.forEach((t, i) => {
-      if (seen.has(t.id)) ctx.addIssue({ code: "custom", path: ["turns", i, "id"], message: `id de turno repetido: ${t.id}` });
+      if (seen.has(t.id)) ctx.addIssue({ code: "custom", path: ["turns", i, "id"], message: `repeated turn id: ${t.id}` });
       seen.add(t.id);
     });
   });
@@ -49,11 +49,11 @@ export function loadFixtures(dir: string): FixtureFile[] {
       try {
         raw = JSON.parse(readFileSync(join(dir, file), "utf8"));
       } catch (e) {
-        throw new ValidationError(`fixture ${file} não é JSON válido (${(e as Error).message})`, [{ path: file, message: "JSON inválido" }]);
+        throw new ValidationError(`fixture ${file} is not valid JSON (${(e as Error).message})`, [{ path: file, message: "invalid JSON" }]);
       }
       const r = parseWithIssues(FixtureFileSchema, raw);
       if (!r.success) {
-        throw new ValidationError(`fixture ${file} inválida em ${formatIssues(r.issues)}`, r.issues.map((i) => ({ path: `${file}:${i.path}`, message: i.message })));
+        throw new ValidationError(`fixture ${file} invalid at ${formatIssues(r.issues)}`, r.issues.map((i) => ({ path: `${file}:${i.path}`, message: i.message })));
       }
       return r.data;
     });

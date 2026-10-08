@@ -4,8 +4,8 @@ import { NO_DATA } from "./registry.ts";
 import type { Tool } from "./registry.ts";
 
 const Params = z.object({
-  service: z.string().min(1).describe("Serviço cujos deploys serão listados"),
-  sinceMinutes: z.number().int().min(1).max(10080).optional().describe("Quantos minutos para trás olhar (padrão 10080, 7 dias)"),
+  service: z.string().min(1).describe("Service whose deploys will be listed"),
+  sinceMinutes: z.number().int().min(1).max(10080).optional().describe("How many minutes to look back (default 10080, 7 days)"),
 });
 
 const minutesBetween = (fromIso: string, to: Date) => Math.round((to.getTime() - Date.parse(fromIso)) / 60000);
@@ -13,7 +13,7 @@ const minutesBetween = (fromIso: string, to: Date) => Math.round((to.getTime() -
 export function createListDeploysTool(): Tool<z.infer<typeof Params>> {
   return {
     name: "list_deploys",
-    description: "Use para correlacionar o início de um problema com deploys recentes do serviço e saber a versão anterior.",
+    description: "Use to correlate the onset of a problem with recent deploys of the service and to learn the previous version.",
     paramsSchema: Params,
     run({ service, sinceMinutes = 10080 }, { scenario, world, now }) {
       const ofService = scenario.deploys.filter((d) => d.service === service);
@@ -23,17 +23,17 @@ export function createListDeploysTool(): Tool<z.infer<typeof Params>> {
       const recent = ofService
         .filter((d) => Date.parse(d.at) >= fromMs && Date.parse(d.at) <= now.getTime())
         .sort((a, b) => b.at.localeCompare(a.at));
-      const runningText = running ? ` Versão em execução agora: ${running.version} (${running.replicas} réplicas).` : "";
+      const runningText = running ? ` Version running now: ${running.version} (${running.replicas} replicas).` : "";
       const evidenceRef = `deploys:${service}@${hhmm(now.toISOString())}`;
       if (recent.length === 0) {
-        return { ok: true, summary: `nenhum deploy de ${service} nos últimos ${formatMinutes(sinceMinutes)}.${runningText}`, evidenceRef, data: { deploys: [] } };
+        return { ok: true, summary: `no deploy of ${service} in the last ${formatMinutes(sinceMinutes)}.${runningText}`, evidenceRef, data: { deploys: [] } };
       }
       const parts = recent.map(
-        (d) => `${d.version} em ${formatTs(d.at, true)} UTC, ${minutesBetween(d.at, now)} min atrás (anterior ${d.previousVersion}, ${d.replicas} réplicas)`,
+        (d) => `${d.version} at ${formatTs(d.at, true)} UTC, ${minutesBetween(d.at, now)} min ago (previous ${d.previousVersion}, ${d.replicas} replicas)`,
       );
       return {
         ok: true,
-        summary: `${recent.length} deploy(s) de ${service} nos últimos ${formatMinutes(sinceMinutes)}, do mais recente: ${parts.join("; ")}.${runningText}`,
+        summary: `${recent.length} ${recent.length === 1 ? "deploy" : "deploys"} of ${service} in the last ${formatMinutes(sinceMinutes)}, most recent first: ${parts.join("; ")}.${runningText}`,
         evidenceRef,
         data: { deploys: recent },
       };

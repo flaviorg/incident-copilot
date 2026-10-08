@@ -20,7 +20,7 @@ import { UsageError } from "./io.ts";
 export type DemoOptions = { scenarioId: string; reject: boolean; persist: boolean; json: boolean; live: boolean };
 
 const DEFAULT_DEMO_SCENARIO = "deploy-5xx-rollback";
-const DEMO_APPROVER = "operador demo";
+const DEMO_APPROVER = "demo operator";
 
 const time = (iso: string) => iso.slice(11, 19);
 
@@ -30,7 +30,7 @@ async function runDemo(o: DemoOptions, io: { out: (line: string) => void; env: R
   const loaded = loadConfig({ ...io.env, CLOCK: "simulated", DB_PATH: dbPath, LOG_LEVEL: io.env.LOG_LEVEL ?? "warn" }, { forceFake: !o.live });
   // --live sem OpenRouter configurado falha em vez de cair no fake em silêncio (quem esqueceu o .env não acha que rodou o modelo).
   if (o.live && loaded.llmProvider !== "openrouter") {
-    throw new UsageError("--live exige OPENROUTER_API_KEY e OPENROUTER_MODEL no ambiente ou no .env (e LLM_PROVIDER vazio ou openrouter)");
+    throw new UsageError("--live requires OPENROUTER_API_KEY and OPENROUTER_MODEL in the environment or in .env (and LLM_PROVIDER empty or openrouter)");
   }
   // Token efêmero quando o ambiente não define um; vai para a redação junto com os demais segredos.
   const config = { ...loaded, approvalToken: loaded.approvalToken ?? randomBytes(24).toString("base64url") };
@@ -41,9 +41,9 @@ async function runDemo(o: DemoOptions, io: { out: (line: string) => void; env: R
     const say = (line: string) => {
       if (!o.json) io.out(line);
     };
-    const provider = config.llmProvider === "fake" ? "fake roteirizado (sem rede, sem chave)" : `openrouter (${config.openrouterModel})`;
-    say(`incident-copilot · demo · provedor: ${provider}`);
-    say(`cenário ${scenario.id} · ${scenario.file.service ? `serviço ${scenario.file.service}` : `conta ${scenario.file.account}`} · ${scenario.file.severity}`);
+    const provider = config.llmProvider === "fake" ? "scripted fake (no network, no key)" : `openrouter (${config.openrouterModel})`;
+    say(`incident-copilot · demo · provider: ${provider}`);
+    say(`scenario ${scenario.id} · ${scenario.file.service ? `service ${scenario.file.service}` : `account ${scenario.file.account}`} · ${scenario.file.severity}`);
     say("");
 
     let view: IncidentView;
@@ -55,7 +55,7 @@ async function runDemo(o: DemoOptions, io: { out: (line: string) => void; env: R
       view = c.incidents.get(c.incidents.list({ limit: 1 })[0]!.id);
     }
     const id = view.incident.id;
-    say(`${time(view.incident.openedAt)}  ${id} aberto: "${view.incident.title}" (impacto desde ${time(view.incident.impactStartedAt)})`);
+    say(`${time(view.incident.openedAt)}  ${id} opened: "${view.incident.title}" (impact since ${time(view.incident.impactStartedAt)})`);
     let lastSeq = 0;
     const flush = () => {
       for (const e of c.store.listTrace(id)) {
@@ -72,7 +72,7 @@ async function runDemo(o: DemoOptions, io: { out: (line: string) => void; env: R
       if (!next) break;
       c.clock.tick(scenario.file.demo.approvalLatencySec);
       const r = await c.approvals.decide(next.id, { decision: o.reject ? "reject" : "approve", approver: DEMO_APPROVER }, token, { requestId: null });
-      say(`${time(r.approval.decidedAt ?? c.clock.now().toISOString())}  ${DEMO_APPROVER} ${o.reject ? "rejeitou" : "aprovou"} ${next.id} (token verificado, valor omitido)`);
+      say(`${time(r.approval.decidedAt ?? c.clock.now().toISOString())}  ${DEMO_APPROVER} ${o.reject ? "rejected" : "approved"} ${next.id} (token verified, value omitted)`);
       flush();
     }
 
@@ -80,14 +80,14 @@ async function runDemo(o: DemoOptions, io: { out: (line: string) => void; env: R
     const esc = view.incident.escalation;
     say("");
     say(view.incident.status === "resolved"
-      ? "desfecho: resolvido (canário saudável)"
-      : esc ? `desfecho: escalado para humanos: ${esc.reason} (${ESCALATION_LABELS[esc.reason]})` : `desfecho: ${view.incident.status}`);
+      ? "outcome: resolved (healthy canary)"
+      : esc ? `outcome: escalated to humans: ${esc.reason} (${ESCALATION_LABELS[esc.reason]})` : `outcome: ${view.incident.status}`);
     say("");
     if (view.metrics) for (const line of renderMetrics(view.metrics)) say(line);
     const events = c.store.listTrace(id);
     const counts = TraceTypeSchema.options.map((t) => `${t} ${events.filter((e) => e.type === t).length}`).join(" · ");
     say("");
-    say(`trace ${events.length} eventos (${counts})`);
+    say(`trace ${events.length} events (${counts})`);
 
     let postmortemPath: string | null = null;
     if (view.postmortemReady) {

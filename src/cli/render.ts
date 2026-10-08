@@ -13,10 +13,10 @@ export function renderTable(headers: string[], rows: string[][]): string {
 export function renderToolResult(o: { name: string; scenarioId: string; now: string; result: ToolResult }): string {
   const r = o.result;
   return [
-    `ferramenta: ${o.name} (faixa 1, só leitura) | cenário: ${o.scenarioId} | agora: ${o.now}`,
-    `ok: ${r.ok ? "sim" : "não"}`,
+    `tool: ${o.name} (tier 1, read-only) | scenario: ${o.scenarioId} | now: ${o.now}`,
+    `ok: ${r.ok ? "yes" : "no"}`,
     r.summary,
-    `evidência: ${r.evidenceRef ?? "nenhuma"}`,
+    `evidence: ${r.evidenceRef ?? "none"}`,
     "",
     JSON.stringify(r, null, 2),
   ].join("\n");
@@ -31,10 +31,10 @@ const argValues = (args: Record<string, unknown>) =>
   Object.values(args).map((v) => (typeof v === "string" ? v : JSON.stringify(v))).join(", ");
 
 const VERDICT_LABELS: Record<string, string> = {
-  approve: "aprovado", revise: "pede revisão", reject: "reprovado", coerced: "escolha corrigida", blocked: "bloqueado",
+  approve: "approved", revise: "asks for revision", reject: "rejected", coerced: "choice corrected", blocked: "blocked",
 };
 const CRITIC_LABELS: Record<string, string> = {
-  auditor: "auditor", supervisor_guard: "guarda do supervisor", gate: "portão", numeric_guard: "guarda numérico", canary: "canário",
+  auditor: "auditor", supervisor_guard: "supervisor guard", gate: "gate", numeric_guard: "numeric guard", canary: "canary",
 };
 
 /** Uma linha por evento no formato do spec 10.3: horário, recuo de 2 espaços para conversa e de 4 para passos. */
@@ -44,14 +44,14 @@ export function renderEvent(e: TraceEvent): string | null {
     case "handoff":
       return `${t}  ${AGENT_LABELS[e.payload.from]} → ${AGENT_LABELS[e.payload.to]}: ${oneLine(e.payload.brief)}`;
     case "thought":
-      return `${t}    pensa ${oneLine(e.payload.text)}`;
+      return `${t}    think ${oneLine(e.payload.text)}`;
     case "action":
-      return `${t}    ação  ${e.payload.tool}(${oneLine(argValues(e.payload.args), 160)})${e.payload.tier === null ? "" : ` · faixa ${e.payload.tier}`}`;
+      return `${t}    act   ${e.payload.tool}(${oneLine(argValues(e.payload.args), 160)})${e.payload.tier === null ? "" : ` · tier ${e.payload.tier}`}`;
     case "observation":
       // No portão, ok=false quer dizer "não passou no portão" (o resumo já diz por quê), não falha de ferramenta.
-      return `${t}    obs   ${e.payload.ok || e.agent === "gate" ? "" : "falhou: "}${oneLine(e.payload.summary)}`;
+      return `${t}    obs   ${e.payload.ok || e.agent === "gate" ? "" : "failed: "}${oneLine(e.payload.summary)}`;
     case "plan":
-      return `${t}  ${AGENT_LABELS[e.agent]}: plano revisão ${e.payload.revision} com ${e.payload.steps.length} passo${e.payload.steps.length === 1 ? "" : "s"}: ${oneLine(e.payload.summary, 160)}`;
+      return `${t}  ${AGENT_LABELS[e.agent]}: plan revision ${e.payload.revision} with ${e.payload.steps.length} step${e.payload.steps.length === 1 ? "" : "s"}: ${oneLine(e.payload.summary, 160)}`;
     case "critique":
       return `${t}  ${CRITIC_LABELS[e.payload.by] ?? e.payload.by}: ${VERDICT_LABELS[e.payload.verdict] ?? e.payload.verdict} (${oneLine(e.payload.feedback, 200)})`;
     case "answer":
@@ -59,9 +59,9 @@ export function renderEvent(e: TraceEvent): string | null {
   }
 }
 
-const one = (x: number) => x.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-const usd = (x: number) => `US$ ${x.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const times = (x: number) => `${x.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}x`;
+const one = (x: number) => x.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1, useGrouping: false });
+const usd = (x: number) => `US$ ${x.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })}`;
+const times = (x: number) => `${x.toLocaleString("en-US", { maximumFractionDigits: 1, useGrouping: false })}x`;
 const row = (label: string, value: string, note: string) => `${label.padEnd(24)}${value.padEnd(16)}${note}`;
 
 /**
@@ -71,17 +71,17 @@ const row = (label: string, value: string, note: string) => `${label.padEnd(24)}
 export function renderMetrics(m: IncidentMetrics): string[] {
   const lines: string[] = [];
   lines.push(m.mttrMin === null
-    ? row("MTTR", "não resolvido", "medido (incidente escalado, sem verificação saudável)")
-    : row("MTTR", `${one(m.mttrMin)} min`, `medido (linha do tempo simulada, ${time(m.impactStartedAt)} → ${time(m.resolvedAt ?? m.detectedAt)})`));
-  lines.push(row("  aguardando aprovação", `${one(m.timeAwaitingApprovalMin)} min`, "medido (soma das aprovações decididas)"));
-  lines.push(row("MTTD", `${one(m.mttdMin)} min`, "medido"));
-  if (m.monthlySavingsUsd > 0) lines.push(row("Economia mensal", usd(m.monthlySavingsUsd), "derivado (achados de inventário das ações executadas)"));
+    ? row("MTTR", "not resolved", "measured (incident escalated, no healthy verification)")
+    : row("MTTR", `${one(m.mttrMin)} min`, `measured (simulated timeline, ${time(m.impactStartedAt)} → ${time(m.resolvedAt ?? m.detectedAt)})`));
+  lines.push(row("  awaiting approval", `${one(m.timeAwaitingApprovalMin)} min`, "measured (sum of decided approvals)"));
+  lines.push(row("MTTD", `${one(m.mttdMin)} min`, "measured"));
+  if (m.monthlySavingsUsd > 0) lines.push(row("Monthly savings", usd(m.monthlySavingsUsd), "derived (inventory findings of executed actions)"));
   if (m.minutesSaved) {
-    lines.push(row("Minutos economizados", `${one(m.minutesSaved.low)} a ${one(m.minutesSaved.high)}`, `ilustrativo (linha de base sintética de ${m.baselineMttrMin.low} a ${m.baselineMttrMin.high} min)`));
+    lines.push(row("Minutes saved", `${one(m.minutesSaved.low)} to ${one(m.minutesSaved.high)}`, `illustrative (synthetic baseline of ${m.baselineMttrMin.low} to ${m.baselineMttrMin.high} min)`));
   }
   if (m.roiIllustrative) {
-    lines.push(row("ROI", `${times(m.roiIllustrative.low)} a ${times(m.roiIllustrative.high)}`, "ilustrativo (premissas em data/business-assumptions.json)"));
+    lines.push(row("ROI", `${times(m.roiIllustrative.low)} to ${times(m.roiIllustrative.high)}`, "illustrative (assumptions in data/business-assumptions.json)"));
   }
-  lines.push(row("Custo de LLM", usd(m.llmCostUsd), `medido (${m.llmCalls} chamadas, ${m.promptTokens + m.completionTokens} tokens)`));
+  lines.push(row("LLM cost", usd(m.llmCostUsd), `measured (${m.llmCalls} calls, ${m.promptTokens + m.completionTokens} tokens)`));
   return lines;
 }

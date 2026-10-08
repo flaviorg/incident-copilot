@@ -23,7 +23,7 @@ function EventItem({ e }: { e: TraceEvent }) {
       return (
         <p className="event handoff">
           {time}
-          <span>{`${AGENT_NAMES[e.payload.from]} para ${AGENT_NAMES[e.payload.to]}: ${e.payload.brief}`}</span>
+          <span>{`${AGENT_NAMES[e.payload.from]} to ${AGENT_NAMES[e.payload.to]}: ${e.payload.brief}`}</span>
         </p>
       );
     case "thought":
@@ -45,18 +45,18 @@ function EventItem({ e }: { e: TraceEvent }) {
     case "observation":
       return (
         <details className="event">
-          <summary>{time} {`${TRACE_TYPE_LABELS.observation}: ${e.payload.tool} (${e.payload.ok ? "ok" : "não concluída"})`}</summary>
+          <summary>{time} {`${TRACE_TYPE_LABELS.observation}: ${e.payload.tool} (${e.payload.ok ? "ok" : "not completed"})`}</summary>
           <p>{e.payload.summary}</p>
         </details>
       );
     case "plan":
       return (
         <details className="event">
-          <summary>{time} {`${TRACE_TYPE_LABELS.plan} (revisão ${e.payload.revision}, ${e.payload.steps.length} passos)`}</summary>
+          <summary>{time} {`${TRACE_TYPE_LABELS.plan} (revision ${e.payload.revision}, ${e.payload.steps.length} steps)`}</summary>
           <p>{e.payload.summary}</p>
           <ol>
             {e.payload.steps.map((s) => (
-              <li key={s.order}>{`${s.actionType} em ${s.target}`}</li>
+              <li key={s.order}>{`${s.actionType} on ${s.target}`}</li>
             ))}
           </ol>
         </details>
@@ -81,9 +81,9 @@ function EventItem({ e }: { e: TraceEvent }) {
 export function AgentConversation({ events }: { events: TraceEvent[] }) {
   return (
     <section className="panel" aria-labelledby="conversation-title">
-      <h2 id="conversation-title">Conversa entre agentes</h2>
+      <h2 id="conversation-title">Agent conversation</h2>
       {events.length === 0 ? (
-        <p className="muted">Nenhum evento ainda. Use Avançar ou Reproduzir.</p>
+        <p className="muted">No events yet. Use Step or Play.</p>
       ) : (
         <ol className="conversation">
           {groupByAgent(events).map((g) => (

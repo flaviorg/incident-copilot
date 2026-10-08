@@ -13,8 +13,8 @@ import { errTurn, patchFixture, turn } from "../helpers/fixtures.ts";
 const echo: PromptDef<{ n: number }, { ok: boolean }> = {
   id: "echo",
   version: "echo.v1",
-  system: "Responda se o número é aceito.",
-  buildUser: (i) => `número: ${i.n}`,
+  system: "Answer whether the number is accepted.",
+  buildUser: (i) => `number: ${i.n}`,
   matchKeys: (i) => ({ n: i.n }),
   inputSchema: z.object({ n: z.number() }),
   outputSchema: z.object({ ok: z.boolean() }),
@@ -40,9 +40,9 @@ test("each incident replays the script from the start (same scenario, same proce
   const r1 = await f.generate(echo, { n: 1 }, ctx);
   const r2 = await f.generate(echo, { n: 1 }, other);
   assert.ok(r1.success && r1.data.ok === true);
-  assert.ok(r2.success && r2.data.ok === true, "o 2º incidente começa do primeiro turno");
+  assert.ok(r2.success && r2.data.ok === true, "the 2nd incident starts from the first turn");
   const r3 = await f.generate(echo, { n: 1 }, ctx);
-  assert.ok(r3.success && r3.data.ok === false, "o 1º incidente segue do ponto onde parou");
+  assert.ok(r3.success && r3.data.ok === false, "the 1st incident continues from where it stopped");
   assert.deepEqual(f.consumedIds(), ["a", "a", "b"]);
   f.assertAllConsumed(); // a e b foram consumidos por algum incidente
   await assert.rejects(f.generate(echo, { n: 1 }, ctx), (e) => e instanceof UnscriptedLlmCallError && e.turnsConsumed === 2);
@@ -110,8 +110,8 @@ test("calls() records prompt, matchKeys and user text", async () => {
   await f.generate(echo, { n: 1 }, ctx);
   await assert.rejects(f.generate(echo, { n: 9 }, ctx));
   assert.deepEqual(f.calls(), [
-    { prompt: "echo.v1", matchKeys: { n: 1 }, user: "número: 1", turnId: "a" },
-    { prompt: "echo.v1", matchKeys: { n: 9 }, user: "número: 9", turnId: null },
+    { prompt: "echo.v1", matchKeys: { n: 1 }, user: "number: 1", turnId: "a" },
+    { prompt: "echo.v1", matchKeys: { n: 9 }, user: "number: 9", turnId: null },
   ]);
 });
 

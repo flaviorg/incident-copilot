@@ -69,10 +69,10 @@ export class ScenarioRepository {
   private dirOf(id: string): string {
     const dir = join(this.rootDir, id);
     if (!ID_PATTERN.test(id) || id.length > SCENARIO_ID_MAX) {
-      throw new NotFoundError("scenario_not_found", "cenário não encontrado (id fora do formato)");
+      throw new NotFoundError("scenario_not_found", "scenario not found (id out of format)");
     }
     if (!existsSync(join(dir, "scenario.json")) || !statSync(dir).isDirectory()) {
-      throw new NotFoundError("scenario_not_found", `cenário não encontrado: ${id}`);
+      throw new NotFoundError("scenario_not_found", `scenario not found: ${id}`);
     }
     return dir;
   }
@@ -83,12 +83,12 @@ export class ScenarioRepository {
     try {
       raw = JSON.parse(readFileSync(path, "utf8"));
     } catch (e) {
-      throw new ValidationError(`cenário ${id}: ${file} não é JSON válido (${(e as Error).message})`, [{ path: file, message: "JSON inválido" }]);
+      throw new ValidationError(`scenario ${id}: ${file} is not valid JSON (${(e as Error).message})`, [{ path: file, message: "invalid JSON" }]);
     }
     const r = parseWithIssues(schema, raw);
     if (!r.success) {
       throw new ValidationError(
-        `cenário ${id}: ${file} inválido em ${formatIssues(r.issues)}`,
+        `scenario ${id}: ${file} invalid at ${formatIssues(r.issues)}`,
         r.issues.map((i) => ({ path: `${file}:${i.path}`, message: i.message })),
       );
     }
@@ -102,8 +102,8 @@ export class ScenarioRepository {
   private readScenarioFile(id: string): ScenarioFile {
     const f = this.readJson(id, "scenario.json", ScenarioFileSchema);
     if (f.id !== id) {
-      throw new ValidationError(`cenário ${id}: scenario.json inválido em id (difere do nome da pasta: ${f.id})`, [
-        { path: "scenario.json:id", message: "difere do nome da pasta" },
+      throw new ValidationError(`scenario ${id}: scenario.json invalid at id (differs from the folder name: ${f.id})`, [
+        { path: "scenario.json:id", message: "differs from the folder name" },
       ]);
     }
     return f;
@@ -120,12 +120,12 @@ export class ScenarioRepository {
       try {
         raw = JSON.parse(line);
       } catch {
-        throw new ValidationError(`cenário ${id}: logs.jsonl linha ${idx + 1} não é JSON válido`, [{ path: `logs.jsonl:${idx + 1}`, message: "JSON inválido" }]);
+        throw new ValidationError(`scenario ${id}: logs.jsonl line ${idx + 1} is not valid JSON`, [{ path: `logs.jsonl:${idx + 1}`, message: "invalid JSON" }]);
       }
       const r = parseWithIssues(LogLineSchema, raw);
       if (!r.success) {
         throw new ValidationError(
-          `cenário ${id}: logs.jsonl linha ${idx + 1} inválida em ${formatIssues(r.issues)}`,
+          `scenario ${id}: logs.jsonl line ${idx + 1} invalid at ${formatIssues(r.issues)}`,
           r.issues.map((i) => ({ path: `logs.jsonl:${idx + 1}:${i.path}`, message: i.message })),
         );
       }

@@ -26,9 +26,9 @@ type Executor = {
   revert?(w: WorldState, a: GatedAction): string | null;
 };
 
-const notFound = (target: string): Check => ({ ok: false, reason: `alvo não encontrado: ${target}` });
+const notFound = (target: string): Check => ({ ok: false, reason: `target not found: ${target}` });
 const str = (v: unknown) => (typeof v === "string" ? v : String(v));
-const fmtGb = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+const fmtGb = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 1, useGrouping: false });
 
 /** deployment/<serviço> */
 function deploymentOf(w: WorldState, target: string) {
@@ -72,7 +72,7 @@ const EXECUTORS: Record<ExecutableActionType, Executor> = {
     check: (_w, s) => {
       const [kind, ref, ...rest] = s.target.split("/");
       if (kind !== "incident" || !ref || rest.length > 0) return notFound(s.target);
-      return { ok: true, changes: [`${s.target}: nota registrada`] };
+      return { ok: true, changes: [`${s.target}: note recorded`] };
     },
     apply: (w, s) => void w.notes.push(str(s.params.text)),
   },
@@ -81,10 +81,10 @@ const EXECUTORS: Record<ExecutableActionType, Executor> = {
       const img = imageOf(w, s.target);
       if (!img) return notFound(s.target);
       if (!img.dep.history.some((v) => v === img.tag || v === `v${img.tag}`)) {
-        return { ok: false, reason: `imagem ${img.svc}:${img.tag} não existe no histórico de deploys de ${img.svc}` };
+        return { ok: false, reason: `image ${img.svc}:${img.tag} is not in the deploy history of ${img.svc}` };
       }
-      if (img.dep.blockedTags.includes(img.tag)) return { ok: false, reason: `tag ${img.svc}:${img.tag} já está bloqueada` };
-      return { ok: true, changes: [`${s.target}: tag bloqueada para promoção`] };
+      if (img.dep.blockedTags.includes(img.tag)) return { ok: false, reason: `tag ${img.svc}:${img.tag} is already blocked` };
+      return { ok: true, changes: [`${s.target}: tag blocked from promotion`] };
     },
     apply: (w, s) => {
       const img = imageOf(w, s.target)!;
@@ -92,7 +92,7 @@ const EXECUTORS: Record<ExecutableActionType, Executor> = {
     },
     revert: (w, a) => {
       const img = imageOf(w, a.target);
-      if (!img) return `alvo não encontrado: ${a.target}`;
+      if (!img) return `target not found: ${a.target}`;
       img.dep.blockedTags = remove(img.dep.blockedTags, img.tag);
       return null;
     },
@@ -100,8 +100,8 @@ const EXECUTORS: Record<ExecutableActionType, Executor> = {
   tag_resource_for_review: {
     check: (w, s) => {
       if (!resourceOf(w.inventory, s.target, ["volume", "ip", "instance"])) return notFound(s.target);
-      if (w.tagsForReview.includes(s.target)) return { ok: false, reason: `${s.target} já está marcado para revisão` };
-      return { ok: true, changes: [`${s.target}: marcado para revisão (${str(s.params.reason)})`] };
+      if (w.tagsForReview.includes(s.target)) return { ok: false, reason: `${s.target} is already tagged for review` };
+      return { ok: true, changes: [`${s.target}: tagged for review (${str(s.params.reason)})`] };
     },
     apply: (w, s) => void w.tagsForReview.push(s.target),
     revert: (w, a) => {
@@ -113,7 +113,7 @@ const EXECUTORS: Record<ExecutableActionType, Executor> = {
     check: (w, s) => {
       const r = resourceOf(w.inventory, s.target, ["volume"]);
       if (!r || r.kind !== "volume") return notFound(s.target);
-      return { ok: true, changes: [`${s.target}: snapshot de ${fmtGb(r.volume.sizeGb)} GB criado`] };
+      return { ok: true, changes: [`${s.target}: snapshot of ${fmtGb(r.volume.sizeGb)} GB created`] };
     },
     apply: (w, s) => {
       if (!w.snapshots.includes(s.target)) w.snapshots.push(s.target);
@@ -128,9 +128,9 @@ const EXECUTORS: Record<ExecutableActionType, Executor> = {
       const d = deploymentOf(w, s.target);
       if (!d) return notFound(s.target);
       const to = str(s.params.toVersion);
-      if (to === d.dep.version) return { ok: false, reason: `${s.target} já roda ${to}` };
-      if (!d.dep.history.includes(to)) return { ok: false, reason: `versão ${to} não existe no histórico de deploys de ${d.svc}` };
-      return { ok: true, changes: [`${s.target}: ${d.dep.version} -> ${to} (${d.dep.replicas} réplicas)`] };
+      if (to === d.dep.version) return { ok: false, reason: `${s.target} already runs ${to}` };
+      if (!d.dep.history.includes(to)) return { ok: false, reason: `version ${to} is not in the deploy history of ${d.svc}` };
+      return { ok: true, changes: [`${s.target}: ${d.dep.version} -> ${to} (${d.dep.replicas} replicas)`] };
     },
     apply: (w, s) => {
       const { dep } = deploymentOf(w, s.target)!;
@@ -139,7 +139,7 @@ const EXECUTORS: Record<ExecutableActionType, Executor> = {
     },
     revert: (w, a) => {
       const d = deploymentOf(w, a.target);
-      if (!d) return `alvo não encontrado: ${a.target}`;
+      if (!d) return `target not found: ${a.target}`;
       const restore = d.dep.previousVersion;
       d.dep.version = restore;
       d.dep.previousVersion = d.dep.history[d.dep.history.indexOf(restore) - 1] ?? str(a.params.toVersion);
@@ -150,8 +150,8 @@ const EXECUTORS: Record<ExecutableActionType, Executor> = {
     check: (w, s) => {
       const r = resourceOf(w.inventory, s.target, ["ip"]);
       if (!r || r.kind !== "ip") return notFound(s.target);
-      if (r.ip.associatedWith !== null) return { ok: false, reason: `IP ${r.id} associado a ${r.ip.associatedWith}` };
-      return { ok: true, changes: [`${s.target}: IPv4 público liberado`] };
+      if (r.ip.associatedWith !== null) return { ok: false, reason: `IP ${r.id} associated with ${r.ip.associatedWith}` };
+      return { ok: true, changes: [`${s.target}: public IPv4 released`] };
     },
     apply: (w, s) => {
       const r = resourceOf(w.inventory, s.target, ["ip"])!;
@@ -162,8 +162,8 @@ const EXECUTORS: Record<ExecutableActionType, Executor> = {
     check: (w, s) => {
       const r = resourceOf(w.inventory, s.target, ["volume"]);
       if (!r || r.kind !== "volume") return notFound(s.target);
-      if (r.volume.attachedTo !== null) return { ok: false, reason: `volume ${r.id} anexado a ${r.volume.attachedTo}` };
-      return { ok: true, changes: [`${s.target}: volume ${r.volume.type} de ${fmtGb(r.volume.sizeGb)} GB excluído`] };
+      if (r.volume.attachedTo !== null) return { ok: false, reason: `volume ${r.id} attached to ${r.volume.attachedTo}` };
+      return { ok: true, changes: [`${s.target}: ${r.volume.type} volume of ${fmtGb(r.volume.sizeGb)} GB deleted`] };
     },
     apply: (w, s) => {
       const r = resourceOf(w.inventory, s.target, ["volume"])!;
@@ -175,8 +175,8 @@ const EXECUTORS: Record<ExecutableActionType, Executor> = {
       const r = resourceOf(w.inventory, s.target, ["instance"]);
       if (!r || r.kind !== "instance") return notFound(s.target);
       const to = str(s.params.toType);
-      if (to === r.instance.type) return { ok: false, reason: `${s.target} já é ${to}` };
-      if (prices.instanceHourUsd[to] === undefined) return { ok: false, reason: `tipo ${to} sem preço na tabela de preços` };
+      if (to === r.instance.type) return { ok: false, reason: `${s.target} is already ${to}` };
+      if (prices.instanceHourUsd[to] === undefined) return { ok: false, reason: `type ${to} has no price in the price table` };
       return { ok: true, changes: [`${s.target}: ${r.instance.type} -> ${to}`] };
     },
     apply: (w, s) => {
@@ -186,7 +186,7 @@ const EXECUTORS: Record<ExecutableActionType, Executor> = {
     revert: (w, a) => {
       const r = resourceOf(w.inventory, a.target, ["instance"]);
       const original = resourceOf(w.initialInventory, a.target, ["instance"]);
-      if (!r || r.kind !== "instance" || !original || original.kind !== "instance") return `alvo não encontrado: ${a.target}`;
+      if (!r || r.kind !== "instance" || !original || original.kind !== "instance") return `target not found: ${a.target}`;
       r.instance.type = original.instance.type;
       return null;
     },
@@ -220,7 +220,7 @@ export class SimulatedInfra {
   /** Efeito puro, usado no dry run sequencial do portão e na execução. Lança se o dry run reprovaria (defeito de quem chama). */
   apply(w: WorldState, step: ValidatedStep): WorldState {
     const c = EXECUTORS[step.actionType].check(w, step, this.prices);
-    if (!c.ok) throw new Error(`apply de ${step.actionType} em ${step.target} com dry run reprovado: ${c.reason}`);
+    if (!c.ok) throw new Error(`apply of ${step.actionType} on ${step.target} with a failed dry run: ${c.reason}`);
     const next = structuredClone(w);
     EXECUTORS[step.actionType].apply(next, step);
     return next;
@@ -229,7 +229,7 @@ export class SimulatedInfra {
   /** Falha injetada pelo cenário (`faults["<tipo>@<alvo>"] === "fail"`) ou mundo que mudou desde o portão: mundo intacto. */
   execute(w: WorldState, step: ValidatedStep, s: LoadedScenario): { world: WorldState; result: ExecutionResult } {
     if (s.file.faults[`${step.actionType}@${step.target}`] === "fail") {
-      return { world: w, result: { ok: false, summary: `falha injetada pelo cenário em ${step.actionType} ${step.target}` } };
+      return { world: w, result: { ok: false, summary: `failure injected by the scenario in ${step.actionType} ${step.target}` } };
     }
     const c = EXECUTORS[step.actionType].check(w, step, this.prices);
     if (!c.ok) return { world: w, result: { ok: false, summary: c.reason } };
@@ -242,12 +242,12 @@ export class SimulatedInfra {
   revert(w: WorldState, a: GatedAction): { world: WorldState; result: ExecutionResult } {
     const executor = isExecutable(a.actionType) ? EXECUTORS[a.actionType] : undefined;
     if (!executor?.revert || !isExecutable(a.actionType) || !EXECUTABLE_ACTIONS[a.actionType].reversible) {
-      return { world: w, result: { ok: false, summary: `${a.actionType} não é reversível` } };
+      return { world: w, result: { ok: false, summary: `${a.actionType} is not reversible` } };
     }
     const next = structuredClone(w);
     const problem = executor.revert(next, a);
     if (problem !== null) return { world: w, result: { ok: false, summary: problem } };
-    return { world: next, result: { ok: true, summary: `${a.target}: ${a.actionType} revertida` } };
+    return { world: next, result: { ok: true, summary: `${a.target}: ${a.actionType} reverted` } };
   }
 
   /**

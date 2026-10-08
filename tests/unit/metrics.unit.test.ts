@@ -22,7 +22,7 @@ function testSeries(): SeriesPoint[] {
   return out;
 }
 
-const deployAlert: Alert = { title: "5xx", service: "orders-api", account: null, signal: "http_5xx_rate", threshold: 0.05, rule: "5xx acima de 5% por 2 min", detectedAt: "2026-10-04T09:42:30.000Z", severity: "sev1" };
+const deployAlert: Alert = { title: "5xx", service: "orders-api", account: null, signal: "http_5xx_rate", threshold: 0.05, rule: "5xx above 5% for 2 min", detectedAt: "2026-10-04T09:42:30.000Z", severity: "sev1" };
 
 function approvalOf(minutes: number): Approval {
   const requested = Date.parse("2026-10-04T09:46:06.000Z");
@@ -45,7 +45,7 @@ function input(o: { resolvedAt: string | null; firstMitigationAt: string | null;
 
 function costInput(o: { executedSavingsUsd: number[] }): MetricsInput {
   return {
-    alert: { title: "custo", service: null, account: "data-platform", signal: "daily_cost_usd", threshold: null, rule: "custo diário 41% acima da média de 7 dias", detectedAt: "2026-10-04T08:00:00.000Z", severity: "sev3" },
+    alert: { title: "cost", service: null, account: "data-platform", signal: "daily_cost_usd", threshold: null, rule: "daily cost 41% above the 7-day average", detectedAt: "2026-10-04T08:00:00.000Z", severity: "sev3" },
     series: { daily_cost_usd: [{ ts: "2026-10-04T08:00:00.000Z", value: 23.1 }] }, resolvedAt: "2026-10-04T08:20:00.000Z",
     approvals: [], actions: [], category: "cost_anomaly", firstMitigationAt: "2026-10-04T08:15:00.000Z",
     executedSavingsUsd: o.executedSavingsUsd, llmCalls: [], assumptions,

@@ -27,11 +27,11 @@ const ICONS: Record<Tier, ReactNode> = {
 
 export function TierBadge({ tier }: { tier: Tier }) {
   return (
-    <span className={`tier-badge tier-${tier}`} title={`Faixa ${tier}: ${TIER_LABELS[tier]}`}>
+    <span className={`tier-badge tier-${tier}`} title={`Tier ${tier}: ${TIER_LABELS[tier]}`}>
       <svg aria-hidden="true" focusable="false" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
         {ICONS[tier]}
       </svg>
-      <span>{`Faixa ${tier}`}</span>
+      <span>{`Tier ${tier}`}</span>
     </span>
   );
 }

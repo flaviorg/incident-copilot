@@ -17,7 +17,7 @@ export const SeriesSpecSchema = z
   })
   .superRefine((spec, ctx) => {
     spec.segments.forEach((s, i) => {
-      if (s.toSec <= s.fromSec) ctx.addIssue({ code: "custom", path: ["segments", i, "toSec"], message: "toSec precisa ser maior que fromSec" });
+      if (s.toSec <= s.fromSec) ctx.addIssue({ code: "custom", path: ["segments", i, "toSec"], message: "toSec must be greater than fromSec" });
     });
   });
 
@@ -80,7 +80,7 @@ export const CanaryCheckSchema = z
     baselineFactor: z.number().positive().optional(),
   })
   .refine((c) => (c.threshold === undefined) !== (c.baselineFactor === undefined), {
-    message: "use exatamente um entre threshold e baselineFactor",
+    message: "use exactly one of threshold and baselineFactor",
     path: ["threshold"],
   });
 
@@ -105,7 +105,7 @@ export const ScenarioFileSchema = z
     // Falhas injetáveis na execução simulada: "<actionType>@<target>": "fail".
     faults: z.record(z.string(), z.literal("fail")).default({}),
   })
-  .refine((s) => s.service !== null || s.account !== null, { message: "defina service ou account", path: ["service"] });
+  .refine((s) => s.service !== null || s.account !== null, { message: "set service or account", path: ["service"] });
 
 export const AfterFileSchema = z.object({
   windowSec: z.number().int().positive(),

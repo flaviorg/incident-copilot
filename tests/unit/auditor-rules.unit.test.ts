@@ -33,7 +33,7 @@ test("one check per rule; rules without applicable steps pass as not applicable"
   const checks = runAuditorRules(deployRev0(), deployEv);
   assert.deepEqual(checks.map((c) => c.rule), [...AUDITOR_RULE_IDS]);
   assert.ok(checks.every((c) => c.passed && c.detail.length <= 300));
-  assert.equal(checks.find((c) => c.rule === "snapshot_before_delete")!.detail, "não se aplica");
+  assert.equal(checks.find((c) => c.rule === "snapshot_before_delete")!.detail, "not applicable");
 });
 
 test("delete_volume without a prior snapshot fails", () => assert.equal(failed(runAuditorRules(costRev0(), costEv)), "snapshot_before_delete"));

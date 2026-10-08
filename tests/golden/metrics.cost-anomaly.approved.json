@@ -31,8 +31,8 @@
     "high": 17.8313
   },
   "llmCalls": 13,
-  "promptTokens": 13971,
-  "completionTokens": 1624,
+  "promptTokens": 13899,
+  "completionTokens": 1632,
   "assumptionsVersion": "2026-10-04",
   "sources": {
     "impactStartedAt": "measured",

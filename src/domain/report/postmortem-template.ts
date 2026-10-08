@@ -14,85 +14,85 @@ export type TemplateInput = {
 };
 
 export const CATEGORY_LABELS: Record<RootCauseCategory, string> = {
-  bad_deploy: "deploy com defeito",
-  resource_leak: "vazamento de recurso",
-  capacity: "capacidade",
-  cost_anomaly: "anomalia de custo",
-  vulnerability: "vulnerabilidade",
-  dependency_failure: "falha de dependência",
-  config_error: "erro de configuração",
-  unknown: "desconhecida",
+  bad_deploy: "faulty deploy",
+  resource_leak: "resource leak",
+  capacity: "capacity",
+  cost_anomaly: "cost anomaly",
+  vulnerability: "vulnerability",
+  dependency_failure: "dependency failure",
+  config_error: "configuration error",
+  unknown: "unknown",
 };
 
 /** Nome de cada agente na interface (spec 4.6). */
 export const AGENT_LABELS: Record<AgentId, string> = {
   supervisor: "supervisor",
-  telemetry_analyst: "analista de telemetria",
-  runbook_retriever: "recuperador de runbooks",
-  remediation_planner: "planejador de remediação",
+  telemetry_analyst: "telemetry analyst",
+  runbook_retriever: "runbook retriever",
+  remediation_planner: "remediation planner",
   auditor: "auditor",
-  gate: "portão de remediação",
+  gate: "remediation gate",
   executor: "executor",
-  verifier: "verificador",
-  reporter: "relator",
-  human: "humano",
-  system: "sistema",
-  mcp_client: "cliente MCP",
+  verifier: "verifier",
+  reporter: "reporter",
+  human: "human",
+  system: "system",
+  mcp_client: "MCP client",
 };
 
-export const CONFIDENCE_LABELS: Record<Confidence, string> = { low: "baixa", medium: "média", high: "alta" };
+export const CONFIDENCE_LABELS: Record<Confidence, string> = { low: "low", medium: "medium", high: "high" };
 
 export const ESCALATION_LABELS: Record<EscalationReason, string> = {
-  team_cap_reached: "teto de iterações da equipe atingido",
-  react_cap_low_confidence: "teto de passos do analista atingido com baixa confiança",
-  low_confidence_diagnosis: "diagnóstico ainda com baixa confiança depois das rodadas permitidas",
-  recursion_limit: "limite de recursão do grafo atingido",
-  llm_unavailable: "LLM indisponível",
-  timeout: "tempo de execução esgotado",
-  mitigation_rejected: "mitigação rejeitada por humano",
-  remediation_ineffective: "remediação ineficaz (canário reprovado)",
-  throttled: "limite de execuções atingido",
-  circuit_open: "circuit breaker aberto",
-  no_executable_actions: "nenhuma ação executável",
+  team_cap_reached: "team iteration cap reached",
+  react_cap_low_confidence: "analyst step cap reached with low confidence",
+  low_confidence_diagnosis: "diagnosis still at low confidence after the allowed rounds",
+  recursion_limit: "graph recursion limit reached",
+  llm_unavailable: "LLM unavailable",
+  timeout: "execution timed out",
+  mitigation_rejected: "mitigation rejected by a human",
+  remediation_ineffective: "ineffective remediation (canary failed)",
+  throttled: "execution limit reached",
+  circuit_open: "circuit breaker open",
+  no_executable_actions: "no executable actions",
 };
 
 export const ACTION_STATUS_LABELS: Record<ActionStatus, string> = {
-  proposed: "proposta",
-  blocked_forbidden: "bloqueada (proibida)",
-  blocked_unknown: "bloqueada (fora do catálogo)",
-  rejected_invalid_params: "recusada (parâmetros inválidos)",
-  rejected_by_dry_run: "recusada pelo dry run",
-  awaiting_approval: "aguardando aprovação",
-  approved: "aprovada",
-  rejected: "rejeitada",
-  expired: "expirada",
-  ready: "pronta",
-  succeeded: "executada",
-  failed: "falhou",
-  throttled: "limitada (taxa de execução)",
-  blocked_circuit_open: "bloqueada (circuit breaker aberto)",
-  cancelled: "cancelada",
-  reverted: "revertida",
+  proposed: "proposed",
+  blocked_forbidden: "blocked (forbidden)",
+  blocked_unknown: "blocked (not in catalog)",
+  rejected_invalid_params: "refused (invalid parameters)",
+  rejected_by_dry_run: "refused by dry run",
+  awaiting_approval: "awaiting approval",
+  approved: "approved",
+  rejected: "rejected",
+  expired: "expired",
+  ready: "ready",
+  succeeded: "executed",
+  failed: "failed",
+  throttled: "throttled (execution rate)",
+  blocked_circuit_open: "blocked (circuit breaker open)",
+  cancelled: "cancelled",
+  reverted: "reverted",
 };
 
 const PREVENTION: Partial<Record<RootCauseCategory, string[]>> = {
   bad_deploy: [
-    "Promover versões com rollout gradual e canário automático antes de atingir todas as réplicas.",
-    "Cobrir com teste os campos opcionais lidos pelo código alterado no deploy.",
-    "Manter a versão anterior pronta para rollback e deixar claro quem pode aprovar.",
+    "Promote releases with a gradual rollout and an automatic canary before reaching every replica.",
+    "Cover with tests the optional fields read by the code changed in the deploy.",
+    "Keep the previous version ready for rollback and make clear who can approve it.",
   ],
   cost_anomaly: [
-    "Marcar recursos com dono e data de revisão para evitar recursos órfãos.",
-    "Rodar a auditoria de inventário toda semana e alertar quando o custo diário fugir da média.",
-    "Criar snapshot antes de excluir volumes e nunca apagar backups para cortar custo.",
+    "Tag resources with an owner and a review date to avoid orphaned resources.",
+    "Run the inventory audit every week and alert when daily cost drifts from the average.",
+    "Take a snapshot before deleting volumes and never delete backups to cut cost.",
   ],
 };
 const DEFAULT_PREVENTION = [
-  "Revisar os sinais que dispararam o alerta e ajustar limiares e painéis.",
-  "Registrar o aprendizado deste incidente no runbook correspondente.",
+  "Review the signals that fired the alert and tune thresholds and dashboards.",
+  "Record what this incident taught in the matching runbook.",
 ];
 
-const fmtFixed = (n: number, d: number) => new Intl.NumberFormat("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d }).format(n);
+const fmtFixed = (n: number, d: number) => new Intl.NumberFormat("en-US", { minimumFractionDigits: d, maximumFractionDigits: d, useGrouping: false }).format(n);
 
 /**
  * Inteiro sem casas; senão, a partir de `preferredDigits` casas (1, como na exibição), o mínimo que mantém o erro
@@ -114,7 +114,7 @@ const truncate = (text: string, max: number) => (text.length <= max ? text : tex
 /** Frase única para pessoas: motivo do escalonamento e, entre parênteses, o detalhe (que é um fragmento em minúsculas). */
 export function escalationSentence(e: { reason: EscalationReason; detail: string }): string {
   const detail = e.detail.trim().replace(/[.;:,\s]+$/, "");
-  return `Incidente escalado para humanos: ${ESCALATION_LABELS[e.reason]}${detail ? ` (${detail})` : ""}.`;
+  return `Incident escalated to humans: ${ESCALATION_LABELS[e.reason]}${detail ? ` (${detail})` : ""}.`;
 }
 
 export function renderTemplateNarrative(i: TemplateInput): PostmortemNarrative {
@@ -125,49 +125,49 @@ export function renderTemplateNarrative(i: TemplateInput): PostmortemNarrative {
   const s: string[] = [];
   if (i.escalation) {
     s.push(escalationSentence(i.escalation));
-    s.push("Este relatório é parcial e foi gerado pelo template determinístico.");
+    s.push("This report is partial and was generated by the deterministic template.");
   } else if (i.status === "final") {
-    s.push("Incidente resolvido.");
+    s.push("Incident resolved.");
   } else {
-    s.push("Incidente ainda sem resolução; relatório parcial.");
+    s.push("Incident not yet resolved; partial report.");
   }
-  s.push(`O impacto começou às ${clock(m.impactStartedAt)} UTC e foi detectado em ${formatForNarrative(m.mttdMin)} min.`);
+  s.push(`Impact started at ${clock(m.impactStartedAt)} UTC and was detected in ${formatForNarrative(m.mttdMin)} min.`);
   if (m.mttrMin !== null) {
-    const waiting = m.timeAwaitingApprovalMin > 0 ? `, dos quais ${formatForNarrative(m.timeAwaitingApprovalMin)} min aguardando aprovação humana` : "";
-    s.push(`A resolução levou ${formatForNarrative(m.mttrMin)} min desde o início do impacto (MTTR)${waiting}.`);
+    const waiting = m.timeAwaitingApprovalMin > 0 ? `, of which ${formatForNarrative(m.timeAwaitingApprovalMin)} min were spent awaiting human approval` : "";
+    s.push(`Resolution took ${formatForNarrative(m.mttrMin)} min from the start of impact (MTTR)${waiting}.`);
   }
-  if (m.monthlySavingsUsd > 0) s.push(`Economia mensal calculada a partir das ações executadas: ${usd(m.monthlySavingsUsd)}.`);
+  if (m.monthlySavingsUsd > 0) s.push(`Monthly savings calculated from the executed actions: ${usd(m.monthlySavingsUsd)}.`);
   if (m.minutesSaved) {
     s.push(
-      `Contra a linha de base sintética de ${formatForNarrative(m.baselineMttrMin.low)} a ${formatForNarrative(m.baselineMttrMin.high)} min, ` +
-      `o ganho ilustrativo fica entre ${formatForNarrative(m.minutesSaved.low)} e ${formatForNarrative(m.minutesSaved.high)} min.`,
+      `Against the synthetic baseline of ${formatForNarrative(m.baselineMttrMin.low)} to ${formatForNarrative(m.baselineMttrMin.high)} min, ` +
+      `the illustrative gain is between ${formatForNarrative(m.minutesSaved.low)} and ${formatForNarrative(m.minutesSaved.high)} min.`,
     );
   }
-  if (i.actions.length > 0) s.push(`Ações registradas no incidente: ${i.actions.length}.`);
+  if (i.actions.length > 0) s.push(`Actions recorded in the incident: ${i.actions.length}.`);
 
   let root: string;
   if (!i.diagnosis) {
-    root = "Sem diagnóstico conclusivo; a causa raiz segue em aberto.";
+    root = "No conclusive diagnosis; the root cause remains open.";
   } else {
     const d = i.diagnosis;
-    root = `Causa classificada como ${CATEGORY_LABELS[d.category]} (confiança ${CONFIDENCE_LABELS[d.confidence]}).`;
+    root = `Cause classified as ${CATEGORY_LABELS[d.category]} (${CONFIDENCE_LABELS[d.confidence]} confidence).`;
     // A hipótese vem do modelo: só entra se todos os números dela tiverem origem.
-    if (checkNarrative(d.hypothesis, allowed).passed) root += ` Hipótese: ${d.hypothesis.trim().replace(/[.;:]?$/, ".")}`;
-    if (evidence.length > 0) root += ` Evidências: ${evidence.map((e) => e.summary).join("; ")}.`;
+    if (checkNarrative(d.hypothesis, allowed).passed) root += ` Hypothesis: ${d.hypothesis.trim().replace(/[.;:]?$/, ".")}`;
+    if (evidence.length > 0) root += ` Evidence: ${evidence.map((e) => e.summary).join("; ")}.`;
   }
 
   const prevention = PREVENTION[i.diagnosis?.category ?? "unknown"] ?? DEFAULT_PREVENTION;
   return { summary: truncate(s.join(" "), 800), rootCauseNarrative: truncate(root, 1200), prevention: [...prevention] };
 }
 
-const minutes = (n: number | null) => (n === null ? "não se aplica" : `${fmtFixed(n, 1)} min`);
-const rangeMin = (r: { low: number; high: number } | null) => (r === null ? "não se aplica" : `${fmtFixed(r.low, 1)} a ${fmtFixed(r.high, 1)} min`);
-const rangeUsd = (r: { low: number; high: number }) => `${usd(r.low)} a ${usd(r.high)}`;
+const minutes = (n: number | null) => (n === null ? "not applicable" : `${fmtFixed(n, 1)} min`);
+const rangeMin = (r: { low: number; high: number } | null) => (r === null ? "not applicable" : `${fmtFixed(r.low, 1)} to ${fmtFixed(r.high, 1)} min`);
+const rangeUsd = (r: { low: number; high: number }) => `${usd(r.low)} to ${usd(r.high)}`;
 const cell = (s: string) => s.replace(/\|/g, "\\|").replace(/\n/g, " ");
 
 /** "fake/scripted (postmortem.v1)" ou "openrouter · anthropic/x (postmortem.v1)": o provedor só aparece se o modelo não o traz. */
 function narrativeSource(g: PostmortemDoc["generatedBy"]): string {
-  if (g.model === "template") return "template determinístico";
+  if (g.model === "template") return "deterministic template";
   const model = g.model.startsWith(`${g.provider}/`) ? g.model : `${g.provider} · ${g.model}`;
   return `${model} (${g.promptVersion})`;
 }
@@ -176,57 +176,57 @@ export function renderPostmortemMarkdown(doc: PostmortemDoc): string {
   const m = doc.metrics;
   const lines: string[] = [];
   lines.push(`# Post-mortem ${doc.incidentId}: ${doc.title}`, "");
-  lines.push(`- Status: ${doc.status === "final" ? "final" : "parcial"}`);
-  lines.push(`- Serviço: ${doc.impact.service}`);
-  lines.push(`- Narrativa: ${narrativeSource(doc.generatedBy)}`);
-  lines.push("- Formato sem culpa: descreve o sistema e as decisões, não pessoas.", "");
+  lines.push(`- Status: ${doc.status === "final" ? "final" : "partial"}`);
+  lines.push(`- Service: ${doc.impact.service}`);
+  lines.push(`- Narrative: ${narrativeSource(doc.generatedBy)}`);
+  lines.push("- Blameless format: describes the system and the decisions, not people.", "");
 
-  lines.push("## Resumo", "", doc.summary, "");
+  lines.push("## Summary", "", doc.summary, "");
 
-  lines.push("## Linha do tempo", "", "| Horário (UTC) | Evento |", "|---|---|");
+  lines.push("## Timeline", "", "| Time (UTC) | Event |", "|---|---|");
   for (const t of doc.timeline) lines.push(`| ${t.ts.slice(0, 10)} ${clock(t.ts)} | ${cell(t.text)} |`);
   lines.push("");
 
-  lines.push("## Causa raiz", "", `Categoria: ${CATEGORY_LABELS[doc.rootCause.category]}.`, "", doc.rootCause.narrative, "");
+  lines.push("## Root cause", "", `Category: ${CATEGORY_LABELS[doc.rootCause.category]}.`, "", doc.rootCause.narrative, "");
   if (doc.rootCause.evidence.length > 0) {
-    lines.push("Evidências:", "");
+    lines.push("Evidence:", "");
     for (const e of doc.rootCause.evidence) lines.push(`- \`${e.ref}\`: ${e.summary}`);
     lines.push("");
   }
 
-  lines.push("## Ações", "");
+  lines.push("## Actions", "");
   if (doc.actions.length === 0) {
-    lines.push("Nenhuma ação registrada.", "");
+    lines.push("No actions recorded.", "");
   } else {
-    lines.push("| Ação | Faixa | Status | Decidido por |", "|---|---|---|---|");
-    for (const a of doc.actions) lines.push(`| ${cell(a.actionType)} | ${a.tier} | ${ACTION_STATUS_LABELS[a.status]} | ${cell(a.decidedBy ?? "automático")} |`);
+    lines.push("| Action | Tier | Status | Decided by |", "|---|---|---|---|");
+    for (const a of doc.actions) lines.push(`| ${cell(a.actionType)} | ${a.tier} | ${ACTION_STATUS_LABELS[a.status]} | ${cell(a.decidedBy ?? "automatic")} |`);
     lines.push("");
   }
 
-  lines.push("## Números", "");
-  lines.push(`- MTTR: ${minutes(m.mttrMin)} (medido)`);
-  lines.push(`- MTTD: ${minutes(m.mttdMin)} (medido)`);
-  lines.push(`- Tempo aguardando aprovação: ${minutes(m.timeAwaitingApprovalMin)} (medido)`);
-  lines.push(`- Economia mensal: ${usd(m.monthlySavingsUsd)} (derivado dos achados de inventário das ações executadas)`);
-  lines.push(`- Linha de base de MTTR: ${rangeMin(m.baselineMttrMin)} (premissa sintética)`);
-  lines.push(`- Minutos economizados: ${rangeMin(m.minutesSaved)} (ilustrativo, linha de base sintética)`);
-  lines.push(`- Custo de indisponibilidade evitado: ${rangeUsd(m.downtimeCostAvoidedUsd)} (ilustrativo)`);
-  lines.push(`- Custo de engenharia economizado: ${rangeUsd(m.engineeringCostSavedUsd)} (ilustrativo)`);
-  lines.push(`- Custo do copiloto por incidente: ${usd(m.copilotCostUsd)} (derivado)`);
-  lines.push(`- ROI: ${m.roiIllustrative === null ? "não se aplica" : `${fmtFixed(m.roiIllustrative.low, 1)}x a ${fmtFixed(m.roiIllustrative.high, 1)}x`} (ilustrativo, linha de base sintética)`);
-  lines.push(`- LLM: ${m.llmCalls} chamadas, ${m.promptTokens} tokens de entrada, ${m.completionTokens} de saída, ${usd(m.llmCostUsd)} (medido)`);
-  lines.push(`- Premissas: versão ${m.assumptionsVersion}`, "");
+  lines.push("## Numbers", "");
+  lines.push(`- MTTR: ${minutes(m.mttrMin)} (measured)`);
+  lines.push(`- MTTD: ${minutes(m.mttdMin)} (measured)`);
+  lines.push(`- Time waiting for approval: ${minutes(m.timeAwaitingApprovalMin)} (measured)`);
+  lines.push(`- Monthly savings: ${usd(m.monthlySavingsUsd)} (derived from the inventory findings of the executed actions)`);
+  lines.push(`- MTTR baseline: ${rangeMin(m.baselineMttrMin)} (synthetic assumption)`);
+  lines.push(`- Minutes saved: ${rangeMin(m.minutesSaved)} (illustrative, synthetic baseline)`);
+  lines.push(`- Downtime cost avoided: ${rangeUsd(m.downtimeCostAvoidedUsd)} (illustrative)`);
+  lines.push(`- Engineering cost saved: ${rangeUsd(m.engineeringCostSavedUsd)} (illustrative)`);
+  lines.push(`- Copilot cost per incident: ${usd(m.copilotCostUsd)} (derived)`);
+  lines.push(`- ROI: ${m.roiIllustrative === null ? "not applicable" : `${fmtFixed(m.roiIllustrative.low, 1)}x to ${fmtFixed(m.roiIllustrative.high, 1)}x`} (illustrative, synthetic baseline)`);
+  lines.push(`- LLM: ${m.llmCalls} calls, ${m.promptTokens} input tokens, ${m.completionTokens} output tokens, ${usd(m.llmCostUsd)} (measured)`);
+  lines.push(`- Assumptions: version ${m.assumptionsVersion}`, "");
 
-  lines.push("## Prevenção", "");
+  lines.push("## Prevention", "");
   for (const p of doc.prevention) lines.push(`- ${p}`);
   lines.push("");
 
   if (doc.escalation) {
-    lines.push("## Escalonamento", "", `${ESCALATION_LABELS[doc.escalation.reason]}: ${doc.escalation.detail}`, "");
+    lines.push("## Escalation", "", `${ESCALATION_LABELS[doc.escalation.reason]}: ${doc.escalation.detail}`, "");
   }
 
-  lines.push("## Guarda numérico", "");
-  lines.push(doc.numericGuard.passed ? "- Todos os números da narrativa têm origem calculada." : `- Números sem origem rejeitados: ${doc.numericGuard.rejectedNumbers.join(", ")}`);
-  lines.push(`- Template usado: ${doc.numericGuard.usedTemplate ? "sim" : "não"}`, "");
+  lines.push("## Numeric guard", "");
+  lines.push(doc.numericGuard.passed ? "- Every number in the narrative has a calculated source." : `- Numbers without a source rejected: ${doc.numericGuard.rejectedNumbers.join(", ")}`);
+  lines.push(`- Template used: ${doc.numericGuard.usedTemplate ? "yes" : "no"}`, "");
   return lines.join("\n");
 }

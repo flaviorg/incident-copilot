@@ -53,7 +53,7 @@ test("executes ready and approved actions in order and audits each one", async (
   // Cada execução começa quando a anterior termina (duração do catálogo: 1, 90 e 5 s).
   assert.deepEqual(out.actions!.map((a) => (Date.parse(a.executedAt!) - t0) / 1000), [0, 1, 91]);
   assert.equal(c.clock.now().getTime() - t0, 96_000);
-  assert.equal(out.actions![1]!.resultSummary, "deployment/orders-api: v3.8.0 -> v3.7.2 (6 réplicas)");
+  assert.equal(out.actions![1]!.resultSummary, "deployment/orders-api: v3.8.0 -> v3.7.2 (6 replicas)");
   const handoffs = c.store.listTrace(bb.incidentId, { type: "handoff" }).filter((e) => e.payload.to === "executor");
   assert.deepEqual(handoffs.map((e) => e.payload.from), ["human"]);
   assert.deepEqual(c.store.listTrace(bb.incidentId, { agent: "executor", type: "action" }).map((e) => e.payload.tool), ["add_incident_note", "rollback_deployment", "block_image_tag"]);
@@ -95,7 +95,7 @@ test("execution failure records a breaker failure", async () => {
   const g = guards({ breaker: new CircuitBreaker({ failureThreshold: 1, cooldownSec: 300 }) });
   const out = await createExecutorNode(ed(c, g))(bb);
   assert.deepEqual(out.actions!.map((a) => a.status), ["succeeded", "failed", "cancelled"]);
-  assert.match(out.actions![1]!.resultSummary!, /falha injetada/);
+  assert.match(out.actions![1]!.resultSummary!, /failure injected/);
   assert.equal(g.breaker.state(c.clock.now()), "open");
   assert.deepEqual(sinceGate(c, bb.incidentId), ["action_executed", "action_failed", "circuit_opened", "action_cancelled"]);
   assert.equal(out.escalation!.reason, "no_executable_actions");
@@ -117,7 +117,7 @@ test("healthy canary verifies; failing canary reverts in reverse order and escal
     assert.equal(ok.phase, "verifying");
     const critique = c.store.listTrace(bb.incidentId, { type: "critique" }).at(-1)!;
     assert.deepEqual([critique.payload.by, critique.payload.verdict], ["canary", "approve"]);
-    assert.match(critique.payload.feedback, /^canário saudável: 5xx 0,5% ≤ 5%; P99 205 ms ≤ 270 ms$/);
+    assert.match(critique.payload.feedback, /^healthy canary: 5xx 0.5% ≤ 5%; P99 205 ms ≤ 270 ms$/);
     const handoff = c.store.listTrace(bb.incidentId, { type: "handoff" }).at(-1)!;
     assert.deepEqual([handoff.payload.from, handoff.payload.to], ["verifier", "supervisor"]);
     // Sucesso do canário zera as falhas consecutivas: uma nova falha não abre o breaker.

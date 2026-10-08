@@ -43,7 +43,7 @@ export const DecisionBodySchema = z
     comment: z.string().max(500).optional(),
   })
   .refine((b) => (b.decision === undefined) !== (b.text === undefined), {
-    message: "informe exatamente um entre decision e text",
+    message: "provide exactly one of decision and text",
     path: ["decision"],
   });
 
@@ -133,7 +133,7 @@ export const ProposeRemediationInputSchema = z.object({
   actionType: z.string().min(1).max(64),
   target: z.string().min(1).max(200),
   params: z.record(z.string(), z.unknown()).refine((p) => jsonLength(p) <= MCP_PARAMS_MAX_JSON_CHARS, {
-    message: `params passa de ${MCP_PARAMS_MAX_JSON_CHARS} caracteres em JSON`,
+    message: `params exceeds ${MCP_PARAMS_MAX_JSON_CHARS} characters as JSON`,
   }),
   rationale: z.string().max(300),
   runbookRef: z.string().min(1).max(120).optional(),

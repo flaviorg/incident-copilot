@@ -32,7 +32,7 @@ export function buildServer(c: Container): FastifyInstance {
   });
 
   app.addHook("onResponse", async (req, reply) => {
-    c.logger.info("requisição atendida", {
+    c.logger.info("request served", {
       requestId: req.id, method: req.method, url: clipText(req.url, 200), statusCode: reply.statusCode, latencyMs: Math.round(reply.elapsedTime),
     });
   });
@@ -41,7 +41,7 @@ export function buildServer(c: Container): FastifyInstance {
     const { status, body, unexpected } = toHttpError(err, req.id);
     if (unexpected) {
       const e = err as { name?: unknown; message?: unknown };
-      c.logger.error("erro inesperado na requisição", {
+      c.logger.error("unexpected error in request", {
         requestId: req.id, method: req.method, url: clipText(req.url, 200), error: typeof e?.name === "string" ? e.name : "Error",
         detail: typeof e?.message === "string" ? clipText(e.message, 500) : null,
       });
@@ -50,7 +50,7 @@ export function buildServer(c: Container): FastifyInstance {
   });
 
   app.setNotFoundHandler((req, reply) =>
-    reply.code(404).send({ error: { code: "route_not_found", message: `rota não encontrada: ${req.method} ${clipText(req.url.split("?")[0] ?? "", 100)}`, requestId: req.id } }),
+    reply.code(404).send({ error: { code: "route_not_found", message: `route not found: ${req.method} ${clipText(req.url.split("?")[0] ?? "", 100)}`, requestId: req.id } }),
   );
 
   registerHealthRoutes(app, c);

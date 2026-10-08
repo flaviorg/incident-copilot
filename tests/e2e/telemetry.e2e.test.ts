@@ -43,12 +43,12 @@ test("12 steps without final: low confidence, capReached, and no GraphRecursionE
   const out = await g.invoke(bb, { recursionLimit: 25 });
   assert.equal(out.diagnosis!.capReached, true);
   assert.equal(out.diagnosis!.confidence, "low");
-  assert.match(out.diagnosis!.hypothesis, /12 passos/);
+  assert.match(out.diagnosis!.hypothesis, /12 steps/);
   const obs = c.store.listTrace(bb.incidentId, { type: "observation" });
   assert.equal(obs.length, 12);
-  assert.match(obs[2]!.payload.summary, /ferramenta desconhecida/);
+  assert.match(obs[2]!.payload.summary, /unknown tool/);
   assert.equal(obs[2]!.payload.ok, false);
-  assert.match(obs[3]!.payload.summary, /argumentos inválidos/);
+  assert.match(obs[3]!.payload.summary, /invalid arguments/);
   assert.equal(obs[3]!.payload.ok, false);
   assert.ok(out.diagnosis!.evidence.length >= 1 && out.diagnosis!.evidence.length <= 8);
   assert.equal(c.store.listTrace(bb.incidentId, { type: "answer" })[0]!.payload.kind, "diagnosis");
@@ -81,7 +81,7 @@ test("trace sink numbers, redacts and clips events; run context carries the requ
 test("diagnose CLI prints the ReAct trace", async () => {
   const r = await runCli(["diagnose", "--scenario", "deploy-5xx-rollback"]);
   assert.equal(r.code, 0, r.stderr);
-  assert.match(r.stdout, /pensa/);
+  assert.match(r.stdout, /think/);
   assert.match(r.stdout, /query_metrics/);
   assert.match(r.stdout, /obs/);
   assert.match(r.stdout, /bad_deploy/);

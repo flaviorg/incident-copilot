@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "scenarioId": "deploy-5xx-rollback",
   "promptHashes": {
-    "supervisor.v1": "sha256:f45bf8a54925bd700e25b547f937ef117d20b04481f7ff6f79282eb0ec5f5079",
-    "telemetry-react.v1": "sha256:ff2dca7f412cf4d3b9b8c332192bfca06fec99e8d111bbb223a4d9762e13d715",
-    "planner.v1": "sha256:cda4e9c0ecc4e06f434a71cf0ff0ce677b361546674b0aed6ac71b96bba096b5",
-    "auditor.v1": "sha256:9810ccb2343e7142aebbc25b42c173dd209e18b9263d62bbdb2ed5ac101c86d5",
-    "postmortem.v1": "sha256:cf433bc53207974b67b94ea94e72202cc47cbbd896fa94254c4666077fa39e14"
+    "supervisor.v1": "sha256:a24255b023aa0ef32a43ca948d5b986cbf2793c8800d26e3a7a3ef94a7ec1bca",
+    "telemetry-react.v1": "sha256:fcb01add11343d95372a338d7c1665bb069ecc739483b3f19cb203051f9cdc26",
+    "planner.v1": "sha256:d78ea090bba8a5f1bd03fa5dab7603256621697afa2b298a3e5e77ebfe44545b",
+    "auditor.v1": "sha256:b3962f64bb97da3181b544047156221ed186ef35d27277398e5d37155519c7ce",
+    "postmortem.v1": "sha256:6db385526780cf1020cf6b246fffe293dc345957a173ca658e636b6c9c2932da"
   },
   "turns": [
     {
@@ -17,8 +17,8 @@
       },
       "output": {
         "next": "telemetry_analyst",
-        "brief": "Correlacione 5xx e latência do orders-api com o deploy v3.8.0",
-        "reason": "Sem diagnóstico; o alerta coincide com um deploy recente"
+        "brief": "Correlate orders-api 5xx errors and latency with the v3.8.0 deploy",
+        "reason": "No diagnosis yet; the alert coincides with a recent deploy"
       },
       "usage": {
         "promptTokens": 812,
@@ -34,7 +34,7 @@
       },
       "output": {
         "kind": "action",
-        "thought": "Começo medindo a taxa de 5xx.",
+        "thought": "I start by measuring the 5xx rate.",
         "tool": "query_metrics",
         "args": {
           "service": "orders-api",
@@ -52,7 +52,7 @@
       },
       "output": {
         "kind": "action",
-        "thought": "Vejo os deploys recentes.",
+        "thought": "I check the recent deploys.",
         "tool": "list_deploys",
         "args": {
           "service": "orders-api"
@@ -68,7 +68,7 @@
       },
       "output": {
         "kind": "action",
-        "thought": "Quero ver os pods direto no cluster.",
+        "thought": "I want to look at the pods directly in the cluster.",
         "tool": "kubectl_exec",
         "args": {
           "command": "kubectl get pods -n orders"
@@ -84,7 +84,7 @@
       },
       "output": {
         "kind": "action",
-        "thought": "Vou olhar a CPU.",
+        "thought": "I will look at the CPU.",
         "tool": "query_metrics",
         "args": {
           "metric": "cpu"
@@ -100,7 +100,7 @@
       },
       "output": {
         "kind": "action",
-        "thought": "Leio os erros recentes.",
+        "thought": "I read the recent errors.",
         "tool": "query_logs",
         "args": {
           "service": "orders-api",
@@ -118,7 +118,7 @@
       },
       "output": {
         "kind": "action",
-        "thought": "Confiro a latência P99.",
+        "thought": "I check the P99 latency.",
         "tool": "query_metrics",
         "args": {
           "service": "orders-api",
@@ -136,7 +136,7 @@
       },
       "output": {
         "kind": "action",
-        "thought": "Confiro a vazão.",
+        "thought": "I check the throughput.",
         "tool": "query_metrics",
         "args": {
           "service": "orders-api",
@@ -154,7 +154,7 @@
       },
       "output": {
         "kind": "action",
-        "thought": "Leio os avisos da última hora.",
+        "thought": "I read the warnings from the last hour.",
         "tool": "query_logs",
         "args": {
           "service": "orders-api",
@@ -172,7 +172,7 @@
       },
       "output": {
         "kind": "action",
-        "thought": "Meço de novo os 5xx em 15 minutos.",
+        "thought": "I measure the 5xx errors again over 15 minutes.",
         "tool": "query_metrics",
         "args": {
           "service": "orders-api",
@@ -190,7 +190,7 @@
       },
       "output": {
         "kind": "action",
-        "thought": "Deploys da última hora.",
+        "thought": "Deploys from the last hour.",
         "tool": "list_deploys",
         "args": {
           "service": "orders-api",
@@ -207,7 +207,7 @@
       },
       "output": {
         "kind": "action",
-        "thought": "Latência em 15 minutos.",
+        "thought": "Latency over 15 minutes.",
         "tool": "query_metrics",
         "args": {
           "service": "orders-api",
@@ -225,7 +225,7 @@
       },
       "output": {
         "kind": "action",
-        "thought": "Erros da última hora.",
+        "thought": "Errors from the last hour.",
         "tool": "query_logs",
         "args": {
           "service": "orders-api",

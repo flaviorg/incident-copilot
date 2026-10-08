@@ -99,14 +99,14 @@ test("guard counters come from trace critiques", () => {
     return { id: `${id}:${seq}`, incidentId: id, runId: "RUN-0001", requestId: null, seq, ts: ago(5), agent: "system", llm: null, type: "critique", payload };
   };
   store.appendTrace([
-    critique("supervisor_guard", "coerced", "gate sem plano"),
-    critique("supervisor_guard", "coerced", "gate sem plano de novo"),
+    critique("supervisor_guard", "coerced", "gate without a plan"),
+    critique("supervisor_guard", "coerced", "gate without a plan again"),
     // O contador lê o campo estruturado, não o texto: o feedback vem do modelo e pode ter qualquer palavra.
-    critique("auditor", "revise", "regras: snapshot_before_delete", true),
+    critique("auditor", "revise", "rules: snapshot_before_delete", true),
     critique("auditor", "revise", "x".repeat(600), true), // feedback cortado em 600: nenhum marcador de texto sobrevive
-    critique("auditor", "revise", "o modelo escreveu que o plano anterior foi sobrescrito", false),
-    critique("auditor", "revise", "falta snapshot", false),
-    critique("numeric_guard", "reject", "números sem origem: 20%"),
+    critique("auditor", "revise", "the model wrote that the previous plan was overridden", false),
+    critique("auditor", "revise", "missing snapshot", false),
+    critique("numeric_guard", "reject", "numbers without a source: 20%"),
     critique("gate", "blocked", "delete_backups"),
   ]);
   assert.deepEqual(stats().get("24h").guard, { supervisorCoercions: 2, auditorOverrides: 2, numericGuardRejections: 1 });

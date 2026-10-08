@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "scenarioId": "cost-anomaly",
   "promptHashes": {
-    "supervisor.v1": "sha256:f45bf8a54925bd700e25b547f937ef117d20b04481f7ff6f79282eb0ec5f5079",
-    "telemetry-react.v1": "sha256:ff2dca7f412cf4d3b9b8c332192bfca06fec99e8d111bbb223a4d9762e13d715",
-    "planner.v1": "sha256:cda4e9c0ecc4e06f434a71cf0ff0ce677b361546674b0aed6ac71b96bba096b5",
-    "auditor.v1": "sha256:9810ccb2343e7142aebbc25b42c173dd209e18b9263d62bbdb2ed5ac101c86d5",
-    "postmortem.v1": "sha256:cf433bc53207974b67b94ea94e72202cc47cbbd896fa94254c4666077fa39e14"
+    "supervisor.v1": "sha256:a24255b023aa0ef32a43ca948d5b986cbf2793c8800d26e3a7a3ef94a7ec1bca",
+    "telemetry-react.v1": "sha256:fcb01add11343d95372a338d7c1665bb069ecc739483b3f19cb203051f9cdc26",
+    "planner.v1": "sha256:d78ea090bba8a5f1bd03fa5dab7603256621697afa2b298a3e5e77ebfe44545b",
+    "auditor.v1": "sha256:b3962f64bb97da3181b544047156221ed186ef35d27277398e5d37155519c7ce",
+    "postmortem.v1": "sha256:6db385526780cf1020cf6b246fffe293dc345957a173ca658e636b6c9c2932da"
   },
   "turns": [
     {
@@ -17,8 +17,8 @@
       },
       "output": {
         "next": "telemetry_analyst",
-        "brief": "Audite o inventário da conta data-platform e confirme quando o custo diário subiu",
-        "reason": "Sem diagnóstico; a alta de custo não veio acompanhada de aumento de uso"
+        "brief": "Audit the data-platform account inventory and confirm when the daily cost went up",
+        "reason": "No diagnosis yet; the cost increase did not come with higher usage"
       }
     },
     {
@@ -30,7 +30,7 @@
       },
       "output": {
         "kind": "action",
-        "thought": "Custo subiu sem aumento de uso; começo auditando o inventário da conta atrás de recursos ociosos.",
+        "thought": "Cost went up without higher usage; I start by auditing the account inventory for idle resources.",
         "tool": "audit_cloud_inventory",
         "args": {
           "account": "data-platform"
@@ -46,7 +46,7 @@
       },
       "output": {
         "kind": "action",
-        "thought": "Vou confirmar no custo diário dos últimos 7 dias quando a alta começou.",
+        "thought": "I will check the daily cost over the last 7 days to confirm when the increase started.",
         "tool": "query_metrics",
         "args": {
           "service": "data-platform",
@@ -64,21 +64,21 @@
       },
       "output": {
         "kind": "final",
-        "thought": "A alta do custo diário coincide com recursos ociosos que o inventário mostra; não há sinal de aumento de uso.",
+        "thought": "The daily cost increase coincides with idle resources shown by the inventory; there is no sign of higher usage.",
         "diagnosis": {
-          "hypothesis": "Recursos ociosos na conta data-platform (volume gp3 sem anexo, IPv4 público sem associação e instância r6i.2xlarge subutilizada) explicam a alta do custo diário.",
+          "hypothesis": "Idle resources in the data-platform account (unattached gp3 volume, unassociated public IPv4 and underused r6i.2xlarge instance) explain the daily cost increase.",
           "category": "cost_anomaly",
           "confidence": "high",
           "evidence": [
             {
               "source": "inventory",
               "ref": "inventory:data-platform@2026-10-04",
-              "summary": "3 achados com economia potencial de US$ 339,59 por mês: volume de 750 GB sem anexo há 23 dias, IP sem associação e instância com CPU média de 3,1%"
+              "summary": "3 findings with potential savings of US$ 339.59 per month: 750 GB volume unattached for 23 days, unassociated IP and instance with 3.1% average CPU"
             },
             {
               "source": "metrics",
               "ref": "metrics:data-platform:daily_cost_usd@09-27T08:00-10-04T08:00",
-              "summary": "custo diário subiu de US$ 16,40 para US$ 23,10 no último dia da janela de 7 dias"
+              "summary": "daily cost rose from US$ 16.40 to US$ 23.10 on the last day of the 7-day window"
             }
           ]
         }
@@ -93,8 +93,8 @@
       },
       "output": {
         "next": "runbook_retriever",
-        "brief": "Procure runbooks de anomalia de custo para a conta data-platform",
-        "reason": "Diagnóstico cost_anomaly com confiança alta; faltam os runbooks"
+        "brief": "Search for cost anomaly runbooks for the data-platform account",
+        "reason": "cost_anomaly diagnosis with high confidence; the runbooks are missing"
       },
       "usage": {
         "promptTokens": 880,
@@ -111,8 +111,8 @@
       },
       "output": {
         "next": "remediation_planner",
-        "brief": "Planeje o corte dos recursos ociosos apontados pelo inventário",
-        "reason": "Diagnóstico e runbooks prontos; falta o plano"
+        "brief": "Plan the removal of the idle resources found by the inventory",
+        "reason": "Diagnosis and runbooks ready; the plan is missing"
       },
       "usage": {
         "promptTokens": 921,
@@ -126,17 +126,17 @@
         "revision": 0
       },
       "output": {
-        "summary": "Cortar o custo ocioso da conta data-platform: marcar e excluir o volume sem anexo, liberar o IPv4 ocioso, redimensionar a instância subutilizada e apagar backups antigos do cofre.",
+        "summary": "Cut the idle cost of the data-platform account: tag and delete the unattached volume, release the idle IPv4, resize the underused instance and delete old backups from the vault.",
         "steps": [
           {
             "order": 1,
             "actionType": "tag_resource_for_review",
             "target": "volume/data-platform/vol-0c41d2",
             "params": {
-              "reason": "volume gp3 sem anexo há 23 dias"
+              "reason": "gp3 volume unattached for 23 days"
             },
-            "rationale": "Registrar dono e revisão antes de mexer no volume.",
-            "runbookRef": "cloud-cost-anomaly#diagnostico",
+            "rationale": "Record owner and review before touching the volume.",
+            "runbookRef": "cloud-cost-anomaly#diagnosis",
             "dependsOn": []
           },
           {
@@ -144,8 +144,8 @@
             "actionType": "delete_volume",
             "target": "volume/data-platform/vol-0c41d2",
             "params": {},
-            "rationale": "Volume sem anexo há 23 dias; a exclusão elimina o custo mensal dele.",
-            "runbookRef": "cloud-cost-anomaly#mitigacao",
+            "rationale": "Volume unattached for 23 days; deleting it removes its monthly cost.",
+            "runbookRef": "cloud-cost-anomaly#mitigation",
             "dependsOn": [
               1
             ]
@@ -155,8 +155,8 @@
             "actionType": "release_elastic_ip",
             "target": "ip/data-platform/eipalloc-0f19",
             "params": {},
-            "rationale": "IPv4 público sem associação cobrado por hora.",
-            "runbookRef": "cloud-cost-anomaly#mitigacao",
+            "rationale": "Unassociated public IPv4 billed by the hour.",
+            "runbookRef": "cloud-cost-anomaly#mitigation",
             "dependsOn": []
           },
           {
@@ -166,8 +166,8 @@
             "params": {
               "toType": "r6i.large"
             },
-            "rationale": "CPU média de 3,1% em 14 dias; um tipo menor da mesma família atende.",
-            "runbookRef": "cloud-cost-anomaly#mitigacao",
+            "rationale": "3.1% average CPU over 14 days; a smaller type of the same family is enough.",
+            "runbookRef": "cloud-cost-anomaly#mitigation",
             "dependsOn": []
           },
           {
@@ -175,7 +175,7 @@
             "actionType": "delete_backups",
             "target": "backup_vault/data-platform/data-platform-prod",
             "params": {},
-            "rationale": "Apagar os backups antigos do cofre para cortar custo.",
+            "rationale": "Delete the old backups from the vault to cut cost.",
             "runbookRef": null,
             "dependsOn": []
           }
@@ -190,7 +190,7 @@
       },
       "output": {
         "verdict": "revise",
-        "feedback": "Falta snapshot do volume vol-0c41d2 antes da exclusão: inclua create_volume_snapshot e faça delete_volume depender dele."
+        "feedback": "A snapshot of volume vol-0c41d2 is missing before the deletion: add create_volume_snapshot and make delete_volume depend on it."
       }
     },
     {
@@ -200,17 +200,17 @@
         "revision": 1
       },
       "output": {
-        "summary": "Cortar o custo ocioso da conta data-platform com snapshot do volume antes da exclusão, liberação do IPv4 ocioso, redimensionamento da instância subutilizada e limpeza de backups antigos do cofre.",
+        "summary": "Cut the idle cost of the data-platform account with a snapshot of the volume before deletion, release of the idle IPv4, resize of the underused instance and cleanup of old backups from the vault.",
         "steps": [
           {
             "order": 1,
             "actionType": "tag_resource_for_review",
             "target": "volume/data-platform/vol-0c41d2",
             "params": {
-              "reason": "volume gp3 sem anexo há 23 dias"
+              "reason": "gp3 volume unattached for 23 days"
             },
-            "rationale": "Registrar dono e revisão antes de mexer no volume.",
-            "runbookRef": "cloud-cost-anomaly#diagnostico",
+            "rationale": "Record owner and review before touching the volume.",
+            "runbookRef": "cloud-cost-anomaly#diagnosis",
             "dependsOn": []
           },
           {
@@ -218,8 +218,8 @@
             "actionType": "create_volume_snapshot",
             "target": "volume/data-platform/vol-0c41d2",
             "params": {},
-            "rationale": "Snapshot antes da exclusão, para ela poder ser desfeita.",
-            "runbookRef": "cloud-cost-anomaly#mitigacao",
+            "rationale": "Snapshot before the deletion, so it can be undone.",
+            "runbookRef": "cloud-cost-anomaly#mitigation",
             "dependsOn": []
           },
           {
@@ -227,8 +227,8 @@
             "actionType": "delete_volume",
             "target": "volume/data-platform/vol-0c41d2",
             "params": {},
-            "rationale": "Volume sem anexo há 23 dias; a exclusão elimina o custo mensal dele.",
-            "runbookRef": "cloud-cost-anomaly#mitigacao",
+            "rationale": "Volume unattached for 23 days; deleting it removes its monthly cost.",
+            "runbookRef": "cloud-cost-anomaly#mitigation",
             "dependsOn": [
               2
             ]
@@ -238,8 +238,8 @@
             "actionType": "release_elastic_ip",
             "target": "ip/data-platform/eipalloc-0f19",
             "params": {},
-            "rationale": "IPv4 público sem associação cobrado por hora.",
-            "runbookRef": "cloud-cost-anomaly#mitigacao",
+            "rationale": "Unassociated public IPv4 billed by the hour.",
+            "runbookRef": "cloud-cost-anomaly#mitigation",
             "dependsOn": []
           },
           {
@@ -249,8 +249,8 @@
             "params": {
               "toType": "r6i.large"
             },
-            "rationale": "CPU média de 3,1% em 14 dias; um tipo menor da mesma família atende.",
-            "runbookRef": "cloud-cost-anomaly#mitigacao",
+            "rationale": "3.1% average CPU over 14 days; a smaller type of the same family is enough.",
+            "runbookRef": "cloud-cost-anomaly#mitigation",
             "dependsOn": []
           },
           {
@@ -258,7 +258,7 @@
             "actionType": "delete_backups",
             "target": "backup_vault/data-platform/data-platform-prod",
             "params": {},
-            "rationale": "Apagar os backups antigos do cofre para cortar custo.",
+            "rationale": "Delete the old backups from the vault to cut cost.",
             "runbookRef": null,
             "dependsOn": []
           }
@@ -273,7 +273,7 @@
       },
       "output": {
         "verdict": "approve",
-        "feedback": "O snapshot vem antes da exclusão e os demais passos seguem os achados do inventário."
+        "feedback": "The snapshot comes before the deletion and the other steps follow the inventory findings."
       }
     },
     {
@@ -286,8 +286,8 @@
       },
       "output": {
         "next": "gate",
-        "brief": "Avalie o risco de cada passo do plano revisado",
-        "reason": "Plano aprovado pelo auditor na revisão 1; segue para o portão de remediação"
+        "brief": "Assess the risk of each step of the revised plan",
+        "reason": "Plan approved by the auditor in revision 1; moving on to the remediation gate"
       },
       "usage": {
         "promptTokens": 1012,
@@ -302,8 +302,8 @@
       },
       "output": {
         "next": "reporter",
-        "brief": "Redija o post-mortem com a economia mensal das ações executadas",
-        "reason": "Canário de custo saudável depois das ações aprovadas; falta o relatório"
+        "brief": "Write the post-mortem with the monthly savings of the executed actions",
+        "reason": "Healthy cost canary after the approved actions; the report is missing"
       },
       "usage": {
         "promptTokens": 1058,
@@ -317,12 +317,12 @@
         "kind": "final"
       },
       "output": {
-        "summary": "Recursos ociosos na conta data-platform elevaram o custo diário. Com aprovação humana, o volume sem anexo foi excluído depois de um snapshot, o IPv4 ocioso foi liberado e a instância subutilizada foi redimensionada; a economia mensal das ações executadas é de US$ 339,59. O passo que apagaria os backups do cofre foi barrado pelo portão.",
-        "rootCauseNarrative": "Um volume gp3 de 750 GB sem anexo há 23 dias, um IPv4 público sem associação e uma instância r6i.2xlarge com CPU média de 3,1% geravam custo sem uso. O auditor exigiu o snapshot antes da exclusão do volume, e o plano revisado seguiu os achados do inventário.",
+        "summary": "Idle resources in the data-platform account raised the daily cost. With human approval, the unattached volume was deleted after a snapshot, the idle IPv4 was released and the underused instance was resized; the monthly savings from the executed actions are US$ 339.59. The step that would have deleted the vault backups was blocked by the gate.",
+        "rootCauseNarrative": "A 750 GB gp3 volume unattached for 23 days, an unassociated public IPv4 and an r6i.2xlarge instance with 3.1% average CPU were generating cost without use. The auditor required the snapshot before the volume deletion, and the revised plan followed the inventory findings.",
         "prevention": [
-          "Alertar sobre volumes sem anexo e IPs sem associação antes de virarem custo recorrente.",
-          "Revisar o tamanho das instâncias com base na CPU média de duas semanas.",
-          "Manter a limpeza de backups fora da automação, com decisão do dono do dado."
+          "Alert on unattached volumes and unassociated IPs before they become recurring cost.",
+          "Review instance sizes based on the two-week average CPU.",
+          "Keep backup cleanup out of automation, with the decision left to the data owner."
         ]
       }
     }

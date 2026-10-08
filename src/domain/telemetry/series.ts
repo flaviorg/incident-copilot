@@ -45,7 +45,7 @@ export function materializeSeries(
   durationSec: number,
   o: { clamp?: "unit" | "nonnegative" } = {},
 ): SeriesPoint[] {
-  if (resolutionSec <= 0) throw new RangeError("resolutionSec precisa ser positivo");
+  if (resolutionSec <= 0) throw new RangeError("resolutionSec must be positive");
   const rng = spec.noise ? mulberry32(spec.noise.seed) : null;
   const amplitude = spec.noise?.amplitude ?? 0;
   const max = o.clamp === "unit" ? 1 : Number.POSITIVE_INFINITY;

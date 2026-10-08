@@ -7,7 +7,7 @@ const pick = (g: { next: string; coerced: boolean }) => ({ next: g.next, coerced
 
 test("gate without plan is coerced to the canonical route", () => {
   assert.deepEqual(pick(guardChoice("gate", bb({ diagnosis: high() }), L)), { next: "runbook_retriever", coerced: true });
-  assert.match(guardChoice("gate", bb({ diagnosis: high() }), L).reason, /plano/);
+  assert.match(guardChoice("gate", bb({ diagnosis: high() }), L).reason, /no plan/);
 });
 
 test("runbook_retriever does not repeat", () => {

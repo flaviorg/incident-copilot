@@ -7,20 +7,20 @@ import type { ExecutableActionType } from "../../src/domain/autonomy/catalog.ts"
 
 const ctx = { scope: { service: "orders-api", account: null, incidentId: "INC-0001" }, revisionsExhausted: false };
 const costCtx = { scope: { service: null, account: "data-platform", incidentId: "INC-0002" }, revisionsExhausted: false };
-const s = (actionType: string, target = "deployment/orders-api", params: Record<string, unknown> = {}, runbookRef: string | null = "orders-5xx-after-deploy#mitigacao") =>
+const s = (actionType: string, target = "deployment/orders-api", params: Record<string, unknown> = {}, runbookRef: string | null = "orders-5xx-after-deploy#mitigation") =>
   ({ actionType, target, params, runbookRef });
 
 test("catalog tiers", () => {
   assert.equal(classifyAction(s("add_incident_note", "incident/INC-0001", { text: "x" }), ctx).tier, 2);
   assert.equal(classifyAction(s("block_image_tag", "image/orders-api:3.8.0"), ctx).tier, 2);
   assert.equal(classifyAction(s("rollback_deployment", "deployment/orders-api", { toVersion: "v3.7.2" }), ctx).tier, 3);
-  assert.equal(classifyAction(s("tag_resource_for_review", "volume/data-platform/vol-0c41d2", { reason: "ocioso" }), costCtx).tier, 2);
+  assert.equal(classifyAction(s("tag_resource_for_review", "volume/data-platform/vol-0c41d2", { reason: "idle" }), costCtx).tier, 2);
   assert.equal(classifyAction(s("create_volume_snapshot", "volume/data-platform/vol-0c41d2"), costCtx).tier, 2);
   assert.equal(classifyAction(s("release_elastic_ip", "ip/data-platform/eipalloc-0f19"), costCtx).tier, 3);
   assert.equal(classifyAction(s("delete_volume", "volume/data-platform/vol-0c41d2"), costCtx).tier, 3);
   assert.equal(classifyAction(s("resize_instance", "instance/data-platform/i-07ab3", { toType: "r6i.large" }), costCtx).tier, 3);
   const ok = classifyAction(s("rollback_deployment", "deployment/orders-api", { toVersion: "v3.7.2" }), ctx);
-  assert.deepEqual([ok.known, ok.executable, ok.paramsOk, ok.reasons], [true, true, true, ["faixa do catálogo: 3"]]);
+  assert.deepEqual([ok.known, ok.executable, ok.paramsOk, ok.reasons], [true, true, true, ["catalog tier: 3"]]);
   assert.deepEqual(ok.params, { toVersion: "v3.7.2" });
 });
 
@@ -47,30 +47,30 @@ test("catalog values follow the spec 6.4 table", () => {
 test("forbidden and unknown are tier 4", () => {
   const f = classifyAction(s("delete_backups", "backup_vault/orders-api/prod"), ctx);
   assert.deepEqual([f.tier, f.known, f.executable, f.paramsOk, f.params], [4, true, false, false, null]);
-  assert.ok(f.reasons.includes("proibida por construção (faixa 4)"));
+  assert.ok(f.reasons.includes("forbidden by construction (tier 4)"));
   for (const t of FORBIDDEN_ACTIONS) assert.equal(classifyAction(s(t, "incident/INC-0001"), ctx).tier, 4, t);
   const u = classifyAction(s("capture_heap_dump"), ctx);
   assert.deepEqual([u.tier, u.known, u.executable], [4, false, false]);
-  assert.deepEqual(u.reasons, ["tipo fora do catálogo: negar por padrão"]);
+  assert.deepEqual(u.reasons, ["type not in catalog: deny by default"]);
   assert.equal(classifyAction(s("__proto__"), ctx).tier, 4);
 });
 
 test("context rules only raise", () => {
   const out = classifyAction(s("block_image_tag", "image/payments-api:1.0"), ctx);
   assert.equal(out.tier, 3);
-  assert.ok(out.reasons.includes("alvo fora do escopo do incidente"));
+  assert.ok(out.reasons.includes("target outside the incident scope"));
   const noRunbook = classifyAction(s("block_image_tag", "image/orders-api:3.8.0", {}, null), ctx);
   assert.equal(noRunbook.tier, 3);
-  assert.ok(noRunbook.reasons.includes("passo sem runbook de referência"));
+  assert.ok(noRunbook.reasons.includes("step without a reference runbook"));
   const exhausted = classifyAction(s("block_image_tag", "image/orders-api:3.8.0"), { ...ctx, revisionsExhausted: true });
   assert.equal(exhausted.tier, 3);
-  assert.ok(exhausted.reasons.includes("revisões do plano esgotadas"));
+  assert.ok(exhausted.reasons.includes("plan revisions exhausted"));
   // Tier 3 never goes down and tier 4 stays 4, whatever the context.
   assert.equal(classifyAction(s("rollback_deployment", "deployment/orders-api", { toVersion: "v3.7.2" }, null), { ...ctx, revisionsExhausted: true }).tier, 3);
   assert.equal(classifyAction(s("delete_backups", "backup_vault/orders-api/prod", {}, null), ctx).tier, 4);
   // Every reason is listed when several rules apply.
   const all = classifyAction(s("add_incident_note", "incident/INC-0009", { text: "x" }, null), { ...ctx, revisionsExhausted: true });
-  assert.deepEqual(all.reasons, ["faixa do catálogo: 2", "alvo fora do escopo do incidente", "passo sem runbook de referência", "revisões do plano esgotadas"]);
+  assert.deepEqual(all.reasons, ["catalog tier: 2", "target outside the incident scope", "step without a reference runbook", "plan revisions exhausted"]);
 });
 
 test("invalid params are flagged", () => {
@@ -104,7 +104,7 @@ test("forbidden types are not executable at the type level", () => {
 test("catalog prompt text lists every executable action and the forbidden ones", () => {
   const text = catalogPromptText();
   for (const t of Object.keys(EXECUTABLE_ACTIONS)) assert.match(text, new RegExp(`^- ${t}: `, "m"), t);
-  assert.match(text, /rollback_deployment: deployment\/<serviço>; parâmetros \{ toVersion: string \}; mitiga o incidente/);
+  assert.match(text, /rollback_deployment: deployment\/<service>; parameters \{ toVersion: string \}; mitigates the incident/);
   for (const t of FORBIDDEN_ACTIONS) assert.ok(text.includes(t), t);
-  assert.doesNotMatch(text, /faixa/i);
+  assert.doesNotMatch(text, /\btier\b/i);
 });

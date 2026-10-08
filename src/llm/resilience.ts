@@ -9,17 +9,17 @@ export type Attempt<O> = (signal: AbortSignal) => Promise<LlmResult<O>>;
  * Resolve mesmo se o attempt ignorar o sinal (corrida com o aborto).
  */
 export async function withTimeout<O>(a: Attempt<O>, ms: number, parent: AbortSignal): Promise<LlmResult<O>> {
-  if (parent.aborted) return llmFailure("aborted", "execução abortada antes da chamada");
+  if (parent.aborted) return llmFailure("aborted", "run aborted before the call");
   const ctrl = new AbortController();
   let timedOut = false;
   const timer = setTimeout(() => {
     timedOut = true;
-    ctrl.abort(new DOMException(`chamada passou de ${ms} ms`, "TimeoutError"));
+    ctrl.abort(new DOMException(`call exceeded ${ms} ms`, "TimeoutError"));
   }, ms);
   const onParentAbort = () => ctrl.abort(parent.reason);
   parent.addEventListener("abort", onParentAbort, { once: true });
-  const timeoutResult = () => llmFailure("timeout", `chamada de LLM passou de ${ms} ms`);
-  const abortedResult = () => llmFailure("aborted", "execução abortada durante a chamada");
+  const timeoutResult = () => llmFailure("timeout", `LLM call exceeded ${ms} ms`);
+  const abortedResult = () => llmFailure("aborted", "run aborted during the call");
   try {
     const attempt = a(ctrl.signal);
     attempt.catch(() => {}); // evita rejeição não tratada se o aborto vencer a corrida; a corrida ainda vê a rejeição
@@ -37,7 +37,7 @@ export async function withTimeout<O>(a: Attempt<O>, ms: number, parent: AbortSig
 
 /** Até `attempts` tentativas; devolve o primeiro sucesso ou a última falha. Não repete "aborted". */
 export async function withRetry<O>(run: () => Promise<LlmResult<O>>, attempts: number): Promise<LlmResult<O>> {
-  let last: LlmResult<O> = llmFailure("server_error", "nenhuma tentativa feita");
+  let last: LlmResult<O> = llmFailure("server_error", "no attempt made");
   for (let i = 0; i < Math.max(1, attempts); i++) {
     last = await run();
     if (last.success || last.error.kind === "aborted") return last;

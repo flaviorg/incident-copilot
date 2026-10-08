@@ -16,9 +16,9 @@ Este documento reúne os três diagramas do desenho (componentes, grafo e máqui
 ```mermaid
 flowchart LR
   subgraph PORTAS [Portas]
-    CLI[CLI src/cli.ts]
-    API[API Fastify src/http]
-    MCP[Servidor MCP stdio src/mcp]
+    CLI["CLI src/cli.ts"]
+    API["API Fastify src/http"]
+    MCP["Servidor MCP stdio src/mcp"]
   end
   subgraph APP [Aplicação]
     IS[IncidentService]
@@ -62,7 +62,7 @@ flowchart LR
   GRAFO --> ST
   GRAFO --> DOMINIO
   DR --> IS
-  WR[War Room React] -- modo demo --> JSON[(web/public/demo/*.json gerado no build)]
+  WR[War Room React] -- modo demo --> JSON[("web/public/demo/*.json gerado no build")]
 ```
 
 Tudo é montado por `createContainer` (`src/app/container.ts`), a única fonte usada pela API, pelo MCP, pela CLI e pelos testes. Os testes usam `createTestContainer` (`tests/helpers/container.ts`), com banco `:memory:`, relógio simulado e provedor fake explícitos.
@@ -85,7 +85,7 @@ flowchart TD
   PL --> AU[auditor]
   AU -- revise com menos de 2 revisões --> PL
   AU -- approve ou revisões esgotadas --> SUP
-  GT -- há aprovação pendente --> END1((END: awaiting_approval))
+  GT -- há aprovação pendente --> END1(("END: awaiting_approval"))
   GT -- sem pendência e com ações prontas --> EX
   GT -- nada executável --> ESC
   EX -- alguma ação mitigadora executada --> VE[verifier]

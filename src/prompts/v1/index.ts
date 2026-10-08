@@ -1,4 +1,4 @@
-// Prompts versionados v1 (198069, 198082, 200963): prompt é configuração versionada; o hash de version + system fica nas fixtures.
+// Versioned v1 prompts (198069, 198082, 200963): a prompt is versioned configuration; the hash of version + system lives in the fixtures.
 import type { PromptDef } from "../../llm/provider.ts";
 import { supervisorPrompt } from "./supervisor.ts";
 import { telemetryReactPrompt } from "./telemetry-react.ts";
