@@ -1,0 +1,19 @@
+[
+  ["--color-text", "--color-bg"],
+  ["--color-text", "--color-surface"],
+  ["--color-text", "--color-surface-muted"],
+  ["--color-text-muted", "--color-bg"],
+  ["--color-text-muted", "--color-surface"],
+  ["--color-text-muted", "--color-surface-muted"],
+  ["--color-accent-text", "--color-accent"],
+  ["--color-link", "--color-surface"],
+  ["--color-link", "--color-bg"],
+  ["--color-danger", "--color-surface"],
+  ["--color-danger", "--color-bg"],
+  ["--color-success", "--color-surface"],
+  ["--color-banner-text", "--color-banner-bg"],
+  ["--color-tier-1-fg", "--color-tier-1-bg"],
+  ["--color-tier-2-fg", "--color-tier-2-bg"],
+  ["--color-tier-3-fg", "--color-tier-3-bg"],
+  ["--color-tier-4-fg", "--color-tier-4-bg"]
+]

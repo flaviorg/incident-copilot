@@ -1,0 +1,9 @@
+node_modules/
+.env
+data/*.db
+data/*.db-*
+reports/
+web/node_modules/
+web/dist/
+web/public/demo/
+coverage/

@@ -1,0 +1,14 @@
+{
+  "account": "data-platform",
+  "region": "us-east-1",
+  "volumes": [
+    { "id": "vol-0c41d2", "type": "gp3", "sizeGb": 750, "attachedTo": null, "unattachedDays": 23 },
+    { "id": "vol-0a77e9", "type": "gp3", "sizeGb": 500, "attachedTo": "i-0db51", "unattachedDays": 0 }
+  ],
+  "publicIps": [{ "id": "eipalloc-0f19", "associatedWith": null }],
+  "instances": [
+    { "id": "i-07ab3", "type": "r6i.2xlarge", "avgCpuPct14d": 3.1, "role": "etl-worker" },
+    { "id": "i-0db51", "type": "r6i.xlarge", "avgCpuPct14d": 55, "role": "warehouse-db" }
+  ],
+  "backupVaults": [{ "id": "bkp-vault/data-platform-prod", "monthlyCostUsd": 41.0, "oldestRecoveryPointDays": 400 }]
+}

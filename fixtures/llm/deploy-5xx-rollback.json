@@ -1,0 +1,260 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "deploy-5xx-rollback",
+  "promptHashes": {
+    "supervisor.v1": "sha256:f45bf8a54925bd700e25b547f937ef117d20b04481f7ff6f79282eb0ec5f5079",
+    "telemetry-react.v1": "sha256:ff2dca7f412cf4d3b9b8c332192bfca06fec99e8d111bbb223a4d9762e13d715",
+    "planner.v1": "sha256:cda4e9c0ecc4e06f434a71cf0ff0ce677b361546674b0aed6ac71b96bba096b5",
+    "auditor.v1": "sha256:9810ccb2343e7142aebbc25b42c173dd209e18b9263d62bbdb2ed5ac101c86d5",
+    "postmortem.v1": "sha256:cf433bc53207974b67b94ea94e72202cc47cbbd896fa94254c4666077fa39e14"
+  },
+  "turns": [
+    {
+      "id": "sup-1",
+      "prompt": "supervisor.v1",
+      "when": {
+        "hasDiagnosis": false
+      },
+      "output": {
+        "next": "telemetry_analyst",
+        "brief": "Correlacione 5xx e latência do orders-api com o deploy v3.8.0",
+        "reason": "Sem diagnóstico; o alerta coincide com um deploy recente"
+      },
+      "usage": {
+        "promptTokens": 812,
+        "completionTokens": 61
+      }
+    },
+    {
+      "id": "tel-1",
+      "prompt": "telemetry-react.v1",
+      "when": {
+        "run": 1,
+        "step": 1
+      },
+      "output": {
+        "kind": "action",
+        "thought": "Preciso confirmar o tamanho do pico de 5xx e quando ele começou.",
+        "tool": "query_metrics",
+        "args": {
+          "service": "orders-api",
+          "metric": "http_5xx_rate",
+          "window": "30m"
+        }
+      }
+    },
+    {
+      "id": "tel-2",
+      "prompt": "telemetry-react.v1",
+      "when": {
+        "run": 1,
+        "step": 2
+      },
+      "output": {
+        "kind": "action",
+        "thought": "O pico começou por volta de 09:40; vou ver se houve deploy recente do orders-api.",
+        "tool": "list_deploys",
+        "args": {
+          "service": "orders-api"
+        }
+      }
+    },
+    {
+      "id": "tel-3",
+      "prompt": "telemetry-react.v1",
+      "when": {
+        "run": 1,
+        "step": 3
+      },
+      "output": {
+        "kind": "action",
+        "thought": "Houve deploy da v3.8.0 às 09:40. Vou agrupar os erros dos últimos 15 minutos por mensagem e versão.",
+        "tool": "query_logs",
+        "args": {
+          "service": "orders-api",
+          "level": "ERROR",
+          "window": "15m"
+        }
+      }
+    },
+    {
+      "id": "tel-4",
+      "prompt": "telemetry-react.v1",
+      "when": {
+        "run": 1,
+        "step": 4
+      },
+      "output": {
+        "kind": "final",
+        "thought": "Os 5xx começaram junto com o rollout da v3.8.0 e o único erro frequente existe só nessa versão. A evidência aponta para deploy com defeito.",
+        "diagnosis": {
+          "hypothesis": "O deploy v3.8.0 do orders-api introduziu um TypeError em PriceFormatter.format ao ler currency de preços sem moeda; os 5xx começaram junto com o rollout.",
+          "category": "bad_deploy",
+          "confidence": "high",
+          "evidence": [
+            {
+              "source": "metrics",
+              "ref": "metrics:orders-api:http_5xx_rate@09:13-09:43",
+              "summary": "taxa de 5xx com pico de 9,9% às 09:40:30, acima do limiar de 5% desde o rollout"
+            },
+            {
+              "source": "deploys",
+              "ref": "deploys:orders-api@09:43",
+              "summary": "deploy v3.8.0 às 09:40 em 6 réplicas; versão anterior v3.7.2"
+            },
+            {
+              "source": "logs",
+              "ref": "logs:orders-api:ERROR@09:28-09:43",
+              "summary": "380 ocorrências de TypeError em PriceFormatter.format (leitura de currency), só na v3.8.0"
+            }
+          ]
+        }
+      },
+      "usage": {
+        "promptTokens": 1480,
+        "completionTokens": 210
+      }
+    },
+    {
+      "id": "sup-2",
+      "prompt": "supervisor.v1",
+      "when": {
+        "hasDiagnosis": true,
+        "runbookSearchDone": false
+      },
+      "output": {
+        "next": "runbook_retriever",
+        "brief": "Procure runbooks de 5xx depois de deploy no orders-api",
+        "reason": "Diagnóstico bad_deploy com confiança alta; falta consultar os runbooks antes de planejar"
+      },
+      "usage": {
+        "promptTokens": 905,
+        "completionTokens": 58
+      }
+    },
+    {
+      "id": "sup-3",
+      "prompt": "supervisor.v1",
+      "when": {
+        "hasDiagnosis": true,
+        "runbookSearchDone": true,
+        "hasPlan": false
+      },
+      "output": {
+        "next": "remediation_planner",
+        "brief": "Monte o plano de remediação a partir do runbook de 5xx depois de deploy",
+        "reason": "Diagnóstico e runbooks prontos; falta o plano de remediação"
+      },
+      "usage": {
+        "promptTokens": 948,
+        "completionTokens": 57
+      }
+    },
+    {
+      "id": "plan-0",
+      "prompt": "planner.v1",
+      "when": {
+        "revision": 0
+      },
+      "output": {
+        "summary": "Reverter o orders-api para a v3.7.2, registrar o motivo no incidente e bloquear a imagem 3.8.0 para que não seja promovida de novo.",
+        "steps": [
+          {
+            "order": 1,
+            "actionType": "add_incident_note",
+            "target": "incident/orders-api",
+            "params": {
+              "text": "Rollback do orders-api de v3.8.0 para v3.7.2: TypeError em PriceFormatter.format após o deploy."
+            },
+            "rationale": "Registrar no incidente a versão revertida e o motivo.",
+            "runbookRef": "orders-5xx-after-deploy#mitigacao",
+            "dependsOn": []
+          },
+          {
+            "order": 2,
+            "actionType": "rollback_deployment",
+            "target": "deployment/orders-api",
+            "params": {
+              "toVersion": "v3.7.2"
+            },
+            "rationale": "O erro existe só na v3.8.0 e a v3.7.2 estava estável antes do deploy.",
+            "runbookRef": "orders-5xx-after-deploy#mitigacao",
+            "dependsOn": []
+          },
+          {
+            "order": 3,
+            "actionType": "block_image_tag",
+            "target": "image/orders-api:3.8.0",
+            "params": {},
+            "rationale": "Impedir que um pipeline promova de novo a imagem com defeito.",
+            "runbookRef": "orders-5xx-after-deploy#mitigacao",
+            "dependsOn": [
+              2
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "aud-0",
+      "prompt": "auditor.v1",
+      "when": {
+        "revision": 0
+      },
+      "output": {
+        "verdict": "approve",
+        "feedback": "Plano coerente com o diagnóstico: rollback para a versão anterior ao deploy, nota no incidente e bloqueio da tag só depois do rollback."
+      }
+    },
+    {
+      "id": "sup-4",
+      "prompt": "supervisor.v1",
+      "when": {
+        "hasPlan": true,
+        "hasAudit": true,
+        "verified": false
+      },
+      "output": {
+        "next": "gate",
+        "brief": "Avalie o risco de cada passo do plano auditado",
+        "reason": "Plano aprovado pelo auditor; segue para o portão de remediação"
+      },
+      "usage": {
+        "promptTokens": 990,
+        "completionTokens": 52
+      }
+    },
+    {
+      "id": "sup-5",
+      "prompt": "supervisor.v1",
+      "when": {
+        "verified": true
+      },
+      "output": {
+        "next": "reporter",
+        "brief": "Redija o post-mortem do incidente resolvido",
+        "reason": "Canário saudável depois do rollback; falta o relatório"
+      },
+      "usage": {
+        "promptTokens": 1034,
+        "completionTokens": 49
+      }
+    },
+    {
+      "id": "pm-1",
+      "prompt": "postmortem.v1",
+      "when": {
+        "kind": "final"
+      },
+      "output": {
+        "summary": "O deploy v3.8.0 do orders-api introduziu um TypeError em PriceFormatter.format e a taxa de 5xx passou do limiar logo após o rollout. O incidente foi detectado em 2 min e resolvido com rollback para v3.7.2 aprovado por humano; o MTTR foi de 11,2 min, dos quais 3 min aguardando aprovação.",
+        "rootCauseNarrative": "A versão v3.8.0 lê o campo currency de preços sem moeda definida, o que gerou 380 ocorrências de TypeError só nessa versão. O rollback para a versão anterior estável removeu o defeito e o canário confirmou a recuperação.",
+        "prevention": [
+          "Promover versões com rollout gradual e canário automático.",
+          "Cobrir com teste os campos opcionais lidos pelo formatador de preços.",
+          "Bloquear a promoção de imagens com defeito conhecido."
+        ]
+      }
+    }
+  ]
+}

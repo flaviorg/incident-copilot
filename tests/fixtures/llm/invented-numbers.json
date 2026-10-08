@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "deploy-5xx-rollback",
+  "promptHashes": {
+    "supervisor.v1": "sha256:f45bf8a54925bd700e25b547f937ef117d20b04481f7ff6f79282eb0ec5f5079",
+    "telemetry-react.v1": "sha256:ff2dca7f412cf4d3b9b8c332192bfca06fec99e8d111bbb223a4d9762e13d715",
+    "planner.v1": "sha256:cda4e9c0ecc4e06f434a71cf0ff0ce677b361546674b0aed6ac71b96bba096b5",
+    "auditor.v1": "sha256:9810ccb2343e7142aebbc25b42c173dd209e18b9263d62bbdb2ed5ac101c86d5",
+    "postmortem.v1": "sha256:cf433bc53207974b67b94ea94e72202cc47cbbd896fa94254c4666077fa39e14"
+  },
+  "turns": [
+    {
+      "id": "pm-1",
+      "prompt": "postmortem.v1",
+      "when": {
+        "kind": "final"
+      },
+      "output": {
+        "summary": "O rollback resolveu o incidente e houve 20% de melhoria na estabilidade.",
+        "rootCauseNarrative": "Deploy com defeito no formatador de preços.",
+        "prevention": [
+          "Rollout gradual com canário."
+        ]
+      }
+    }
+  ]
+}

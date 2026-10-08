@@ -1,0 +1,19 @@
+{
+  "id": "cost-anomaly",
+  "title": "Custo diário 41% acima da média na conta data-platform",
+  "summary": "Custo diário subiu de US$ 16,40 para US$ 23,10 com recursos ociosos na conta",
+  "service": null,
+  "account": "data-platform",
+  "severity": "sev3",
+  "expectedCategory": "cost_anomaly",
+  "alert": {
+    "signal": "daily_cost_usd",
+    "threshold": null,
+    "detectedAt": "2026-10-04T08:00:00.000Z",
+    "rule": "custo diário 41% acima da média de 7 dias"
+  },
+  "baselines": {},
+  "canary": [{ "metric": "projected_monthly_cost_usd", "op": "<=", "threshold": 600 }],
+  "demo": { "approvalLatencySec": 180 },
+  "faults": {}
+}

@@ -1,0 +1,20 @@
+{
+  "windowSec": 60,
+  "resolutionSec": 10,
+  "variants": [
+    {
+      "when": { "deployment.orders-api.version": "v3.7.2" },
+      "series": {
+        "http_5xx_rate": { "segments": [{ "fromSec": 0, "toSec": 60, "kind": "constant", "value": 0.005 }] },
+        "p99_latency_ms": { "segments": [{ "fromSec": 0, "toSec": 60, "kind": "constant", "value": 205 }] }
+      }
+    },
+    {
+      "when": {},
+      "series": {
+        "http_5xx_rate": { "segments": [{ "fromSec": 0, "toSec": 60, "kind": "constant", "value": 0.096 }] },
+        "p99_latency_ms": { "segments": [{ "fromSec": 0, "toSec": 60, "kind": "constant", "value": 1240 }] }
+      }
+    }
+  ]
+}

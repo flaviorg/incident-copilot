@@ -1,0 +1,22 @@
+{
+  "id": "deploy-5xx-rollback",
+  "title": "Taxa de 5xx acima de 5% no orders-api",
+  "summary": "Pico de 5xx e de latência logo após o deploy v3.8.0",
+  "service": "orders-api",
+  "account": null,
+  "severity": "sev1",
+  "expectedCategory": "bad_deploy",
+  "alert": {
+    "signal": "http_5xx_rate",
+    "threshold": 0.05,
+    "detectedAt": "2026-10-04T09:42:30.000Z",
+    "rule": "5xx acima de 5% por 2 min"
+  },
+  "baselines": { "p99_latency_ms": 180 },
+  "canary": [
+    { "metric": "http_5xx_rate", "op": "<=", "threshold": 0.05 },
+    { "metric": "p99_latency_ms", "op": "<=", "baselineFactor": 1.5 }
+  ],
+  "demo": { "approvalLatencySec": 180 },
+  "faults": {}
+}

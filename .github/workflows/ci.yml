@@ -1,0 +1,32 @@
+# CI do incident-copilot (spec 8.4 e AC-41): typecheck do backend e da web, testes do backend e da web, build da web,
+# check:tokens e check:secrets. Nenhum segredo configurado: o provedor fake roda os testes sem rede.
+# Majors das actions conferidas nas releases oficiais em 2026-10-04 (checkout v7.0.1, setup-node v7.0.0).
+name: CI
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+      - run: npm ci
+      - run: npm --prefix web ci
+      - run: npm run typecheck
+      - run: npm run typecheck:web
+      - run: npm test
+      - run: npm run web:test
+      - run: npm run web:build
+      - run: npm run check:tokens
+      - run: npm run check:secrets

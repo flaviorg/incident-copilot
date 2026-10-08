@@ -1,0 +1,4 @@
+[
+  { "service": "orders-api", "version": "v3.7.2", "previousVersion": "v3.7.1", "at": "2026-09-25T14:00:00.000Z", "replicas": 6 },
+  { "service": "orders-api", "version": "v3.8.0", "previousVersion": "v3.7.2", "at": "2026-10-04T09:40:00.000Z", "replicas": 6 }
+]

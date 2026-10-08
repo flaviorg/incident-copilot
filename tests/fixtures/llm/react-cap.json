@@ -1,0 +1,238 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "deploy-5xx-rollback",
+  "promptHashes": {
+    "supervisor.v1": "sha256:f45bf8a54925bd700e25b547f937ef117d20b04481f7ff6f79282eb0ec5f5079",
+    "telemetry-react.v1": "sha256:ff2dca7f412cf4d3b9b8c332192bfca06fec99e8d111bbb223a4d9762e13d715",
+    "planner.v1": "sha256:cda4e9c0ecc4e06f434a71cf0ff0ce677b361546674b0aed6ac71b96bba096b5",
+    "auditor.v1": "sha256:9810ccb2343e7142aebbc25b42c173dd209e18b9263d62bbdb2ed5ac101c86d5",
+    "postmortem.v1": "sha256:cf433bc53207974b67b94ea94e72202cc47cbbd896fa94254c4666077fa39e14"
+  },
+  "turns": [
+    {
+      "id": "sup-1",
+      "prompt": "supervisor.v1",
+      "when": {
+        "hasDiagnosis": false
+      },
+      "output": {
+        "next": "telemetry_analyst",
+        "brief": "Correlacione 5xx e latência do orders-api com o deploy v3.8.0",
+        "reason": "Sem diagnóstico; o alerta coincide com um deploy recente"
+      },
+      "usage": {
+        "promptTokens": 812,
+        "completionTokens": 61
+      }
+    },
+    {
+      "id": "cap-1",
+      "prompt": "telemetry-react.v1",
+      "when": {
+        "run": 1,
+        "step": 1
+      },
+      "output": {
+        "kind": "action",
+        "thought": "Começo medindo a taxa de 5xx.",
+        "tool": "query_metrics",
+        "args": {
+          "service": "orders-api",
+          "metric": "http_5xx_rate",
+          "window": "30m"
+        }
+      }
+    },
+    {
+      "id": "cap-2",
+      "prompt": "telemetry-react.v1",
+      "when": {
+        "run": 1,
+        "step": 2
+      },
+      "output": {
+        "kind": "action",
+        "thought": "Vejo os deploys recentes.",
+        "tool": "list_deploys",
+        "args": {
+          "service": "orders-api"
+        }
+      }
+    },
+    {
+      "id": "cap-3",
+      "prompt": "telemetry-react.v1",
+      "when": {
+        "run": 1,
+        "step": 3
+      },
+      "output": {
+        "kind": "action",
+        "thought": "Quero ver os pods direto no cluster.",
+        "tool": "kubectl_exec",
+        "args": {
+          "command": "kubectl get pods -n orders"
+        }
+      }
+    },
+    {
+      "id": "cap-4",
+      "prompt": "telemetry-react.v1",
+      "when": {
+        "run": 1,
+        "step": 4
+      },
+      "output": {
+        "kind": "action",
+        "thought": "Vou olhar a CPU.",
+        "tool": "query_metrics",
+        "args": {
+          "metric": "cpu"
+        }
+      }
+    },
+    {
+      "id": "cap-5",
+      "prompt": "telemetry-react.v1",
+      "when": {
+        "run": 1,
+        "step": 5
+      },
+      "output": {
+        "kind": "action",
+        "thought": "Leio os erros recentes.",
+        "tool": "query_logs",
+        "args": {
+          "service": "orders-api",
+          "level": "ERROR",
+          "window": "15m"
+        }
+      }
+    },
+    {
+      "id": "cap-6",
+      "prompt": "telemetry-react.v1",
+      "when": {
+        "run": 1,
+        "step": 6
+      },
+      "output": {
+        "kind": "action",
+        "thought": "Confiro a latência P99.",
+        "tool": "query_metrics",
+        "args": {
+          "service": "orders-api",
+          "metric": "p99_latency_ms",
+          "window": "30m"
+        }
+      }
+    },
+    {
+      "id": "cap-7",
+      "prompt": "telemetry-react.v1",
+      "when": {
+        "run": 1,
+        "step": 7
+      },
+      "output": {
+        "kind": "action",
+        "thought": "Confiro a vazão.",
+        "tool": "query_metrics",
+        "args": {
+          "service": "orders-api",
+          "metric": "request_rate",
+          "window": "30m"
+        }
+      }
+    },
+    {
+      "id": "cap-8",
+      "prompt": "telemetry-react.v1",
+      "when": {
+        "run": 1,
+        "step": 8
+      },
+      "output": {
+        "kind": "action",
+        "thought": "Leio os avisos da última hora.",
+        "tool": "query_logs",
+        "args": {
+          "service": "orders-api",
+          "level": "WARN",
+          "window": "60m"
+        }
+      }
+    },
+    {
+      "id": "cap-9",
+      "prompt": "telemetry-react.v1",
+      "when": {
+        "run": 1,
+        "step": 9
+      },
+      "output": {
+        "kind": "action",
+        "thought": "Meço de novo os 5xx em 15 minutos.",
+        "tool": "query_metrics",
+        "args": {
+          "service": "orders-api",
+          "metric": "http_5xx_rate",
+          "window": "15m"
+        }
+      }
+    },
+    {
+      "id": "cap-10",
+      "prompt": "telemetry-react.v1",
+      "when": {
+        "run": 1,
+        "step": 10
+      },
+      "output": {
+        "kind": "action",
+        "thought": "Deploys da última hora.",
+        "tool": "list_deploys",
+        "args": {
+          "service": "orders-api",
+          "sinceMinutes": 60
+        }
+      }
+    },
+    {
+      "id": "cap-11",
+      "prompt": "telemetry-react.v1",
+      "when": {
+        "run": 1,
+        "step": 11
+      },
+      "output": {
+        "kind": "action",
+        "thought": "Latência em 15 minutos.",
+        "tool": "query_metrics",
+        "args": {
+          "service": "orders-api",
+          "metric": "p99_latency_ms",
+          "window": "15m"
+        }
+      }
+    },
+    {
+      "id": "cap-12",
+      "prompt": "telemetry-react.v1",
+      "when": {
+        "run": 1,
+        "step": 12
+      },
+      "output": {
+        "kind": "action",
+        "thought": "Erros da última hora.",
+        "tool": "query_logs",
+        "args": {
+          "service": "orders-api",
+          "level": "ERROR",
+          "window": "60m"
+        }
+      }
+    }
+  ]
+}

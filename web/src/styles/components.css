@@ -1,0 +1,411 @@
+/* Componentes da War Room. Só var(--...): nenhuma cor literal fora de tokens.css (npm run check:tokens).
+   Uma coluna por padrão (telas estreitas, abaixo de 600px); duas colunas a partir de 900px. */
+.app {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--space-4);
+}
+
+.app-header h1 {
+  font-size: var(--font-size-xl);
+  margin: var(--space-4) 0;
+}
+
+.app-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.app-footer {
+  margin-top: var(--space-6);
+  font-size: var(--font-size-sm);
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+.mode-banner {
+  background: var(--color-banner-bg);
+  color: var(--color-banner-text);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-sm);
+}
+
+.panel {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  min-width: 0;
+}
+
+.panel h2 {
+  font-size: var(--font-size-lg);
+  margin: 0 0 var(--space-3);
+}
+
+.panel h3 {
+  font-size: var(--font-size-md);
+  margin: var(--space-4) 0 var(--space-2);
+}
+
+.alert {
+  background: var(--color-surface);
+  color: var(--color-danger);
+  border: var(--focus-width) solid var(--color-danger);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  font-weight: 600;
+}
+
+button {
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  color: var(--color-text-muted);
+}
+
+.button-primary {
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  border-color: var(--color-accent);
+}
+
+.button-danger {
+  background: var(--color-surface);
+  color: var(--color-danger);
+  border: var(--focus-width) solid var(--color-danger);
+}
+
+.link-button {
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-link);
+  text-decoration: underline;
+  padding-left: 0;
+}
+
+/* Seleção de cenário */
+.scenario-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.scenario-card {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+}
+
+.scenario-title {
+  font-weight: 700;
+}
+
+.scenario-meta,
+.scenario-summary {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* Cabeçalho do incidente */
+.incident-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: 0 0 var(--space-2);
+}
+
+.incident-meta div {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.incident-meta dt {
+  color: var(--color-text-muted);
+}
+
+.incident-meta dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* Reprodução */
+.playback {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.playback-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.playback-status {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+@media (min-width: 900px) {
+  .layout {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    align-items: start;
+  }
+}
+
+/* Conversa */
+.conversation,
+.agent-messages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.agent-group {
+  border-left: var(--focus-width) solid var(--color-border);
+  padding-left: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.agent-name {
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.event {
+  margin: var(--space-1) 0;
+}
+
+.event-time {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin-right: var(--space-2);
+}
+
+.event summary {
+  cursor: pointer;
+}
+
+.event pre {
+  background: var(--color-surface-muted);
+  padding: var(--space-2);
+  border-radius: var(--radius);
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+.handoff {
+  font-weight: 600;
+}
+
+/* Faixas */
+.tier-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tier-1 {
+  background: var(--color-tier-1-bg);
+  color: var(--color-tier-1-fg);
+}
+
+.tier-2 {
+  background: var(--color-tier-2-bg);
+  color: var(--color-tier-2-fg);
+}
+
+.tier-3 {
+  background: var(--color-tier-3-bg);
+  color: var(--color-tier-3-fg);
+}
+
+.tier-4 {
+  background: var(--color-tier-4-bg);
+  color: var(--color-tier-4-fg);
+}
+
+/* Portão */
+.gate-steps {
+  margin: 0;
+  padding-left: var(--space-5);
+}
+
+.gate-step {
+  margin-bottom: var(--space-3);
+}
+
+.gate-step p {
+  margin: var(--space-1) 0;
+}
+
+.step-order {
+  font-weight: 700;
+}
+
+.step-blocked {
+  color: var(--color-danger);
+}
+
+.gate-decision {
+  border-top: var(--border-width) solid var(--color-border);
+  padding-top: var(--space-3);
+}
+
+.gate-buttons,
+.dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Diálogo */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--color-backdrop);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  z-index: 10;
+}
+
+.dialog {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-5);
+  max-width: 32rem;
+  width: 100%;
+}
+
+.dialog h2 {
+  margin-top: 0;
+  font-size: var(--font-size-lg);
+}
+
+.dialog-warning {
+  background: var(--color-banner-bg);
+  color: var(--color-banner-text);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+}
+
+/* Números */
+.metrics-highlight {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-3);
+  margin: 0 0 var(--space-4);
+}
+
+.metric-card {
+  background: var(--color-surface-muted);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+}
+
+.metric-card dt {
+  font-weight: 600;
+}
+
+.metric-card dd,
+.metric-row dd {
+  margin: 0;
+}
+
+.metric-value {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+}
+
+.metric-source {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.illustrative-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-2);
+}
+
+.metrics-ranges dl,
+.metrics-small {
+  margin: 0 0 var(--space-3);
+}
+
+.metric-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-1) 0;
+}
+
+.metric-row dt {
+  min-width: 12rem;
+}
+
+/* Post-mortem */
+.seal {
+  display: inline-block;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius);
+  background: var(--color-surface-muted);
+  font-weight: 600;
+}
+
+.seal-ok {
+  color: var(--color-success);
+}
+
+.timeline,
+.postmortem-actions {
+  padding-left: var(--space-5);
+}

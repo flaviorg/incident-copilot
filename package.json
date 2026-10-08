@@ -1,0 +1,49 @@
+{
+  "name": "incident-copilot",
+  "version": "0.1.0",
+  "description": "Copiloto de incidentes multiagente: o modelo propõe; o código e o humano decidem",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --import ./tests/setup/no-network.ts --test \"tests/unit/**/*.test.ts\" \"tests/e2e/**/*.test.ts\"",
+    "test:unit": "node --import ./tests/setup/no-network.ts --test \"tests/unit/**/*.test.ts\"",
+    "test:e2e": "node --import ./tests/setup/no-network.ts --test \"tests/e2e/**/*.test.ts\"",
+    "test:dev": "node --import ./tests/setup/no-network.ts --test --watch \"tests/unit/**/*.test.ts\"",
+    "cli": "node --env-file-if-exists=.env src/cli.ts",
+    "fixtures:rehash": "node scripts/rehash-fixtures.ts",
+    "regen": "UPDATE_GOLDEN=1 node --import ./tests/setup/no-network.ts --test tests/e2e/scenarios.e2e.test.ts && node scripts/gen-autonomy-doc.ts",
+    "demo": "node src/cli.ts demo",
+    "start": "node --env-file-if-exists=.env src/index.ts",
+    "dev": "node --env-file-if-exists=.env --watch --inspect src/index.ts",
+    "mcp": "node --env-file-if-exists=.env src/mcp/server.ts",
+    "mcp:inspect": "npx @modelcontextprotocol/inspector node src/mcp/server.ts",
+    "demo:record": "node src/cli.ts record-demo --out web/public/demo",
+    "typecheck:web": "npm --prefix web run typecheck",
+    "web:install": "npm --prefix web ci",
+    "web:demo": "npm run demo:record && npm --prefix web run dev",
+    "web:build": "npm run demo:record && npm --prefix web run build",
+    "web:test": "npm run demo:record && npm --prefix web run test",
+    "check:tokens": "node scripts/check-tokens.ts",
+    "check:secrets": "node scripts/check-secrets.ts",
+    "setup:hooks": "git config core.hooksPath .githooks",
+    "test:live": "node --env-file-if-exists=.env --test \"tests/live/**/*.live.ts\"",
+    "verify": "npm run typecheck && npm run typecheck:web && npm test && npm run web:test && npm run web:build && npm run check:tokens && npm run check:secrets"
+  },
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=24.21"
+  },
+  "dependencies": {
+    "@langchain/core": "1.2.14",
+    "@langchain/langgraph": "1.4.19",
+    "@langchain/openai": "1.6.2",
+    "@modelcontextprotocol/sdk": "1.32.0",
+    "fastify": "5.12.5",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.1",
+    "typescript": "7.0.2"
+  }
+}

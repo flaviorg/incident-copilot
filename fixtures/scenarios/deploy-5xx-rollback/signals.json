@@ -1,0 +1,27 @@
+{
+  "start": "2026-10-04T09:10:00.000Z",
+  "durationSec": 3600,
+  "resolutionSec": 30,
+  "series": {
+    "http_5xx_rate": {
+      "segments": [
+        { "fromSec": 0, "toSec": 1800, "kind": "constant", "value": 0.004 },
+        { "fromSec": 1800, "toSec": 1830, "kind": "linear", "startValue": 0.004, "endValue": 0.062 },
+        { "fromSec": 1830, "toSec": 3600, "kind": "constant", "value": 0.096 }
+      ],
+      "noise": { "amplitude": 0.004, "seed": 7 }
+    },
+    "p99_latency_ms": {
+      "segments": [
+        { "fromSec": 0, "toSec": 1800, "kind": "constant", "value": 180 },
+        { "fromSec": 1800, "toSec": 1860, "kind": "linear", "startValue": 180, "endValue": 1240 },
+        { "fromSec": 1860, "toSec": 3600, "kind": "constant", "value": 1240 }
+      ],
+      "noise": { "amplitude": 25, "seed": 11 }
+    },
+    "request_rate": {
+      "segments": [{ "fromSec": 0, "toSec": 3600, "kind": "constant", "value": 820 }],
+      "noise": { "amplitude": 30, "seed": 3 }
+    }
+  }
+}

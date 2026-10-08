@@ -1,0 +1,13 @@
+{
+  "version": "2026-10-04",
+  "note": "premissas sintéticas da demo; substitua pelos dados da sua operação. Linha de base de MTTR sintética; substitua pelo histórico real da sua operação",
+  "engineersEngaged": 3,
+  "engineerHourlyCostUsd": 60,
+  "copilotMonthlyCostUsd": 900,
+  "incidentsPerMonth": 30,
+  "revenuePerMinuteUsd": { "orders-api": 150 },
+  "baselineMttrMin": {
+    "bad_deploy": { "low": 45, "high": 95 },
+    "cost_anomaly": { "low": 45, "high": 95 }
+  }
+}

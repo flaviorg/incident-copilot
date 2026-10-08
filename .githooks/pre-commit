@@ -1,0 +1,9 @@
+#!/bin/sh
+# Pre-commit do incident-copilot (spec 6.6 e AC-41): typecheck, testes unitários e varredura de segredos.
+# Instale só depois de a pasta ter Git próprio: npm run setup:hooks (muda core.hooksPath do repositório).
+# Os testes de ponta a ponta rodam no CI e em npm run verify, para o hook continuar rápido.
+set -e
+cd "$(dirname "$0")/.."
+npm run --silent typecheck
+npm run --silent test:unit
+npm run --silent check:secrets

@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "incident-copilot": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["--env-file-if-exists=.env", "src/mcp/server.ts"]
+    }
+  }
+}

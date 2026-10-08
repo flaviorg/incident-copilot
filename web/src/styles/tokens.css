@@ -1,0 +1,82 @@
+/* Design tokens semânticos: única fonte de cores, espaçamento e tipografia da War Room (spec 4.8 e 10.2).
+   Nenhuma cor literal fora deste arquivo (npm run check:tokens). Pares de texto e fundo em contrast-pairs.json,
+   conferidos com pelo menos 4,5:1 nos dois temas (src/test/tokens-contrast.test.ts). */
+:root {
+  color-scheme: light dark;
+
+  --color-bg: #f6f7f9;
+  --color-surface: #ffffff;
+  --color-surface-muted: #eef1f5;
+  --color-border: #8c96a3;
+  --color-text: #1b1f24;
+  --color-text-muted: #4f5966;
+  --color-accent: #1d4ed8;
+  --color-accent-text: #ffffff;
+  --color-link: #1d4ed8;
+  --color-focus: #1d4ed8;
+  --color-danger: #b42318;
+  --color-success: #1a7f37;
+  --color-banner-bg: #fff7e0;
+  --color-banner-text: #5c3d00;
+
+  --color-tier-1-bg: #e7f0ff;
+  --color-tier-1-fg: #1e3a8a;
+  --color-tier-2-bg: #e6f4ea;
+  --color-tier-2-fg: #14532d;
+  --color-tier-3-bg: #fff4e5;
+  --color-tier-3-fg: #7a3e00;
+  --color-tier-4-bg: #fde8e8;
+  --color-tier-4-fg: #8a1c1c;
+
+  --color-backdrop: #1b1f24b3;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --radius: 8px;
+  --border-width: 1px;
+  --focus-width: 3px;
+  --content-max: 1100px;
+
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.25rem;
+  --font-size-xl: 1.75rem;
+  --line-height: 1.5;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #0f1216;
+    --color-surface: #171b21;
+    --color-surface-muted: #1f252d;
+    --color-border: #5d6878;
+    --color-text: #e8ecf1;
+    --color-text-muted: #a9b3bf;
+    --color-accent: #8ab4ff;
+    --color-accent-text: #0b1220;
+    --color-link: #8ab4ff;
+    --color-focus: #8ab4ff;
+    --color-danger: #ff8a80;
+    --color-success: #6fdc8c;
+    --color-banner-bg: #3a2f0b;
+    --color-banner-text: #ffe8a3;
+
+    --color-tier-1-bg: #1b2a45;
+    --color-tier-1-fg: #bcd4ff;
+    --color-tier-2-bg: #173222;
+    --color-tier-2-fg: #a7e8b8;
+    --color-tier-3-bg: #3a2a10;
+    --color-tier-3-fg: #ffd59a;
+    --color-tier-4-bg: #431a1a;
+    --color-tier-4-fg: #ffb4ab;
+
+    --color-backdrop: #000000b3;
+  }
+}

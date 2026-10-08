@@ -1,0 +1,58 @@
+{
+  "impactStartedAt": "2026-10-04T08:00:00.000Z",
+  "detectedAt": "2026-10-04T08:00:00.000Z",
+  "resolvedAt": "2026-10-04T08:19:53.000Z",
+  "mttdMin": 0,
+  "mttrMin": 19.8833,
+  "timeAwaitingApprovalMin": 18,
+  "baselineMttrMin": {
+    "low": 45,
+    "high": 95
+  },
+  "minutesSaved": {
+    "low": 25.1167,
+    "high": 75.1167
+  },
+  "impactFraction": 0,
+  "revenuePerMinuteUsd": 0,
+  "downtimeCostAvoidedUsd": {
+    "low": 0,
+    "high": 0
+  },
+  "engineeringCostSavedUsd": {
+    "low": 75.3501,
+    "high": 225.3501
+  },
+  "monthlySavingsUsd": 339.59,
+  "llmCostUsd": 0,
+  "copilotCostUsd": 30,
+  "roiIllustrative": {
+    "low": 12.8313,
+    "high": 17.8313
+  },
+  "llmCalls": 13,
+  "promptTokens": 13971,
+  "completionTokens": 1624,
+  "assumptionsVersion": "2026-10-04",
+  "sources": {
+    "impactStartedAt": "measured",
+    "detectedAt": "measured",
+    "resolvedAt": "measured",
+    "mttdMin": "measured",
+    "mttrMin": "measured",
+    "timeAwaitingApprovalMin": "measured",
+    "baselineMttrMin": "assumption",
+    "minutesSaved": "derived",
+    "impactFraction": "measured",
+    "revenuePerMinuteUsd": "assumption",
+    "downtimeCostAvoidedUsd": "derived",
+    "engineeringCostSavedUsd": "derived",
+    "monthlySavingsUsd": "derived",
+    "llmCostUsd": "measured",
+    "copilotCostUsd": "derived",
+    "roiIllustrative": "derived",
+    "llmCalls": "measured",
+    "promptTokens": "measured",
+    "completionTokens": "measured"
+  }
+}

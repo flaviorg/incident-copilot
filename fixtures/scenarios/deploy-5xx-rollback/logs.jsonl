@@ -1,0 +1,6 @@
+{"ts":"2026-10-04T09:21:15.000Z","level":"WARN","service":"orders-api","version":"v3.7.2","message":"payment-gateway call retried after 800ms timeout","count":3}
+{"ts":"2026-10-04T09:28:02.000Z","level":"INFO","service":"orders-api","version":"v3.7.2","message":"catalog cache reloaded","count":1}
+{"ts":"2026-10-04T09:33:47.000Z","level":"WARN","service":"orders-api","version":"v3.7.2","message":"db pool usage above 70% of max connections","count":2}
+{"ts":"2026-10-04T09:40:05.000Z","level":"INFO","service":"orders-api","version":"v3.8.0","message":"rollout of v3.8.0 completed on 6 replicas","count":1}
+{"ts":"2026-10-04T09:40:40.000Z","level":"ERROR","service":"orders-api","version":"v3.8.0","message":"TypeError: Cannot read properties of undefined (reading 'currency') at PriceFormatter.format","count":380}
+{"ts":"2026-10-04T09:41:50.000Z","level":"WARN","service":"orders-api","version":"v3.8.0","message":"payment-gateway call retried after 800ms timeout","count":4}

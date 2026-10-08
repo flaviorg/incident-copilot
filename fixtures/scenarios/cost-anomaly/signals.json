@@ -1,0 +1,13 @@
+{
+  "start": "2026-09-27T08:00:00.000Z",
+  "durationSec": 604800,
+  "resolutionSec": 3600,
+  "series": {
+    "daily_cost_usd": {
+      "segments": [
+        { "fromSec": 0, "toSec": 518400, "kind": "constant", "value": 16.4 },
+        { "fromSec": 518400, "toSec": 604800, "kind": "constant", "value": 23.1 }
+      ]
+    }
+  }
+}
