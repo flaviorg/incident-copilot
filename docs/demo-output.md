@@ -1,6 +1,6 @@
 # Saída completa da demo de terminal
 
-Saída real dos dois cenários, copiada do terminal. A demo roda offline com o provedor fake roteirizado e força o fake mesmo que o shell tenha `OPENROUTER_API_KEY` (só `--live` usa o modelo real). O relógio é simulado, por isso os horários e o MTTR se repetem a cada execução. Resumo e contexto no [README](../README.md#início-rápido).
+Saída real dos dois cenários, copiada do terminal. A demo roda offline com o provedor fake roteirizado e força o fake mesmo que o shell tenha `OPENROUTER_API_KEY` (só `--live` usa o modelo real). O relógio é simulado, por isso os horários e o MTTR se repetem a cada execução. Resumo e contexto no [README](../README.md#quick-start).
 
 ## Cenário `deploy-5xx-rollback` (padrão)
 

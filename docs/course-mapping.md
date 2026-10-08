@@ -8,7 +8,7 @@ O tema de cada linha é o tópico da aula, resumido com palavras próprias. Quan
 
 | Aula | Tema | Arquivo no projeto | Prática provada |
 |---|---|---|---|
-| 198027 | Introdução ao curso: critério de replicar com outro domínio | `fixtures/scenarios/`, `README.md` ("O que mudei em relação à aula") | Mecanismos das aulas sobre dados próprios, com a lista do que mudou |
+| 198027 | Introdução ao curso: critério de replicar com outro domínio | `fixtures/scenarios/`, `README.md` ("What I changed from the course") | Mecanismos das aulas sobre dados próprios, com a lista do que mudou |
 | 198069 | Prompt engineering: prompt em blocos e validação por schema | `src/prompts/v1/*.ts` | Prompt com papel, regras e formato, validado por schema na saída |
 | 198071 | Ferramentas de IA para devs: papéis, permissões mínimas e SDD | `src/mcp/tools/propose-remediation.ts` | Nenhuma tool MCP aprova nem executa; aprovação só por HTTP com token |
 | 198081 | RAG, embeddings e busca semântica: fluxo e configuração por ambiente | `src/infra/runbooks/runbook-repository.ts`, `src/config.ts` | Busca por seção sobre `runbooks/`; modelo e provedor trocados por variável de ambiente |

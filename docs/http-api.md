@@ -1,6 +1,6 @@
 # API HTTP
 
-`npm start` sobe a API Fastify em `127.0.0.1:3000`. Corpo de erro: `{ "error": { "code", "message", "requestId", "issues"? } }`, sem stack. Toda resposta traz `X-Request-Id`. Resumo no [README](../README.md#api-http).
+`npm start` sobe a API Fastify em `127.0.0.1:3000`. Corpo de erro: `{ "error": { "code", "message", "requestId", "issues"? } }`, sem stack. Toda resposta traz `X-Request-Id`. Resumo no [README](../README.md#http-api).
 
 ## Rotas
 
@@ -58,4 +58,4 @@ $ curl -s 'localhost:3000/incidents/INC-0001/postmortem?format=json' | jq -c .nu
 
 Com o relógio do sistema, o cenário é deslocado para que o alerta coincida com a abertura, e o MTTR da API depende de quanto o operador leva para aprovar: neste exemplo, cerca de 2 min.
 
-O post-mortem saiu pelo template porque o [guarda numérico](../README.md#números-sem-invenção) rejeitou o "11,2" da narrativa roteirizada: esse é o MTTR da linha do tempo simulada, e com o relógio do sistema o MTTR real foi outro.
+O post-mortem saiu pelo template porque o [guarda numérico](../README.md#numbers-without-invention) rejeitou o "11,2" da narrativa roteirizada: esse é o MTTR da linha do tempo simulada, e com o relógio do sistema o MTTR real foi outro.

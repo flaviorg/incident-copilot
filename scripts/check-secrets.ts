@@ -38,7 +38,7 @@ const IGNORED_PATHS = new Set(["reports", "web/dist", "web/public/demo", "covera
 const isIgnoredFile = (rel: string) => /^data\/[^/]*\.db/.test(rel);
 /**
  * Arquivo de ambiente local, fora do commit pelo `.gitignore` (padrão `.env`, em qualquer nível). É onde o README manda
- * pôr a chave real ("Usando um modelo real"), então varrê-lo quebraria o pre-commit de quem segue o README. Só entra na
+ * pôr a chave real ("Using a real model (OpenRouter)"), então varrê-lo quebraria o pre-commit de quem segue o README. Só entra na
  * varredura se estiver rastreado pelo Git. `.env.example` continua sendo varrido.
  */
 const LOCAL_ENV_FILES = new Set([".env"]);

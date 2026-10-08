@@ -2,127 +2,129 @@
 
 # incident-copilot
 
-**Copiloto de incidentes multiagente em TypeScript: o modelo propõe; o código e o humano decidem.**
+**A multi-agent incident copilot in TypeScript: the model proposes; code and humans decide.**
 
 [![CI](https://github.com/flaviorg/incident-copilot/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/flaviorg/incident-copilot/actions/workflows/ci.yml)
-[![Licença MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-green)](LICENSE)
+[![MIT License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Node 24.21](https://img.shields.io/badge/node-24.21-brightgreen?logo=nodedotjs&logoColor=white)](.nvmrc)
 [![TypeScript 7](https://img.shields.io/badge/TypeScript-7.0-3178c6?logo=typescript&logoColor=white)](tsconfig.json)
-[![Testes](https://img.shields.io/badge/testes-340%20backend%20%2B%2032%20web-brightgreen)](#testes-e-qualidade)
+[![Tests](https://img.shields.io/badge/tests-340%20backend%20%2B%2032%20web-brightgreen)](#tests-and-quality)
 
-[**Demo ao vivo da War Room**](https://flaviorg.github.io/incident-copilot/) · [Início rápido](#início-rápido) · [Arquitetura](docs/architecture.md) · [Modelo de ameaças](docs/threat-model.md)
+[**Live War Room demo**](https://flaviorg.github.io/incident-copilot/) · [Quick start](#quick-start) · [Architecture](docs/architecture.md) · [Threat model](docs/threat-model.md)
 
 </div>
 
-> **English summary.** Multi-agent incident copilot in TypeScript: a LangGraph supervisor coordinates telemetry, runbook, planning and audit agents; risky actions go through an autonomy matrix with human approval, and forbidden ones never run even when the model proposes them. MTTR and savings are computed from data, not by the LLM. Runs offline with a scripted fake LLM; plug OpenRouter with two env vars (API key and model).
+A LangGraph supervisor coordinates telemetry, runbook, planning and audit agents. Risky actions go through an autonomy matrix with human approval, and forbidden ones never run, even when the model proposes them. MTTR and savings are computed from data, not by the LLM. It runs offline with a scripted fake LLM; plug in OpenRouter with two environment variables (API key and model).
+
+> **Note on language.** The documentation under `docs/`, `specs/` and the CLI output are written in Brazilian Portuguese (this is a portfolio project for a Brazilian course). Terminal output blocks below are real program output and are kept verbatim.
 
 <p align="center">
   <a href="https://flaviorg.github.io/incident-copilot/">
-    <img src="docs/media/demo.gif" alt="War Room: conversa entre agentes, portão de aprovação e números" width="720">
+    <img src="docs/media/demo.gif" alt="War Room: conversation between agents, approval gate and numbers" width="720">
   </a>
 </p>
 
-<p align="center"><sub>Reprodução de execução gravada com provedor fake roteirizado. Cenário de deploy: a equipe investiga, o portão para no <code>rollback_deployment</code> de faixa 3, o humano aprova e aparecem MTTR e tempo aguardando aprovação.</sub></p>
+<p align="center"><sub>Replay of a recorded run with a scripted fake provider. Deploy scenario: the team investigates, the gate stops at the tier 3 <code>rollback_deployment</code>, the human approves, and MTTR and time waiting for approval appear.</sub></p>
 
-## Sumário
+## Table of contents
 
-- [Por que este projeto existe](#por-que-este-projeto-existe)
-- [Destaques](#destaques)
-- [Arquitetura](#arquitetura)
-- [Início rápido](#início-rápido)
-- [Uso](#uso): [CLI](#cli) · [API HTTP](#api-http) · [Servidor MCP](#servidor-mcp) · [War Room](#war-room) · [Modelo real](#usando-um-modelo-real-openrouter)
-- [Cenários](#cenários)
-- [Segurança e guardrails](#segurança-e-guardrails)
-- [Números sem invenção](#números-sem-invenção)
-- [Testes e qualidade](#testes-e-qualidade)
-- [Estrutura de pastas](#estrutura-de-pastas)
-- [Aulas do curso aplicadas](#aulas-do-curso-aplicadas)
-- [O que mudei em relação à aula](#o-que-mudei-em-relação-à-aula)
-- [Limitações conhecidas](#limitações-conhecidas)
-- [Licença](#licença)
+- [Why this project exists](#why-this-project-exists)
+- [Highlights](#highlights)
+- [Architecture](#architecture)
+- [Quick start](#quick-start)
+- [Usage](#usage): [CLI](#cli) · [HTTP API](#http-api) · [MCP server](#mcp-server) · [War Room](#war-room) · [Real model](#using-a-real-model-openrouter)
+- [Scenarios](#scenarios)
+- [Security and guardrails](#security-and-guardrails)
+- [Numbers without invention](#numbers-without-invention)
+- [Tests and quality](#tests-and-quality)
+- [Folder structure](#folder-structure)
+- [Course lessons applied](#course-lessons-applied)
+- [What I changed from the course](#what-i-changed-from-the-course)
+- [Known limitations](#known-limitations)
+- [License](#license)
 
-## Por que este projeto existe
+## Why this project exists
 
-Agentes de LLM já conseguem investigar um incidente e propor uma correção. O problema é confiar neles para executar: um modelo pode errar o diagnóstico, inventar um número no post-mortem ou ser convencido por uma linha de log hostil a apagar backups. Este repositório defende, com testes, uma tese simples: **o modelo propõe; o código e o humano decidem.** O LLM escolhe o próximo especialista, investiga, planeja e redige. A faixa de risco, a aprovação, a execução, os números e a auditoria ficam com código determinístico e com uma pessoa.
+LLM agents can already investigate an incident and propose a fix. The problem is trusting them to execute it: a model can get the diagnosis wrong, invent a number in the post-mortem, or be convinced by a hostile log line to delete backups. This repository defends a simple thesis with tests: **the model proposes; code and humans decide.** The LLM picks the next specialist, investigates, plans and writes. The risk tier, the approval, the execution, the numbers and the audit stay with deterministic code and a person.
 
-## Destaques
+## Highlights
 
-- **Equipe de agentes com supervisor** (LangGraph): analista de telemetria com ReAct (teto 12), recuperador de runbooks por BM25, planejador e auditor com Reflection. Cada passagem vira um evento `handoff` persistido.
-- **Matriz de Autonomia em quatro faixas.** A faixa vem do catálogo, nunca da saída do LLM. Faixa 3 exige aprovação humana; faixa 4 é proibida por construção e não roda nem quando o modelo a propõe, inclusive por injeção de prompt vinda de log.
-- **Números calculados, não escritos.** MTTR, tempo aguardando aprovação e economia saem de funções puras; um guarda numérico rejeita na narrativa número que não sai dos cálculos.
-- **Quatro portas, um núcleo:** CLI, API HTTP (Fastify), servidor MCP (stdio) e War Room (React 19, publicada no GitHub Pages).
-- **Auditoria só de inserção**, com hash encadeado sobre JSON canônico, verificável pelo cliente.
-- **Roda offline**, sem Docker, sem chave e sem rede depois do `npm install`, com um LLM fake roteirizado; o OpenRouter entra com duas variáveis de ambiente.
-- **340 testes no backend e 32 na War Room, sem rede**, mais specs SDD com 41 critérios de aceite em EARS.
+- **A team of agents with a supervisor** (LangGraph): a telemetry analyst using ReAct (cap of 12), a BM25 runbook retriever, a planner, and an auditor using Reflection. Every handoff becomes a persisted `handoff` event.
+- **An Autonomy Matrix with four tiers.** The tier comes from the catalog, never from LLM output. Tier 3 requires human approval; tier 4 is forbidden by construction and does not run even when the model proposes it, including via prompt injection coming from a log.
+- **Numbers are computed, not written.** MTTR, time waiting for approval and savings come out of pure functions; a numeric guard rejects any number in the narrative that does not come from those calculations.
+- **Four entry points, one core:** CLI, HTTP API (Fastify), MCP server (stdio) and War Room (React 19, published on GitHub Pages).
+- **Insert-only audit** with a hash chain over canonical JSON, verifiable by the client.
+- **Runs offline**, with no Docker, no key and no network after `npm install`, using a scripted fake LLM; OpenRouter plugs in with two environment variables.
+- **340 backend tests and 32 War Room tests, none using the network**, plus SDD specs with 41 acceptance criteria in EARS.
 
-## Arquitetura
+## Architecture
 
 ```mermaid
 flowchart LR
-  subgraph PORTAS [Portas]
+  subgraph PORTAS [Entry points]
     CLI[CLI]
-    API[API HTTP Fastify]
-    MCP[Servidor MCP stdio]
+    API[HTTP API Fastify]
+    MCP[MCP server stdio]
     WR[War Room React]
   end
 
-  subgraph EQUIPE [Grafo LangGraph]
+  subgraph EQUIPE [LangGraph graph]
     SUP{{supervisor}}
-    subgraph ESP [Especialistas]
-      TEL[analista de telemetria<br/>ReAct, teto 12]
-      RB[recuperador de runbooks<br/>BM25]
-      PL[planejador] --> AU[auditor<br/>Reflection + regras em código]
+    subgraph ESP [Specialists]
+      TEL[telemetry analyst<br/>ReAct, cap 12]
+      RB[runbook retriever<br/>BM25]
+      PL[planner] --> AU[auditor<br/>Reflection + rules in code]
     end
-    GT[portão de remediação<br/>faixa do catálogo + dry run]
-    HUM([humano aprova<br/>faixa 3])
-    EX[executor] --> VE[verificador<br/>canário]
-    RP[relator<br/>post-mortem + guarda numérico]
-    ESC[escalonamento]
+    GT[remediation gate<br/>catalog tier + dry run]
+    HUM([human approves<br/>tier 3])
+    EX[executor] --> VE[verifier<br/>canary]
+    RP[reporter<br/>post-mortem + numeric guard]
+    ESC[escalation]
   end
 
-  DB[(SQLite<br/>blackboard, trace,<br/>auditoria encadeada)]
+  DB[(SQLite<br/>blackboard, trace,<br/>chained audit)]
 
   CLI & API & MCP --> SUP
   SUP --> TEL & RB & PL
   TEL & RB --> SUP
   AU --> SUP
   SUP --> GT
-  GT -- faixa 3 --> HUM --> EX
-  GT -- faixa 2 --> EX
-  GT -. faixa 4 bloqueada .-> GT
-  VE -- saudável --> SUP --> RP
-  VE -- reprovado --> ESC --> RP
+  GT -- tier 3 --> HUM --> EX
+  GT -- tier 2 --> EX
+  GT -. tier 4 blocked .-> GT
+  VE -- healthy --> SUP --> RP
+  VE -- failed --> ESC --> RP
   EQUIPE --- DB
-  WR -. modo demo .-> REC[(gravações geradas no build)]
+  WR -. demo mode .-> REC[(recordings generated at build time)]
 ```
 
-- Toda rota para o escalonamento é decidida por código: o schema da decisão do supervisor não tem essa opção.
-- A pausa para aprovação persiste o blackboard no SQLite, e a retomada é uma nova invocação que entra pelo executor.
-- `src/contracts` e `src/domain` são puros (sem `node:*` nem camadas externas), e há teste que garante isso.
+- Every route to escalation is decided by code: the supervisor's decision schema does not have that option.
+- The approval pause persists the blackboard in SQLite, and resuming is a new invocation that enters through the executor.
+- `src/contracts` and `src/domain` are pure (no `node:*` and no outer layers), and a test guarantees it.
 
-Diagramas completos (componentes, grafo, máquina de estados da aprovação), tabela de rotas e regra de dependência: [`docs/architecture.md`](docs/architecture.md).
+Full diagrams (components, graph, approval state machine), route table and dependency rule: [`docs/architecture.md`](docs/architecture.md).
 
 <details>
-<summary><strong>Os agentes, um a um</strong></summary>
+<summary><strong>The agents, one by one</strong></summary>
 
-| Agente | LLM | Ferramentas | Produz |
+| Agent | LLM | Tools | Produces |
 |---|---|---|---|
-| Supervisor | sim (`supervisor.v1`) | nenhuma | próximo especialista e `brief`, validados por uma guarda em código |
-| Analista de telemetria | sim (`telemetry-react.v1`), laço ReAct até 12 passos | `query_metrics`, `query_logs`, `list_deploys`, `audit_cloud_inventory` (faixa 1) | diagnóstico com categoria em enum, confiança e evidências |
-| Recuperador de runbooks | não | BM25 sobre `runbooks/` | trechos acima do limiar, ou recusa |
-| Planejador de remediação | sim (`planner.v1`) | nenhuma (vê o catálogo como texto) | plano de até 8 passos |
-| Auditor de plano | sim (`auditor.v1`), mais 5 regras em código como piso | consultas de inventário e deploys feitas pelo código | `approve` ou `revise`, com até 2 revisões |
-| Portão de remediação | não | `classifyAction`, dry run, fila de aprovação | ações por faixa |
-| Executor | não | mundo simulado, circuit breaker, limitador | ações executadas |
-| Verificador | não | canário (`analyzeCanary`), reversão | canário saudável ou reversão |
-| Relator | sim (`postmortem.v1`), só para a narrativa de incidente resolvido | métricas puras, guarda numérico, template | post-mortem |
-| Escalonamento | não | nenhuma | motivo do escalonamento |
+| Supervisor | yes (`supervisor.v1`) | none | next specialist and `brief`, validated by a guard in code |
+| Telemetry analyst | yes (`telemetry-react.v1`), ReAct loop up to 12 steps | `query_metrics`, `query_logs`, `list_deploys`, `audit_cloud_inventory` (tier 1) | diagnosis with an enum category, confidence and evidence |
+| Runbook retriever | no | BM25 over `runbooks/` | passages above the threshold, or a refusal |
+| Remediation planner | yes (`planner.v1`) | none (sees the catalog as text) | plan of up to 8 steps |
+| Plan auditor | yes (`auditor.v1`), plus 5 rules in code as a floor | inventory and deploy queries made by the code | `approve` or `revise`, with up to 2 revisions |
+| Remediation gate | no | `classifyAction`, dry run, approval queue | actions by tier |
+| Executor | no | simulated world, circuit breaker, rate limiter | executed actions |
+| Verifier | no | canary (`analyzeCanary`), rollback | healthy canary or rollback |
+| Reporter | yes (`postmortem.v1`), only for the narrative of a resolved incident | pure metrics, numeric guard, template | post-mortem |
+| Escalation | no | none | escalation reason |
 
 </details>
 
-## Início rápido
+## Quick start
 
-Requer Node 24.21 ou mais novo ([`.nvmrc`](.nvmrc)). Sem chave de LLM, sem Docker e sem rede depois do `npm install`.
+Requires Node 24.21 or newer ([`.nvmrc`](.nvmrc)). No LLM key, no Docker and no network after `npm install`.
 
 ```bash
 git clone https://github.com/flaviorg/incident-copilot.git && cd incident-copilot
@@ -130,7 +132,7 @@ npm install
 npm run demo
 ```
 
-A demo força o provedor fake mesmo que o shell tenha `OPENROUTER_API_KEY` (só `--live` usa o modelo real). Saída real, resumida:
+The demo forces the fake provider even if your shell has `OPENROUTER_API_KEY` (only `--live` uses the real model). Real output, abridged (the CLI prints in Brazilian Portuguese):
 
 ```text
 $ npm run demo
@@ -165,37 +167,37 @@ trace 41 eventos (thought 4 · action 10 · observation 10 · plan 1 · critique
 post-mortem: reports/INC-0001-postmortem.md
 ```
 
-A saída completa dos dois cenários, linha a linha, está em [`docs/demo-output.md`](docs/demo-output.md).
+The full output of both scenarios, line by line, is in [`docs/demo-output.md`](docs/demo-output.md).
 
-## Uso
+## Usage
 
 ### CLI
 
-| Comando | Faz |
+| Command | What it does |
 |---|---|
-| `npm run demo` | Cenário `deploy-5xx-rollback` com o fake, aprovação automática do operador demo |
-| `npm run demo -- --reject` | O operador rejeita: o rollback é cancelado junto com o passo que dependia dele, e o incidente termina escalado com `mitigation_rejected` |
-| `npm run demo -- --scenario cost-anomaly` | O cenário FinOps, com Reflection e faixa 4 bloqueada |
-| `npm run demo -- --json` | Só o objeto final |
-| `npm run demo -- --persist` | Grava em `data/incident-copilot.db`; a segunda execução vira `INC-0002` |
-| `npm run cli -- demo --live` | A demo com o modelo real ([ver abaixo](#usando-um-modelo-real-openrouter)) |
+| `npm run demo` | The `deploy-5xx-rollback` scenario with the fake provider, automatic approval by the demo operator |
+| `npm run demo -- --reject` | The operator rejects: the rollback is cancelled along with the step that depended on it, and the incident ends escalated with `mitigation_rejected` |
+| `npm run demo -- --scenario cost-anomaly` | The FinOps scenario, with Reflection and tier 4 blocked |
+| `npm run demo -- --json` | Only the final object |
+| `npm run demo -- --persist` | Writes to `data/incident-copilot.db`; the second run becomes `INC-0002` |
+| `npm run cli -- demo --live` | The demo with the real model ([see below](#using-a-real-model-openrouter)) |
 
-### API HTTP
+### HTTP API
 
-`npm start` sobe a API em `127.0.0.1:3000`. Corpo de erro: `{ "error": { "code", "message", "requestId", "issues"? } }`, sem stack. Toda resposta traz `X-Request-Id`.
+`npm start` brings the API up at `127.0.0.1:3000`. Error body: `{ "error": { "code", "message", "requestId", "issues"? } }`, with no stack trace. Every response carries `X-Request-Id`.
 
-| Rota | Faz |
+| Route | What it does |
 |---|---|
-| `POST /incidents` | abre e executa a equipe até `awaiting_approval`, `resolved` ou `escalated` |
-| `GET /incidents`, `GET /incidents/:id` | lista com filtro em SQL; visão completa do incidente |
-| `GET /incidents/:id/trace`, `/audit`, `/postmortem` | trace, trilha de auditoria verificável e post-mortem (Markdown ou JSON) |
-| `GET /approvals`, `POST /approvals/:id/decision` | fila de aprovações; decisão com `X-Approval-Token`, que retoma o incidente |
-| `GET /health`, `GET /scenarios`, `GET /stats` | saúde, cenários e estatísticas em SQL (MTTR P50 e P95, faixas, guardas, uso do LLM) |
+| `POST /incidents` | opens an incident and runs the team until `awaiting_approval`, `resolved` or `escalated` |
+| `GET /incidents`, `GET /incidents/:id` | list with SQL filtering; full view of the incident |
+| `GET /incidents/:id/trace`, `/audit`, `/postmortem` | trace, verifiable audit trail and post-mortem (Markdown or JSON) |
+| `GET /approvals`, `POST /approvals/:id/decision` | approval queue; decision with `X-Approval-Token`, which resumes the incident |
+| `GET /health`, `GET /scenarios`, `GET /stats` | health, scenarios and SQL statistics (MTTR P50 and P95, tiers, guards, LLM usage) |
 
 <details>
-<summary><strong>Sequência real com <code>curl</code></strong> (abrir, errar o token, decisão ambígua, aprovar)</summary>
+<summary><strong>Real <code>curl</code> sequence</strong> (open, wrong token, ambiguous decision, approve)</summary>
 
-Com banco novo e um token local de 16 caracteres ou mais exportado no shell como `APPROVAL_TOKEN` (o valor não aparece em nenhuma saída):
+With a fresh database and a local token of 16 or more characters exported in the shell as `APPROVAL_TOKEN` (the value does not appear in any output):
 
 ```text
 $ curl -s -X POST localhost:3000/incidents -H 'content-type: application/json' -d '{"scenarioId":"deploy-5xx-rollback"}' | jq -c '{id: .incident.id, status: .incident.status, pendentes: [.approvals[] | select(.status=="pending") | .id]}'
@@ -214,28 +216,28 @@ $ curl -s 'localhost:3000/incidents/INC-0001/postmortem?format=json' | jq -c .nu
 {"passed":false,"rejectedNumbers":["11,2"],"usedTemplate":true}
 ```
 
-O último comando mostra o [guarda numérico](#números-sem-invenção) funcionando: com o relógio do sistema, a narrativa roteirizada cita "11,2" (o MTTR da linha do tempo simulada), o MTTR real foi outro (cerca de 2 min neste exemplo), e o post-mortem saiu pelo template determinístico.
+The last command shows the [numeric guard](#numbers-without-invention) at work: with the system clock, the scripted narrative cites "11,2" (the MTTR of the simulated timeline), the real MTTR was different (about 2 min in this example), and the post-mortem came out through the deterministic template.
 
 </details>
 
-Todas as rotas com seus códigos de erro e a sequência completa (`/health`, `/stats`, post-mortem em Markdown): [`docs/http-api.md`](docs/http-api.md).
+All routes with their error codes and the full sequence (`/health`, `/stats`, post-mortem in Markdown): [`docs/http-api.md`](docs/http-api.md).
 
-### Servidor MCP
+### MCP server
 
-`npm run mcp` sobe o servidor stdio `incident-copilot` sobre o mesmo banco da API. O stdout só leva JSON-RPC; todo log vai para stderr. Para ligar um cliente MCP, use `node` direto, como nas configurações do repositório, ou `npm run -s mcp`: sem o `-s`, o próprio npm escreve duas linhas de cabeçalho no stdout antes do JSON-RPC.
+`npm run mcp` starts the `incident-copilot` stdio server over the same database as the API. Stdout carries only JSON-RPC; all logging goes to stderr. To connect an MCP client, call `node` directly, as in the repository's configs, or use `npm run -s mcp`: without `-s`, npm itself writes two header lines to stdout before the JSON-RPC.
 
-| Tool | Faz |
+| Tool | What it does |
 |---|---|
-| `list_incidents` | incidentes recentes e status, com filtro |
-| `get_incident` | visão do incidente e os últimos eventos do trace |
-| `propose_remediation` | propõe uma ação para um incidente `awaiting_approval`: faixa 2 entra no lote pronto, faixa 3 vai para a fila humana, faixa 4 e tipo desconhecido são recusados com auditoria |
+| `list_incidents` | recent incidents and their status, with filtering |
+| `get_incident` | incident view and the latest trace events |
+| `propose_remediation` | proposes an action for an `awaiting_approval` incident: tier 2 goes into the ready batch, tier 3 goes to the human queue, tier 4 and unknown types are refused with an audit record |
 
-**Nenhuma tool aprova nem executa.** A proposta roda junto com o lote, depois da decisão humana pela API. Para inspecionar: `npm run mcp:inspect`, que baixa o MCP Inspector com `npx` na primeira vez.
+**No tool approves or executes anything.** The proposal runs together with the batch, after the human decision through the API. To inspect: `npm run mcp:inspect`, which downloads the MCP Inspector with `npx` the first time.
 
 <details>
-<summary><strong>Configuração do cliente</strong> (VS Code e Cursor)</summary>
+<summary><strong>Client configuration</strong> (VS Code and Cursor)</summary>
 
-VS Code ([`.vscode/mcp.json`](.vscode/mcp.json), já no repositório):
+VS Code ([`.vscode/mcp.json`](.vscode/mcp.json), already in the repository):
 
 ```json
 {
@@ -249,315 +251,315 @@ VS Code ([`.vscode/mcp.json`](.vscode/mcp.json), já no repositório):
 }
 ```
 
-O Cursor usa o mesmo conteúdo com a chave `mcpServers` ([`.cursor/mcp.json`](.cursor/mcp.json)).
+Cursor uses the same content with the `mcpServers` key ([`.cursor/mcp.json`](.cursor/mcp.json)).
 
 </details>
 
 ### War Room
 
-**Ao vivo:** [flaviorg.github.io/incident-copilot](https://flaviorg.github.io/incident-copilot/)
+**Live:** [flaviorg.github.io/incident-copilot](https://flaviorg.github.io/incident-copilot/)
 
-A War Room ([`web/`](web/)) é uma página estática em React 19 e Vite 8 que reproduz gravações geradas pelo próprio backend (`npm run demo:record`), sem precisar de API: conversa entre agentes com handoffs, portão de aprovação com selo de faixa (texto, ícone e cor) e os ramos aprovar e rejeitar, cartões de números e post-mortem com o selo do guarda numérico.
+The War Room ([`web/`](web/)) is a static page built with React 19 and Vite 8 that replays recordings generated by the backend itself (`npm run demo:record`), with no API needed: a conversation between agents with handoffs, an approval gate with a tier badge (text, icon and color) and both the approve and reject branches, number cards, and a post-mortem with the numeric guard badge.
 
 ```bash
-npm run web:install   # uma vez: pacote aninhado, instalação própria
-npm run web:demo      # gera as gravações e sobe o Vite
+npm run web:install   # once: nested package, its own install
+npm run web:demo      # generates the recordings and starts Vite
 ```
 
 <p align="center">
-  <img src="docs/media/war-room.png" alt="Captura da War Room no portão do cenário cost-anomaly, com delete_backups bloqueado na faixa 4" width="640">
+  <img src="docs/media/war-room.png" alt="Screenshot of the War Room at the cost-anomaly scenario gate, with delete_backups blocked at tier 4" width="640">
 </p>
-<p align="center"><sub>O portão do cenário de custo: três aprovações de faixa 3 pendentes e o <code>delete_backups</code> de faixa 4 bloqueado sem dry run. Como as mídias foram feitas: <a href="docs/media/README.md"><code>docs/media/README.md</code></a>.</sub></p>
+<p align="center"><sub>The cost scenario gate: three pending tier 3 approvals and the tier 4 <code>delete_backups</code> blocked without a dry run. How the media were made: <a href="docs/media/README.md"><code>docs/media/README.md</code></a>.</sub></p>
 
-- **Acessibilidade.** axe sem violações nas telas principais, diálogo com foco preso e Escape, faixa por texto e ícone, foco do teclado acompanhando a reprodução e uma coluna em tela estreita. Checklist e evidências em [`docs/accessibility.md`](docs/accessibility.md).
-- **Design tokens.** Cores, espaçamento e tipografia só em [`web/src/styles/tokens.css`](web/src/styles/tokens.css), com temas claro e escuro. `npm run check:tokens` falha com cor literal fora dele, e um teste prova contraste de pelo menos 4,5:1 em todos os pares declarados.
-- **Publicação.** O workflow manual "Pages (War Room)" ([`.github/workflows/pages.yml`](.github/workflows/pages.yml)) faz o build com `VITE_BASE=/incident-copilot/` e publica `web/dist`. Nada é publicado sem alguém disparar o workflow.
+- **Accessibility.** axe reports no violations on the main screens, the dialog traps focus and closes on Escape, tiers are conveyed by text and icon, keyboard focus follows playback, and the layout collapses to one column on narrow screens. Checklist and evidence in [`docs/accessibility.md`](docs/accessibility.md).
+- **Design tokens.** Colors, spacing and typography live only in [`web/src/styles/tokens.css`](web/src/styles/tokens.css), with light and dark themes. `npm run check:tokens` fails on any literal color outside it, and a test proves a contrast ratio of at least 4.5:1 for every declared pair.
+- **Publishing.** The manual "Pages (War Room)" workflow ([`.github/workflows/pages.yml`](.github/workflows/pages.yml)) builds with `VITE_BASE=/incident-copilot/` and publishes `web/dist`. Nothing is published unless someone triggers the workflow.
 
-### Usando um modelo real (OpenRouter)
+### Using a real model (OpenRouter)
 
-1. Copie [`.env.example`](.env.example) para `.env` e preencha `OPENROUTER_API_KEY` e `OPENROUTER_MODEL`. O modelo precisa suportar saída estruturada. `OPENROUTER_MODEL_FALLBACK` é opcional. O `.env` está no `.gitignore`, e `check:secrets` (com o pre-commit) não o varre enquanto ele não for rastreado pelo Git.
-2. Com a chave definida e `LLM_PROVIDER` vazio, a API, o MCP e a CLI usam o OpenRouter. `LLM_PROVIDER=fake` força o fake mesmo com chave.
-3. Rode:
-   - `npm run test:live`: roda o cenário de deploy contra o modelo real e confere só estrutura (categoria no enum, passos no catálogo ou bloqueados, guarda numérico aprovado ou template usado). Sem chave, o teste é pulado.
-   - `npm run cli -- demo --live`: a demo de terminal com o modelo real. O script `cli` lê o `.env`; o script `demo` não lê, de propósito, para a demo padrão nunca pegar uma chave sem querer. Sem `OPENROUTER_API_KEY` e `OPENROUTER_MODEL` (ou com `LLM_PROVIDER=fake`), `--live` termina com erro e código 1 em vez de cair no fake.
+1. Copy [`.env.example`](.env.example) to `.env` and fill in `OPENROUTER_API_KEY` and `OPENROUTER_MODEL`. The model must support structured output. `OPENROUTER_MODEL_FALLBACK` is optional. `.env` is in `.gitignore`, and `check:secrets` (with the pre-commit hook) does not scan it as long as Git does not track it.
+2. With the key set and `LLM_PROVIDER` empty, the API, the MCP server and the CLI use OpenRouter. `LLM_PROVIDER=fake` forces the fake even when a key is present.
+3. Run:
+   - `npm run test:live`: runs the deploy scenario against the real model and checks structure only (category in the enum, steps in the catalog or blocked, numeric guard passed or template used). Without a key, the test is skipped.
+   - `npm run cli -- demo --live`: the terminal demo with the real model. The `cli` script reads `.env`; the `demo` script deliberately does not, so the default demo never picks up a key by accident. Without `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` (or with `LLM_PROVIDER=fake`), `--live` ends with an error and exit code 1 instead of falling back to the fake.
 
-Qualquer endpoint compatível com a API da OpenAI serve (`LLM_BASE_URL`). Cada chamada fica registrada em `llm_calls` com tokens, custo estimado ([`data/model-prices.json`](data/model-prices.json)), latência e tipo de erro.
+Any endpoint compatible with the OpenAI API will work (`LLM_BASE_URL`). Every call is recorded in `llm_calls` with tokens, estimated cost ([`data/model-prices.json`](data/model-prices.json)), latency and error type.
 
-## Cenários
+## Scenarios
 
-Os dados são do projeto, gerados por especificação determinística (séries com PRNG semeado). As aulas inspiram o mecanismo, não os números.
+The data belongs to this project and is generated from a deterministic specification (series with a seeded PRNG). The course lessons inspire the mechanism, not the numbers.
 
-| Cenário | Situação | Diagnóstico | Plano final (faixa) | O que mostra |
+| Scenario | Situation | Diagnosis | Final plan (tier) | What it shows |
 |---|---|---|---|---|
-| `deploy-5xx-rollback` | `orders-api`, sev1. 5xx de 0,4% para quase 10% logo depois do deploy `v3.8.0`; `TypeError` em `PriceFormatter.format` só nessa versão | `bad_deploy`, confiança alta | `add_incident_note` (2), `rollback_deployment` para `v3.7.2` (3), `block_image_tag` (2, depende do rollback) | Caminho feliz, aprovação humana, canário saudável, MTTR. O runbook distrator fica abaixo no ranking |
-| `cost-anomaly` | conta `data-platform`, sev3. Custo diário 41% acima da média; volume `gp3` sem anexo, IPv4 ocioso, instância com 3,1% de CPU | `cost_anomaly`, confiança alta | Revisão 0 reprovada por `snapshot_before_delete`. Revisão 1: `tag_resource_for_review` (2), `create_volume_snapshot` (2), `delete_volume` (3), `release_elastic_ip` (3), `resize_instance` (3) e `delete_backups` (4, bloqueado) | Reflection; faixa 4 barrada mesmo num plano aprovado pelo auditor; economia mensal de US$ 339,59 (60,00 + 3,65 + 275,94) |
+| `deploy-5xx-rollback` | `orders-api`, sev1. 5xx rises from 0.4% to almost 10% right after deploy `v3.8.0`; `TypeError` in `PriceFormatter.format` only in that version | `bad_deploy`, high confidence | `add_incident_note` (2), `rollback_deployment` to `v3.7.2` (3), `block_image_tag` (2, depends on the rollback) | Happy path, human approval, healthy canary, MTTR. The distractor runbook ranks lower |
+| `cost-anomaly` | `data-platform` account, sev3. Daily cost 41% above average; unattached `gp3` volume, idle IPv4, instance at 3.1% CPU | `cost_anomaly`, high confidence | Revision 0 rejected by `snapshot_before_delete`. Revision 1: `tag_resource_for_review` (2), `create_volume_snapshot` (2), `delete_volume` (3), `release_elastic_ip` (3), `resize_instance` (3) and `delete_backups` (4, blocked) | Reflection; tier 4 stopped even in a plan approved by the auditor; monthly savings of US$ 339.59 (60.00 + 3.65 + 275.94) |
 
-## Segurança e guardrails
+## Security and guardrails
 
-Toda entrada externa é tratada como não confiável, inclusive a saída do modelo. O [modelo de ameaças](docs/threat-model.md) tem uma linha por entrada (saída do LLM, logs e runbooks no prompt, comentário e texto da decisão, `X-Request-Id`, parâmetros do MCP, token), com a defesa e o teste que a prova.
+All external input is treated as untrusted, including the model's output. The [threat model](docs/threat-model.md) has one row per input (LLM output, logs and runbooks in the prompt, comment and decision text, `X-Request-Id`, MCP parameters, token), with the defense and the test that proves it.
 
-**Injeção indireta por log** ([`tests/e2e/injection.e2e.test.ts`](tests/e2e/injection.e2e.test.ts)): uma linha de log hostil manda o agente apagar backups; o teste afirma que o texto chega ao prompt do analista e que o planejador roteirizado inclui `delete_backups`. Mesmo assim, o passo termina `blocked_forbidden`, sem dry run, com auditoria e `critique` do portão, e os passos legítimos seguem. A defesa não está no prompt: está no catálogo, que nega por padrão, e na faixa 4, que não tem executor.
+**Indirect injection via log** ([`tests/e2e/injection.e2e.test.ts`](tests/e2e/injection.e2e.test.ts)): a hostile log line tells the agent to delete backups; the test asserts that the text reaches the analyst's prompt and that the scripted planner includes `delete_backups`. Even so, the step ends as `blocked_forbidden`, with no dry run, with an audit record and a `critique` from the gate, and the legitimate steps carry on. The defense is not in the prompt: it is in the catalog, which denies by default, and in tier 4, which has no executor.
 
-| Faixa | Comportamento |
+| Tier | Behavior |
 |---|---|
-| 1 | Só leitura, roda livre |
-| 2 | Roda e registra |
-| 3 | Exige aprovação humana com token |
-| 4 | Proibida por construção: o tipo nem existe no registro de executores |
+| 1 | Read-only, runs freely |
+| 2 | Runs and is logged |
+| 3 | Requires human approval with a token |
+| 4 | Forbidden by construction: the type does not even exist in the executor registry |
 
-Catálogo completo de ações e regras de contexto: [`docs/autonomy-matrix.md`](docs/autonomy-matrix.md) (gerado do código).
+Full action catalog and context rules: [`docs/autonomy-matrix.md`](docs/autonomy-matrix.md) (generated from the code).
 
 <details>
-<summary><strong>Todos os guardrails e o teste que prova cada um</strong></summary>
+<summary><strong>All guardrails and the test that proves each one</strong></summary>
 
-| Guardrail | Como funciona | Teste que prova |
+| Guardrail | How it works | Test that proves it |
 |---|---|---|
-| Matriz de Autonomia | Faixa do catálogo; regras de contexto só sobem. Faixa 1 lê; 2 roda e registra; 3 exige aprovação humana; 4 é proibida por construção (o tipo nem existe no registro de executores) | `autonomy.unit.test.ts`, `scenarios.e2e.test.ts` |
-| Guarda do supervisor | Escolha sem pré-condição vira `critique` (`coerced`) e segue a rota canônica | `supervisor-guard.unit.test.ts`, `team.e2e.test.ts` |
-| Auditor com piso em código | O LLM pode endurecer o veredito, nunca afrouxar; a sobrescrita fica no campo `overridden` do `critique`, que o `/stats` conta | `auditor-rules.unit.test.ts`, `nodes-planning.unit.test.ts`, `stats.unit.test.ts` |
-| Tetos | ReAct 12, rodadas do analista 2, equipe 8, recursão 25, revisões 2, passos por plano 8, observação 600 caracteres; `RUN_TIMEOUT_MS` conferido também pelo relógio a cada superstep | `telemetry.e2e.test.ts`, `team.e2e.test.ts`, `tools.unit.test.ts` (observação), `resilience.e2e.test.ts` (timeout) |
-| Aprovação | Máquina de estados pura; texto livre só com termos exatos; expiração projetada na leitura e materializada na decisão; rejeição cancela dependentes; decisão recusada (409 `incident_not_accepting`) enquanto a execução do incidente ainda roda | `approval-machine.unit.test.ts`, `parse-decision.unit.test.ts`, `gate.e2e.test.ts` |
-| Token de aprovação | Comparação em tempo constante; 5 erros em 10 min bloqueiam 10 min (bloqueio global do processo, ver limitações); nunca ecoado | `guards.unit.test.ts`, `http.e2e.test.ts` |
-| Segredos | `redactSecrets` em toda saída; varredura das 7 superfícies; `check:secrets` no pre-commit e no CI (o `.env` local fica de fora enquanto não for rastreado pelo Git) | `secrets.e2e.test.ts`, `check-secrets.unit.test.ts` |
-| Circuit breaker e rate limit | 3 falhas abrem por 300 s; 5 execuções por minuto; mesma ação no mesmo alvo 1 vez em 10 min | `guards.unit.test.ts`, `gate.e2e.test.ts` |
-| Canário | Limiar em código; reprovado reverte as ações reversíveis em ordem inversa | `canary.unit.test.ts`, `gate.e2e.test.ts` |
-| Auditoria | Só inserção (gatilhos no banco), hash encadeado sobre JSON canônico, uma cadeia por incidente desde o hash gênese, ordem por `seq INTEGER PRIMARY KEY`; a API devolve `prevHash` e `hash` para o cliente recalcular a cadeia | `store-audit.unit.test.ts`, `http.e2e.test.ts` |
+| Autonomy Matrix | Tier from the catalog; context rules can only raise it. Tier 1 reads; 2 runs and is logged; 3 requires human approval; 4 is forbidden by construction (the type does not even exist in the executor registry) | `autonomy.unit.test.ts`, `scenarios.e2e.test.ts` |
+| Supervisor guard | A choice without its precondition becomes a `critique` (`coerced`) and follows the canonical route | `supervisor-guard.unit.test.ts`, `team.e2e.test.ts` |
+| Auditor with a floor in code | The LLM can tighten the verdict, never loosen it; the override is recorded in the `overridden` field of the `critique`, which `/stats` counts | `auditor-rules.unit.test.ts`, `nodes-planning.unit.test.ts`, `stats.unit.test.ts` |
+| Caps | ReAct 12, analyst rounds 2, team 8, recursion 25, revisions 2, steps per plan 8, observation 600 characters; `RUN_TIMEOUT_MS` is also checked against the clock at every superstep | `telemetry.e2e.test.ts`, `team.e2e.test.ts`, `tools.unit.test.ts` (observation), `resilience.e2e.test.ts` (timeout) |
+| Approval | Pure state machine; free text only with exact terms; expiry projected on read and materialized on decision; rejection cancels dependents; decision refused (409 `incident_not_accepting`) while the incident's run is still in progress | `approval-machine.unit.test.ts`, `parse-decision.unit.test.ts`, `gate.e2e.test.ts` |
+| Approval token | Constant-time comparison; 5 errors in 10 min lock for 10 min (a process-wide lock, see limitations); never echoed | `guards.unit.test.ts`, `http.e2e.test.ts` |
+| Secrets | `redactSecrets` on every output; scan of the 7 surfaces; `check:secrets` in the pre-commit hook and in CI (the local `.env` is skipped as long as Git does not track it) | `secrets.e2e.test.ts`, `check-secrets.unit.test.ts` |
+| Circuit breaker and rate limit | 3 failures open it for 300 s; 5 executions per minute; the same action on the same target once per 10 min | `guards.unit.test.ts`, `gate.e2e.test.ts` |
+| Canary | Threshold in code; a failed canary reverts reversible actions in reverse order | `canary.unit.test.ts`, `gate.e2e.test.ts` |
+| Audit | Insert-only (database triggers), hash chain over canonical JSON, one chain per incident from the genesis hash, ordered by `seq INTEGER PRIMARY KEY`; the API returns `prevHash` and `hash` so the client can recompute the chain | `store-audit.unit.test.ts`, `http.e2e.test.ts` |
 
 </details>
 
-## Números sem invenção
+## Numbers without invention
 
-Os números de destaque são **MTTR** e **tempo aguardando aprovação**; no cenário FinOps, também a **economia mensal**. Todos são calculados por funções puras ([`src/domain/metrics/incident-metrics.ts`](src/domain/metrics/incident-metrics.ts)) sobre a linha do tempo, as séries e as premissas. Os valores vêm dos arquivos golden ([`tests/golden/`](tests/golden/)), que a suíte confere a cada execução:
+The headline numbers are **MTTR** and **time waiting for approval**; in the FinOps scenario, also the **monthly savings**. All are computed by pure functions ([`src/domain/metrics/incident-metrics.ts`](src/domain/metrics/incident-metrics.ts)) over the timeline, the series and the assumptions. The values come from the golden files ([`tests/golden/`](tests/golden/)), which the suite checks on every run:
 
-| Cenário (ramo aprovado) | MTTR | Aguardando aprovação | Economia mensal | Minutos economizados (ilustrativo) | ROI (ilustrativo) |
+| Scenario (approved branch) | MTTR | Waiting for approval | Monthly savings | Minutes saved (illustrative) | ROI (illustrative) |
 |---|---|---|---|---|---|
-| `deploy-5xx-rollback` | **11,2 min** (09:40:30 → 09:51:41) | **3,0 min** | não se aplica | 33,8 a 83,8 | 18,9x a 48,2x |
-| `cost-anomaly` | **19,9 min** | **18,0 min** (soma das 3 aprovações) | **US$ 339,59** | 25,1 a 75,1 | 12,8x a 17,8x |
+| `deploy-5xx-rollback` | **11.2 min** (09:40:30 → 09:51:41) | **3.0 min** | not applicable | 33.8 to 83.8 | 18.9x to 48.2x |
+| `cost-anomaly` | **19.9 min** | **18.0 min** (sum of the 3 approvals) | **US$ 339.59** | 25.1 to 75.1 | 12.8x to 17.8x |
 
-Minutos economizados e ROI são **ilustrativos, sobre linha de base sintética**: comparam o MTTR com uma linha de base de 45 a 95 min que **não vem de histórico real** e está em [`data/business-assumptions.json`](data/business-assumptions.json) para ser trocada pelo histórico da sua operação. Cada valor carrega um rótulo: `measured` (medido), `assumption` (premissa) ou `derived` (derivado).
+Minutes saved and ROI are **illustrative, over a synthetic baseline**: they compare MTTR with a baseline of 45 to 95 min that **does not come from real history** and lives in [`data/business-assumptions.json`](data/business-assumptions.json) so you can swap in your own operation's history. Each value carries a label: `measured`, `assumption` or `derived`.
 
 <details>
-<summary><strong>Relógio simulado e guarda numérico</strong></summary>
+<summary><strong>Simulated clock and numeric guard</strong></summary>
 
-**MTTR da demo.** Vem do relógio simulado: 20 s por chamada de LLM, 3 s por ferramenta, 2 s por dry run, a duração do catálogo por execução e 180 s por aprovação. Com modelo real e relógio do sistema, os números mudam.
+**Demo MTTR.** It comes from the simulated clock: 20 s per LLM call, 3 s per tool, 2 s per dry run, the catalog duration per execution, and 180 s per approval. With a real model and the system clock, the numbers change.
 
-**ROI.** Usa premissas declaradas em `data/business-assumptions.json` (custo por hora de engenharia, receita por minuto, custo mensal do copiloto).
+**ROI.** It uses assumptions declared in `data/business-assumptions.json` (engineering cost per hour, revenue per minute, monthly cost of the copilot).
 
-**Guarda numérico.** O LLM só redige a narrativa do post-mortem, a partir de fatos já formatados. O guarda extrai cada número escrito com algarismos e rejeita o que não corresponde a um valor calculado, da linha do tempo ou das evidências. Ele ignora identificadores (versões, horários ISO, ids de recurso). A forma equivalente (9,4% e 0,094) só vale para frações medidas, como a fração de impacto e o pico da taxa de erro, e para números que já aparecem com "%" nas evidências: uma contagem 3 ou a linha de base 45 não autorizam "300%" nem "45%". Se rejeitar, a narrativa vai fora e entra o template determinístico, com `critique` listando os números. Número por extenso ("três minutos") não é extraído; ver limitações.
+**Numeric guard.** The LLM only writes the post-mortem narrative, from facts that are already formatted. The guard extracts every number written in digits and rejects anything that does not match a computed value, the timeline or the evidence. It ignores identifiers (versions, ISO times, resource ids). The equivalent form (9.4% and 0.094) is only valid for measured fractions, such as the impact fraction and the error-rate peak, and for numbers that already appear with "%" in the evidence: a count of 3 or the baseline of 45 do not authorize "300%" or "45%". If it rejects, the narrative is dropped and the deterministic template takes its place, with a `critique` listing the numbers. A number spelled out in words ("three minutes") is not extracted; see limitations.
 
 </details>
 
-## Testes e qualidade
+## Tests and quality
 
-| Camada | Ferramenta | Rede | Cobre |
+| Layer | Tool | Network | Covers |
 |---|---|---|---|
-| Unidade | `node:test`, `tests/unit/*.unit.test.ts` | proibida | domínio puro, store em `:memory:`, fake, resiliência, redação, contratos, suposições de API, specs, varredura de segredos |
-| Ponta a ponta | `node:test`, `tests/e2e/*.e2e.test.ts` | proibida | grafo por cenário com asserção no banco, HTTP por `app.inject`, MCP com cliente real, CLI como processo filho, gravações |
-| War Room | Vitest, jsdom, Testing Library, axe-core | proibida | replay, fonte demo, diálogo, acessibilidade, contraste |
-| Ao vivo (opcional) | `node:test`, `tests/live/*.live.ts` | OpenRouter | estrutura com modelo real; pulado sem chave |
+| Unit | `node:test`, `tests/unit/*.unit.test.ts` | forbidden | pure domain, store in `:memory:`, fake, resilience, redaction, contracts, API assumptions, specs, secret scan |
+| End to end | `node:test`, `tests/e2e/*.e2e.test.ts` | forbidden | graph per scenario with database assertions, HTTP via `app.inject`, MCP with a real client, CLI as a child process, recordings |
+| War Room | Vitest, jsdom, Testing Library, axe-core | forbidden | replay, demo source, dialog, accessibility, contrast |
+| Live (optional) | `node:test`, `tests/live/*.live.ts` | OpenRouter | structure with a real model; skipped without a key |
 
 ```bash
-npm test             # backend inteiro, sem rede
-npm run test:unit    # só unitários (o pre-commit)
+npm test             # entire backend, no network
+npm run test:unit    # unit tests only (the pre-commit hook)
 npm run web:test     # War Room
-npm run verify       # o que o CI roda: typecheck, testes, testes e build da web, check:tokens, check:secrets
+npm run verify       # what CI runs: typecheck, tests, web tests and build, check:tokens, check:secrets
 ```
 
-Contagem atual: **340 testes no backend**, todos passando (262 unitários em 40 arquivos e 78 de ponta a ponta em 11 arquivos), e **32 na War Room**, em 6 arquivos. O teste ao vivo é pulado sem chave.
+Current count: **340 backend tests**, all passing (262 unit tests in 40 files and 78 end-to-end tests in 11 files), and **32 in the War Room**, in 6 files. The live test is skipped without a key.
 
-- **Sem rede.** `fetch` é substituído por uma função que lança erro, no processo de teste e nos filhos (CLI e MCP); um teste sobe um filho pelos mesmos helpers e confere o bloqueio lá dentro.
-- **Fake estrito.** Os testes de cenário afirmam que todos os turnos do roteiro foram consumidos e que as métricas batem com os golden.
-- **Sem comparar narrativa.** Nenhum teste compara texto livre do LLM por igualdade.
+- **No network.** `fetch` is replaced by a function that throws, in the test process and in child processes (CLI and MCP); one test starts a child through the same helpers and checks that the block holds inside it.
+- **Strict fake.** Scenario tests assert that every turn of the script was consumed and that the metrics match the golden files.
+- **No narrative comparison.** No test compares free LLM text for equality.
 
 <details>
-<summary><strong>O que o provedor fake prova e o que não prova</strong></summary>
+<summary><strong>What the fake provider proves and what it does not</strong></summary>
 
-O provedor padrão é um **fake roteirizado**: cada resposta do "modelo" está escrita numa fixture (`fixtures/llm/<cenário>.json`), indexada por versão do prompt e por uma condição pequena sobre a entrada. Chamada sem turno roteirizado ou prompt alterado sem atualizar a fixture quebra o teste. Detalhes em [`docs/fake-provider.md`](docs/fake-provider.md).
+The default provider is a **scripted fake**: each answer from the "model" is written in a fixture (`fixtures/llm/<scenario>.json`), indexed by prompt version and a small condition on the input. A call without a scripted turn, or a prompt changed without updating the fixture, breaks the test. Details in [`docs/fake-provider.md`](docs/fake-provider.md).
 
-**Prova:**
+**It proves:**
 
-- o fluxo do grafo, as rotas por código, os tetos e o escalonamento;
-- que a faixa vem do catálogo e que a faixa 4 nunca executa;
-- a máquina de aprovação, o token, a redação e a auditoria;
-- que os números saem de funções puras e que o guarda rejeita número inventado;
-- os caminhos de falha do LLM (timeout, erro do servidor, saída inválida) com retry, fallback, 503 e 504.
+- the graph flow, the routes decided by code, the caps and the escalation;
+- that the tier comes from the catalog and that tier 4 never executes;
+- the approval machine, the token, the redaction and the audit;
+- that numbers come out of pure functions and that the guard rejects invented numbers;
+- the LLM failure paths (timeout, server error, invalid output) with retry, fallback, 503 and 504.
 
-**Não prova:**
+**It does not prove:**
 
-- **Qualidade do modelo.** Um LLM real pode errar o diagnóstico ou montar um plano pior. As guardas e o portão limitam o dano, mas não garantem acerto.
-- **Reflection espontâneo.** Na demo `cost-anomaly`, o auditor devolve o plano porque a **regra em código** `snapshot_before_delete` reprova a revisão 0. O texto do feedback é roteirizado.
-- **Tempos e custos reais.** O relógio é simulado e o fake custa US$ 0,00.
+- **Model quality.** A real LLM can get the diagnosis wrong or build a worse plan. The guards and the gate limit the damage but do not guarantee correctness.
+- **Spontaneous Reflection.** In the `cost-anomaly` demo, the auditor sends the plan back because the **rule in code** `snapshot_before_delete` rejects revision 0. The feedback text is scripted.
+- **Real times and costs.** The clock is simulated and the fake costs US$ 0.00.
 
-A War Room diz isso em todas as telas: "Reprodução de execução gravada com provedor fake roteirizado".
+The War Room says this on every screen: "Reprodução de execução gravada com provedor fake roteirizado" ("replay of a recorded run with a scripted fake provider").
 
 </details>
 
 <details>
-<summary><strong>Tempos medidos num clone limpo</strong></summary>
+<summary><strong>Timings measured on a clean clone</strong></summary>
 
-Medidos em 2026-10-04, sem `.env`, depois de apagar tudo o que é gerado (o equivalente a um clone limpo), num Apple M5 Pro com Node 24.21.0 e npm 11.19.0:
+Measured on 2026-10-04, with no `.env`, after deleting everything that is generated (the equivalent of a clean clone), on an Apple M5 Pro with Node 24.21.0 and npm 11.19.0:
 
-| Critério | Comando | Tempo | Meta |
+| Criterion | Command | Time | Target |
 |---|---|---|---|
-| S1 | `rm -rf node_modules web/node_modules web/dist web/public/demo reports` e depois `npm ci && npm --prefix web ci && npm run verify` | 17,7 s (real), código 0 | menos de 3 min |
-| S2 | `npm run demo` com uma `OPENROUTER_API_KEY` falsa no ambiente | 0,455 s, código 0, cabeçalho "provedor: fake roteirizado" | menos de 10 s |
+| S1 | `rm -rf node_modules web/node_modules web/dist web/public/demo reports` and then `npm ci && npm --prefix web ci && npm run verify` | 17.7 s (wall clock), exit code 0 | under 3 min |
+| S2 | `npm run demo` with a fake `OPENROUTER_API_KEY` in the environment | 0.455 s, exit code 0, header "provedor: fake roteirizado" | under 10 s |
 
-O `npm ci` levou cerca de 1 s na raiz e 0,6 s em `web/`, porque o cache do npm na máquina já tinha os pacotes. Numa máquina sem esse cache, o download entra na conta e o tempo do S1 depende da rede.
+`npm ci` took about 1 s at the root and 0.6 s in `web/`, because the machine's npm cache already had the packages. On a machine without that cache, the download counts and the S1 time depends on the network.
 
 </details>
 
-### Processo de desenvolvimento
+### Development process
 
-- **SDD.** [`specs/constitution.md`](specs/constitution.md) traz os princípios inegociáveis. Cada marco tem uma spec em `specs/NNN-*/spec.md` (de [`001-store-and-tools`](specs/001-store-and-tools/spec.md) a [`007-war-room`](specs/007-war-room/spec.md)), com contexto, escopo, non-goals e critérios de aceite em EARS ("Quando...", "Se..., então...", "O sistema deve..."). Os 41 critérios aparecem uma vez cada, e um teste confere.
-- **TDD.** Regra do projeto: o teste vem antes e é visto falhando. Houve exceções pontuais durante a construção, e elas ficaram registradas nas notas de desenvolvimento.
-- **[`AGENTS.md`](AGENTS.md).** Instruções curtas e factuais para agentes de código: comandos, mapa de pastas, regras e como acrescentar uma ação ao catálogo.
-- **CI.** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) roda typecheck do backend e da web, testes do backend e da web, build da web, `check:tokens` e `check:secrets`, sem nenhum segredo configurado.
-- **Pre-commit.** [`.githooks/pre-commit`](.githooks/pre-commit) roda typecheck, testes unitários e `check:secrets`. Instale com `npm run setup:hooks`.
-- **Post-mortems da construção.** [`docs/incidents/`](docs/incidents/) guarda post-mortems sem culpa de falhas reais da construção, como o fake que consumia o roteiro por processo e o foco perdido no portão. Nenhum é inventado.
-- **APIs conferidas.** [`docs/api-notes.md`](docs/api-notes.md) registra as assinaturas conferidas nos `.d.ts` antes do uso; as suposições de comportamento viram testes em `api-assumptions.unit.test.ts`.
+- **SDD.** [`specs/constitution.md`](specs/constitution.md) holds the non-negotiable principles. Each milestone has a spec in `specs/NNN-*/spec.md` (from [`001-store-and-tools`](specs/001-store-and-tools/spec.md) to [`007-war-room`](specs/007-war-room/spec.md)), with context, scope, non-goals and acceptance criteria in EARS ("When...", "If..., then...", "The system shall..."). Each of the 41 criteria appears exactly once, and a test checks it.
+- **TDD.** Project rule: the test comes first and is seen failing. There were occasional exceptions during construction, and they were recorded in the development notes.
+- **[`AGENTS.md`](AGENTS.md).** Short, factual instructions for coding agents: commands, folder map, rules, and how to add an action to the catalog.
+- **CI.** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the typecheck for backend and web, backend and web tests, the web build, `check:tokens` and `check:secrets`, with no secrets configured.
+- **Pre-commit.** [`.githooks/pre-commit`](.githooks/pre-commit) runs the typecheck, unit tests and `check:secrets`. Install it with `npm run setup:hooks`.
+- **Build-time post-mortems.** [`docs/incidents/`](docs/incidents/) keeps blameless post-mortems of real failures during construction, such as the fake that consumed the script per process and the focus lost at the gate. None of them is invented.
+- **Checked APIs.** [`docs/api-notes.md`](docs/api-notes.md) records the signatures checked in the `.d.ts` files before use; behavior assumptions become tests in `api-assumptions.unit.test.ts`.
 
-## Estrutura de pastas
+## Folder structure
 
 ```text
 incident-copilot/
 ├── src/
-│   ├── contracts/      # schemas Zod e tipos compartilhados com a War Room (sem lógica, sem I/O)
-│   ├── domain/         # regras puras: faixas, aprovação, auditor, guardas, canário, métricas, BM25
-│   ├── infra/          # SQLite, cenários, runbooks, mundo simulado, relógio, ids, logger, redação
-│   ├── llm/            # provedores (fake e OpenRouter) e resiliência
-│   ├── prompts/v1/     # prompts versionados
-│   ├── tools/          # ferramentas de faixa 1 do analista (métricas, logs, deploys, inventário)
-│   ├── graph/          # grafo LangGraph, rotas e nós (um por arquivo, criados por fábrica)
-│   ├── app/            # serviços de aplicação e container.ts
-│   ├── http/           # porta: API Fastify
-│   ├── mcp/            # porta: servidor MCP stdio
-│   ├── cli/            # porta: CLI (subcomandos)
-│   ├── cli.ts          # entrada da CLI
-│   ├── index.ts        # entrada da API
-│   └── config.ts       # configuração validada na partida
-├── web/                # War Room (React 19 + Vite 8, pacote aninhado)
-├── fixtures/           # cenários com dados próprios e roteiros do fake
-├── runbooks/           # runbooks em Markdown indexados por BM25
-├── data/               # premissas de negócio e tabelas de preço
+│   ├── contracts/      # Zod schemas and types shared with the War Room (no logic, no I/O)
+│   ├── domain/         # pure rules: tiers, approval, auditor, guards, canary, metrics, BM25
+│   ├── infra/          # SQLite, scenarios, runbooks, simulated world, clock, ids, logger, redaction
+│   ├── llm/            # providers (fake and OpenRouter) and resilience
+│   ├── prompts/v1/     # versioned prompts
+│   ├── tools/          # the analyst's tier 1 tools (metrics, logs, deploys, inventory)
+│   ├── graph/          # LangGraph graph, routes and nodes (one per file, created by factories)
+│   ├── app/            # application services and container.ts
+│   ├── http/           # entry point: Fastify API
+│   ├── mcp/            # entry point: MCP stdio server
+│   ├── cli/            # entry point: CLI (subcommands)
+│   ├── cli.ts          # CLI entry
+│   ├── index.ts        # API entry
+│   └── config.ts       # configuration validated at startup
+├── web/                # War Room (React 19 + Vite 8, nested package)
+├── fixtures/           # scenarios with their own data and fake scripts
+├── runbooks/           # Markdown runbooks indexed by BM25
+├── data/               # business assumptions and price tables
 ├── tests/              # unit, e2e, golden, fixtures/llm, helpers, live
-├── specs/              # constitution e specs SDD por marco
-├── docs/               # arquitetura, ameaças, matriz, fake, acessibilidade, post-mortems
-└── scripts/            # check:tokens, check:secrets, rehash de fixtures, geração de docs
+├── specs/              # constitution and SDD specs per milestone
+├── docs/               # architecture, threats, matrix, fake, accessibility, post-mortems
+└── scripts/            # check:tokens, check:secrets, fixture rehash, doc generation
 ```
 
-## Aulas do curso aplicadas
+## Course lessons applied
 
-Projeto de portfólio do curso de IA da UNIPDS. Só ID e tema, sem trechos de transcrição, slides ou material autoral. O mapa aula a aula, com o arquivo e a prática de cada uma, está em [`docs/course-mapping.md`](docs/course-mapping.md).
+A portfolio project for the UNIPDS AI course. Only IDs and topics, with no transcript excerpts, slides or authored course material. The lesson-by-lesson map, with the file and practice for each, is in [`docs/course-mapping.md`](docs/course-mapping.md).
 
 <details>
-<summary><strong>Tabela de aulas por parte do projeto</strong></summary>
+<summary><strong>Table of lessons by project part</strong></summary>
 
-| Parte do projeto | Aulas | Tema |
+| Project part | Lessons | Topic |
 |---|---|---|
-| Supervisor, blackboard e handoffs | 221528 | Multiagentes com supervisor |
-| `StateGraph`, rotas condicionais, fábricas com DI, estado em Zod | 200955, 200956, 200957, 200958, 200959, 200963, 221524 | Pipeline LangGraph; prompt chaining; fallback de modelo |
-| ReAct do analista com teto 12 | 221508, 221511, 213411, 213412, 213413 | Padrões de raciocínio; ReAct; troubleshooting com ReAct |
-| Auditor com Reflection e trace tipado | 221512, 221513 | Plan-and-Execute; Reflection e benchmark |
-| Erro como observação | 221517 | Ferramenta resiliente a provedor externo |
-| Saída estruturada e "confio, mas confiro" | 200960, 200961, 200962 | Prompt chaining e JSON prompts |
-| Limite de recursão e testes sem LLM | 200978 | RAG avançado com Text-to-Cypher |
-| Contrato HTTP e timeout de 180 s | 221514 | API que também é agente |
-| Config que falha cedo, Fastify, `app.inject` | 200953, 200954 | Gateway de modelos |
-| `node:sqlite`, CHECK, `:memory:` | 221515, 221516 | Integração com banco |
-| MCP como segunda porta, logs em stderr | 221518, 203479, 203482, 203483, 203484, 203485 | Agente via MCP; MCP do zero com testes; customers-mcp |
-| Agente sem credencial de ação crítica | 198071, 210748 | Permissões mínimas; agente que entrega por PR |
-| Prompt injection | 200969, 200970, 200971, 200972 | Prompt injection, hijacking e guardrails |
-| Observabilidade e Matriz de Autonomia | 221525 | Estratégias de observabilidade |
-| War Room e GitHub Pages | 221526, 221527 | War Room; publicação no Pages |
-| SDD, constitution, EARS, pre-commit, instruções curtas | 221503, 221504, 221505, 221506, 221507, 203477 | Agente de código; SDD do zero; guardrails; agents e instructions |
-| Non-goals na spec | 210745 | OpenSpec com non-goals |
-| Design tokens, acessibilidade, layout estreito | 210738, 210739, 210742 | Tokens; modal acessível; contraste e layout |
-| Mock primeiro, Zod no cliente, contrato compartilhado | 210764, 210765, 210744 | BragBot; CFP Platform |
-| Canário | 213409, 213410 | Agentes para Kubernetes |
-| ChatOps com humano no laço | 213417, 213418, 213419 | ChatOps e governança |
-| FinOps | 213428, 213429 | FinOps (inspiração) |
-| Runbooks e post-mortem | 213430, 213431 | RAG de runbooks e post-mortem |
-| Remediação segura | 213437, 213438 | Auto-remediação com guardrails |
-| Projeto integrador e valor | 213439, 213440, 213441 | Nexus Manager |
-| Automação determinística para ação destrutiva | 213495 | Supply chain |
-| Portfólio com incidentes reais | 213487, 213488, 213489, 198027 | IA em DevOps; critério de replicar com outro domínio |
-| Prompt como configuração versionada | 198069, 198082 | Prompt engineering; RAG |
+| Supervisor, blackboard and handoffs | 221528 | Multi-agent with a supervisor |
+| `StateGraph`, conditional routes, factories with DI, state in Zod | 200955, 200956, 200957, 200958, 200959, 200963, 221524 | LangGraph pipeline; prompt chaining; model fallback |
+| Analyst ReAct with a cap of 12 | 221508, 221511, 213411, 213412, 213413 | Reasoning patterns; ReAct; troubleshooting with ReAct |
+| Auditor with Reflection and typed trace | 221512, 221513 | Plan-and-Execute; Reflection and benchmark |
+| Error as observation | 221517 | Tool resilient to an external provider |
+| Structured output and "trust, but verify" | 200960, 200961, 200962 | Prompt chaining and JSON prompts |
+| Recursion limit and tests without an LLM | 200978 | Advanced RAG with Text-to-Cypher |
+| HTTP contract and 180 s timeout | 221514 | An API that is also an agent |
+| Config that fails early, Fastify, `app.inject` | 200953, 200954 | Model gateway |
+| `node:sqlite`, CHECK, `:memory:` | 221515, 221516 | Database integration |
+| MCP as a second entry point, logs on stderr | 221518, 203479, 203482, 203483, 203484, 203485 | Agent via MCP; MCP from scratch with tests; customers-mcp |
+| Agent without credentials for critical actions | 198071, 210748 | Least privilege; an agent that delivers via PR |
+| Prompt injection | 200969, 200970, 200971, 200972 | Prompt injection, hijacking and guardrails |
+| Observability and Autonomy Matrix | 221525 | Observability strategies |
+| War Room and GitHub Pages | 221526, 221527 | War Room; publishing on Pages |
+| SDD, constitution, EARS, pre-commit, short instructions | 221503, 221504, 221505, 221506, 221507, 203477 | Coding agent; SDD from scratch; guardrails; agents and instructions |
+| Non-goals in the spec | 210745 | OpenSpec with non-goals |
+| Design tokens, accessibility, narrow layout | 210738, 210739, 210742 | Tokens; accessible modal; contrast and layout |
+| Mock first, Zod on the client, shared contract | 210764, 210765, 210744 | BragBot; CFP Platform |
+| Canary | 213409, 213410 | Agents for Kubernetes |
+| ChatOps with a human in the loop | 213417, 213418, 213419 | ChatOps and governance |
+| FinOps | 213428, 213429 | FinOps (inspiration) |
+| Runbooks and post-mortem | 213430, 213431 | Runbook RAG and post-mortem |
+| Safe remediation | 213437, 213438 | Auto-remediation with guardrails |
+| Capstone project and value | 213439, 213440, 213441 | Nexus Manager |
+| Deterministic automation for destructive action | 213495 | Supply chain |
+| Portfolio with real incidents | 213487, 213488, 213489, 198027 | AI in DevOps; criterion of replicating with another domain |
+| Prompt as versioned configuration | 198069, 198082 | Prompt engineering; RAG |
 
 </details>
 
-## O que mudei em relação à aula
+## What I changed from the course
 
-As aulas do módulo 06 usam Python e CrewAI; aqui o mecanismo foi reimplementado em TypeScript e LangGraph, sobre dados próprios, e cada atalho didático virou código que dá para testar.
+The module 06 lessons use Python and CrewAI; here the mechanism was reimplemented in TypeScript and LangGraph, over the project's own data, and every didactic shortcut became code that can be tested.
 
-| Na aula | Neste projeto |
+| In the course | In this project |
 |---|---|
-| Python e CrewAI (módulo 06) | TypeScript e LangGraph: o trio de portfólio é TypeScript, e o ambiente tem Python 3.9 |
-| Dados dos labs | Dados próprios: outro serviço, outras métricas, outro inventário e outra tabela de preços, mantendo o mecanismo |
-| Express (221514) | Fastify, por causa do `app.inject` e da convenção dos módulos 02 e 03 |
-| `createReactAgent` com tool calling nativo (221511) | ReAct com saída estruturada num laço dentro do nó: funciona com modelos sem tool calling, o fake roteiriza cada passo e o laço não consome o limite de recursão do grafo |
-| Senha de aprovação no código e devolvida na resposta (213418) | Token de ambiente, com comparação em tempo constante e redação em todas as saídas, com teste |
-| Aprovação "sim/não" interpretada pelo agente (213437, 213438) | Máquina de estados em código com lista fechada de termos |
-| ROI escrito pelo LLM (213441) | Cálculo puro, com ROI só como faixa ilustrativa sobre premissas declaradas e guarda numérico na narrativa |
-| Canário que não conseguia falhar (213410) | Função pura, com cenário que reprova e reversão automática |
-| Runbook escolhido por parâmetro do prompt (213430) | BM25 por seção, com recusa abaixo do limiar |
-| Reflection só por LLM (221513) | Reflection com piso de regras em código |
-| War Room com túnel temporário (221527) | Modo demo estático, com gravações e dois ramos |
-| Tailwind (210738) | CSS com design tokens semânticos |
-| `zod/v3` (221516) | Zod 4, com os enums do SQL gerados do mesmo schema |
-| Filtro em memória (203484) | Filtro em SQL |
-| Testes contra LLM real (200954, 200978) | Suíte sem rede, com fake roteirizado e guarda de `fetch` |
-| Checkpointer do LangGraph | Blackboard persistido em `node:sqlite`, com retomada explícita |
+| Python and CrewAI (module 06) | TypeScript and LangGraph: the portfolio trio is TypeScript, and the environment has Python 3.9 |
+| Lab data | Own data: another service, other metrics, another inventory and another price table, keeping the mechanism |
+| Express (221514) | Fastify, because of `app.inject` and the convention of modules 02 and 03 |
+| `createReactAgent` with native tool calling (221511) | ReAct with structured output in a loop inside the node: it works with models without tool calling, the fake scripts each step, and the loop does not consume the graph's recursion limit |
+| Approval password in the code and returned in the response (213418) | Environment token, with constant-time comparison and redaction in every output, with a test |
+| "Yes/no" approval interpreted by the agent (213437, 213438) | State machine in code with a closed list of terms |
+| ROI written by the LLM (213441) | Pure calculation, with ROI only as an illustrative range over declared assumptions and a numeric guard on the narrative |
+| Canary that could not fail (213410) | Pure function, with a scenario that fails and automatic rollback |
+| Runbook chosen by a prompt parameter (213430) | BM25 per section, with a refusal below the threshold |
+| Reflection by LLM only (221513) | Reflection with a floor of rules in code |
+| War Room with a temporary tunnel (221527) | Static demo mode, with recordings and two branches |
+| Tailwind (210738) | CSS with semantic design tokens |
+| `zod/v3` (221516) | Zod 4, with the SQL enums generated from the same schema |
+| In-memory filter (203484) | SQL filter |
+| Tests against a real LLM (200954, 200978) | Suite without network, with a scripted fake and a `fetch` guard |
+| LangGraph checkpointer | Blackboard persisted in `node:sqlite`, with explicit resume |
 
 <details>
-<summary><strong>Padrões do módulo 06 reimplementados em TypeScript</strong></summary>
+<summary><strong>Module 06 patterns reimplemented in TypeScript</strong></summary>
 
-| No curso (Python e CrewAI) | No projeto (TypeScript e LangGraph) |
+| In the course (Python and CrewAI) | In the project (TypeScript and LangGraph) |
 |---|---|
-| `Agent(role, goal, backstory)` | Fábrica de nó (`createXNode(deps)`) e prompt versionado |
-| `Crew` sequencial | Arestas fixas do `StateGraph` (planejador para auditor) |
-| `manager_agent` com delegação | Nó supervisor com `SupervisorDecisionSchema` e guarda de pré-condições em código |
-| Tools simuladas por condicionais | Ferramentas com parâmetros Zod sobre séries sintéticas determinísticas |
-| Runbook consultado por parâmetro de serviço | BM25 sobre seções de runbooks com frontmatter, limiar normalizado e recusa |
-| Senha de aprovação no código | Token em `APPROVAL_TOKEN`, comparação em tempo constante, redação em todas as saídas |
-| Aprovação "sim/não" interpretada pelo agente | Máquina de estados em código com lista fechada de termos |
-| Canário que não falhava | Função pura com cenário de métricas ruins e reversão automática |
-| ROI escrito pelo gerente | Funções puras de métricas, ROI como faixa ilustrativa e guarda numérico |
-| Log com hash da execução | `runId`, `requestId`, trace persistido e auditoria encadeada por hash |
+| `Agent(role, goal, backstory)` | Node factory (`createXNode(deps)`) and versioned prompt |
+| Sequential `Crew` | Fixed `StateGraph` edges (planner to auditor) |
+| `manager_agent` with delegation | Supervisor node with `SupervisorDecisionSchema` and a precondition guard in code |
+| Tools simulated with conditionals | Tools with Zod parameters over deterministic synthetic series |
+| Runbook looked up by a service parameter | BM25 over runbook sections with frontmatter, normalized threshold and refusal |
+| Approval password in the code | Token in `APPROVAL_TOKEN`, constant-time comparison, redaction in every output |
+| "Yes/no" approval interpreted by the agent | State machine in code with a closed list of terms |
+| Canary that did not fail | Pure function with a bad-metrics scenario and automatic rollback |
+| ROI written by the manager | Pure metric functions, ROI as an illustrative range, and a numeric guard |
+| Log with the run hash | `runId`, `requestId`, persisted trace and hash-chained audit |
 
 </details>
 
-## Limitações conhecidas
+## Known limitations
 
-O ponto mais importante primeiro: **o provedor fake prova a mecânica, não a qualidade do modelo.** Toda a demo e toda a suíte rodam com respostas roteirizadas. Com um LLM real, o diagnóstico e o plano podem ser piores; as guardas e o portão limitam o dano, mas não garantem acerto. A qualidade do modelo só aparece com `npm run test:live` e uso real.
+The most important point first: **the fake provider proves the mechanics, not the quality of the model.** The whole demo and the whole suite run on scripted answers. With a real LLM, the diagnosis and the plan can be worse; the guards and the gate limit the damage but do not guarantee correctness. Model quality only shows up with `npm run test:live` and real use.
 
-- **Mundo simulado.** Nenhuma ação toca infraestrutura real.
-- **Relógio simulado na demo.** O MTTR da demo é a linha do tempo simulada, não um tempo medido.
-- **Narrativa roteirizada.** Com relógio do sistema, os números da narrativa do fake não batem e o post-mortem sai pelo template (o guarda numérico funcionando, mas sem narrativa).
-- **Proteções em memória.** Circuit breaker, limitador de execuções e bloqueio por tentativas de token valem por processo; reiniciar a API zera os três.
-- **Bloqueio de token global.** As 5 tentativas erradas (ou sem token) contam para o processo inteiro, não por cliente: quem errar 5 vezes em 10 min trava as decisões de todos, inclusive do operador com o token certo, por 10 min. A API só escuta em `127.0.0.1`; o risco está aceito no [modelo de ameaças](docs/threat-model.md).
-- **Token único.** Não há usuários nem papéis.
-- **Números por extenso.** O guarda numérico só extrai algarismos; "três minutos" numa narrativa passa sem conferência.
-- **Expiração sem agendador.** Um incidente cujo operador nunca tenta decidir continua `awaiting_approval` no banco, embora as leituras mostrem a aprovação como `expired`.
-- **Execução interrompida pela queda do processo.** Decisões só são aceitas quando nenhuma execução do incidente está em andamento (linha de `runs` sem fim). Se o processo cair no meio de uma execução, essa linha fica aberta e o incidente passa a recusar decisões com 409 `incident_not_accepting`; não há comando de recuperação na v1.
-- **Tempo aguardando aprovação** é a soma das aprovações decididas (18,0 min no cenário de custo), não o tempo de relógio em que o incidente ficou parado (9 min).
+- **Simulated world.** No action touches real infrastructure.
+- **Simulated clock in the demo.** The demo MTTR is the simulated timeline, not a measured time.
+- **Scripted narrative.** With the system clock, the numbers in the fake's narrative do not match and the post-mortem comes out through the template (the numeric guard working, but without a narrative).
+- **In-memory protections.** The circuit breaker, the execution rate limiter and the token-attempt lock are per process; restarting the API resets all three.
+- **Global token lock.** The 5 wrong attempts (or attempts without a token) count for the whole process, not per client: whoever gets it wrong 5 times in 10 min blocks decisions for everyone, including the operator with the right token, for 10 min. The API only listens on `127.0.0.1`; the risk is accepted in the [threat model](docs/threat-model.md).
+- **Single token.** There are no users or roles.
+- **Numbers spelled out.** The numeric guard only extracts digits; "three minutes" in a narrative passes without being checked.
+- **Expiry without a scheduler.** An incident whose operator never tries to decide stays `awaiting_approval` in the database, although reads show the approval as `expired`.
+- **Run interrupted by a process crash.** Decisions are only accepted when no run of the incident is in progress (a `runs` row with no end). If the process crashes mid-run, that row stays open and the incident starts refusing decisions with 409 `incident_not_accepting`; there is no recovery command in v1.
+- **Time waiting for approval** is the sum of the decided approvals (18.0 min in the cost scenario), not the wall-clock time the incident sat idle (9 min).
 
 <details>
-<summary><strong>Trabalho futuro (v2)</strong></summary>
+<summary><strong>Future work (v2)</strong></summary>
 
-1. Cenário `memory-leak-saturation`, com previsão de saturação por regressão linear e consulta de traces.
-2. Cenário de imagem com CVE crítica e triagem de vulnerabilidades, com dados próprios.
-3. Modo ao vivo da War Room contra a API local: diálogo de configuração, campo de token `type="password"` e CORS restrito à origem da War Room, suportado só em `localhost`.
-4. `Tabs`, `Sparkline`, tabela de trace filtrável e teste de `prefers-reduced-motion` na War Room.
-5. Resource `incident-copilot://autonomy-matrix` e prompt `triage-incident` no MCP.
-6. `/stats` com latência de execução P50 e P95 e detalhamento por modelo e por cenário.
-7. Regra de subida de faixa por custo estimado da ação.
-8. Golden do post-mortem em Markdown.
-9. Agendador que materializa a expiração de aprovação sem depender de uma tentativa de decisão.
-10. Comandos `fixtures check` e `postmortem` na CLI.
-11. Ações do catálogo sem uso nos cenários da v1 (`scale_out`, `rolling_restart`, `silence_alert`, `update_resource_limits`, `rebuild_and_redeploy_image`, `create_ticket`).
+1. A `memory-leak-saturation` scenario, with saturation forecasting by linear regression and trace queries.
+2. An image scenario with a critical CVE and vulnerability triage, with its own data.
+3. A live War Room mode against the local API: configuration dialog, a `type="password"` token field and CORS restricted to the War Room origin, supported only on `localhost`.
+4. `Tabs`, `Sparkline`, a filterable trace table and a `prefers-reduced-motion` test in the War Room.
+5. An `incident-copilot://autonomy-matrix` resource and a `triage-incident` prompt in the MCP server.
+6. `/stats` with execution latency P50 and P95 and a breakdown by model and by scenario.
+7. A tier-raising rule based on the estimated cost of the action.
+8. A golden file for the Markdown post-mortem.
+9. A scheduler that materializes approval expiry without depending on a decision attempt.
+10. `fixtures check` and `postmortem` commands in the CLI.
+11. Catalog actions unused in the v1 scenarios (`scale_out`, `rolling_restart`, `silence_alert`, `update_resource_limits`, `rebuild_and_redeploy_image`, `create_ticket`).
 
 </details>
 
-## Licença
+## License
 
 [MIT](LICENSE), Copyright (c) 2026 Flavio Gouveia.
