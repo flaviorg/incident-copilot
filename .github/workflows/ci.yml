@@ -1,6 +1,6 @@
 # CI do incident-copilot (spec 8.4 e AC-41): typecheck do backend e da web, testes do backend e da web, build da web,
 # check:tokens e check:secrets. Nenhum segredo configurado: o provedor fake roda os testes sem rede.
-# Majors das actions conferidas nas releases oficiais em 2026-10-04 (checkout v7.0.1, setup-node v7.0.0).
+# Action major versions checked against the official releases on 2026-10-04 (checkout v7.0.1, setup-node v7.0.0).
 name: CI
 
 on: [push, pull_request]

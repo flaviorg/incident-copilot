@@ -1,60 +1,60 @@
 # AGENTS.md
 
-Instruções para agentes de código neste repositório. Princípios completos em `specs/constitution.md`; requisitos por marco em `specs/NNN-*/spec.md`.
+Instructions for coding agents in this repository. Full principles are in `specs/constitution.md`; per-milestone requirements are in `specs/NNN-*/spec.md`.
 
-## Comandos
+## Commands
 
-| Comando | Faz |
+| Command | What it does |
 |---|---|
-| `npm test` | Suíte do backend (unitários e ponta a ponta), sem rede |
-| `npm run test:unit` | Só unitários (o que o pre-commit roda) |
-| `npm run typecheck` | `tsc --noEmit` do backend; `npm run typecheck:web` para a War Room |
-| `npm run verify` | Tudo o que o CI roda: typecheck, testes, testes e build da web, `check:tokens`, `check:secrets` |
-| `npm run demo` | Cenário `deploy-5xx-rollback` offline com o fake (`-- --scenario cost-anomaly`, `-- --reject`) |
-| `npm run regen` | Regera os golden de métricas e `docs/autonomy-matrix.md` |
-| `npm run fixtures:rehash` | Atualiza os hashes de prompt nas fixtures do fake |
-| `npm run check:secrets` | Procura chaves e tokens na árvore |
+| `npm test` | Backend suite (unit and end-to-end), no network |
+| `npm run test:unit` | Unit tests only (what the pre-commit hook runs) |
+| `npm run typecheck` | Backend `tsc --noEmit`; use `npm run typecheck:web` for the War Room |
+| `npm run verify` | Everything CI runs: typecheck, tests, web tests and build, `check:tokens`, `check:secrets` |
+| `npm run demo` | Offline `deploy-5xx-rollback` scenario with the fake (`-- --scenario cost-anomaly`, `-- --reject`) |
+| `npm run regen` | Regenerates the metrics goldens and `docs/autonomy-matrix.md` |
+| `npm run fixtures:rehash` | Updates the prompt hashes in the fake's fixtures |
+| `npm run check:secrets` | Looks for keys and tokens in the tree |
 
-A War Room precisa de `npm run web:install` uma vez, antes de `typecheck:web`, `web:test` e `web:build`.
+The War Room needs `npm run web:install` once, before `typecheck:web`, `web:test` and `web:build`.
 
-## Mapa de pastas
+## Folder map
 
-| Pasta | Conteúdo |
+| Folder | Contents |
 |---|---|
-| `src/contracts` | Schemas Zod e tipos compartilhados com a War Room. Sem lógica, sem I/O |
-| `src/domain` | Regras puras: faixas, aprovação, auditor, guardas, canário, métricas, BM25 |
-| `src/infra` | SQLite, cenários, runbooks, mundo simulado, relógio, ids, logger, redação |
-| `src/llm`, `src/prompts/v1` | Provedores (fake e OpenRouter), resiliência, prompts versionados |
-| `src/graph` | Grafo LangGraph, rotas e nós (um por arquivo, criados por fábrica) |
-| `src/app` | Serviços de aplicação e `container.ts` |
-| `src/http`, `src/mcp`, `src/cli` | Portas: API Fastify, servidor MCP stdio, CLI |
-| `fixtures/` | Cenários com dados próprios e roteiros do fake |
-| `tests/` | `unit`, `e2e`, `golden`, `fixtures/llm` (roteiros só de teste), `helpers`, `live` |
-| `web/` | War Room (pacote aninhado, instalação própria) |
-| `docs/`, `specs/` | Documentação técnica, post-mortems e specs SDD |
+| `src/contracts` | Zod schemas and types shared with the War Room. No logic, no I/O |
+| `src/domain` | Pure rules: tiers, approval, auditor, guards, canary, metrics, BM25 |
+| `src/infra` | SQLite, scenarios, runbooks, simulated world, clock, ids, logger, redaction |
+| `src/llm`, `src/prompts/v1` | Providers (fake and OpenRouter), resilience, versioned prompts |
+| `src/graph` | LangGraph graph, routes and nodes (one per file, built by factories) |
+| `src/app` | Application services and `container.ts` |
+| `src/http`, `src/mcp`, `src/cli` | Ports: Fastify API, stdio MCP server, CLI |
+| `fixtures/` | Scenarios with their own data and the fake's scripts |
+| `tests/` | `unit`, `e2e`, `golden`, `fixtures/llm` (test-only scripts), `helpers`, `live` |
+| `web/` | War Room (nested package, separate install) |
+| `docs/`, `specs/` | Technical documentation, post-mortems and SDD specs |
 
-## Regras
+## Rules
 
-- **TDD.** Escreva o teste, veja falhar, implemente o mínimo, veja passar. Testes em `tests/unit/*.unit.test.ts` ou `tests/e2e/*.e2e.test.ts`, com `node:test` e `node:assert/strict`.
-- **Sem rede nos testes.** `fetch` é bloqueado por `tests/setup/no-network.ts`. Processos filhos de teste sobem com `--import ./tests/setup/no-network.ts`. Nunca use chave real.
-- **Zod 4:** `import * as z from "zod"`. Nunca `zod/v3`.
-- **Domínio puro.** `src/contracts` e `src/domain` não importam `node:*` nem camadas externas (há teste).
-- **TypeScript nativo do Node 24.** Imports relativos com `.ts`, `import type` para tipos, sem `enum` nem `namespace`.
-- **A faixa vem do catálogo.** Nunca leia faixa, aprovação ou decisão de execução da saída do LLM. Regras de contexto só sobem a faixa.
-- **Nunca ecoe segredo.** Todo texto que sai do processo passa por `redactSecrets`. Testes que precisam de valor com formato de chave montam o valor em tempo de execução (`"sk-or-v1-" + "a".repeat(40)`).
-- **Fixture muda junto com prompt.** Mudou um `system` em `src/prompts/v1`? Rode `npm run fixtures:rehash`. Mudou entrada ou fluxo? Ajuste os turnos. Detalhes em `docs/fake-provider.md`.
-- **Golden só muda de propósito.** Rode `npm run regen` e revise o diff antes de aceitar.
-- **Não teste texto livre de LLM por igualdade.** Afirme estrutura, enums, estado e números.
-- **Idiomas.** Identificadores e texto para pessoas (CLI, API, MCP, post-mortem, War Room, prompts e roteiros do fake) em inglês, com números no formato en-US; `docs/` e `specs/` podem ficar em pt-BR.
-- **Dependência nova exige justificativa** e versão exata.
-- **Não publique nada.** Sem `git push`, `npm publish`, repositório remoto ou disparo do Pages sem aval do dono. Não rode `npm run setup:hooks` enquanto a pasta estiver dentro de outro repositório Git.
-- **Falha real vira nota.** Registre em `docs/incidents/notes.md`, com data, sintoma e causa. Nunca invente.
+- **TDD.** Write the test, watch it fail, implement the minimum, watch it pass. Tests live in `tests/unit/*.unit.test.ts` or `tests/e2e/*.e2e.test.ts`, using `node:test` and `node:assert/strict`.
+- **No network in tests.** `fetch` is blocked by `tests/setup/no-network.ts`. Child processes in tests start with `--import ./tests/setup/no-network.ts`. Never use a real key.
+- **Zod 4:** `import * as z from "zod"`. Never `zod/v3`.
+- **Pure domain.** `src/contracts` and `src/domain` do not import `node:*` or outer layers (a test enforces it).
+- **Native Node 24 TypeScript.** Relative imports with `.ts`, `import type` for types, no `enum` or `namespace`.
+- **The tier comes from the catalog.** Never read a tier, approval or execution decision from LLM output. Context rules only raise the tier.
+- **Never echo a secret.** All text leaving the process goes through `redactSecrets`. Tests that need a key-shaped value build it at run time (`"sk-or-v1-" + "a".repeat(40)`).
+- **Fixtures change together with prompts.** Changed a `system` in `src/prompts/v1`? Run `npm run fixtures:rehash`. Changed input or flow? Adjust the turns. Details in `docs/fake-provider.md`.
+- **Goldens change only on purpose.** Run `npm run regen` and review the diff before accepting it.
+- **Do not test free LLM text for equality.** Assert structure, enums, state and numbers.
+- **Language.** Identifiers and all human-facing text (CLI, API, MCP, post-mortems, War Room, prompts, fake scripts, docs and specs) are in English, with en-US number formats.
+- **A new dependency needs a justification** and an exact version.
+- **Publish nothing.** No `git push`, `npm publish`, remote repository or Pages trigger without the owner's approval. Do not run `npm run setup:hooks` while the folder is inside another Git repository.
+- **A real failure becomes a note.** Record it in `docs/incidents/notes.md`, with date, symptom and cause. Never invent one.
 
-## Como acrescentar uma ação ao catálogo
+## How to add an action to the catalog
 
-1. **Teste primeiro.** Em `tests/unit/autonomy.unit.test.ts`, afirme a faixa, os parâmetros válidos e os inválidos. Em `tests/unit/simulated-infra.unit.test.ts`, afirme o dry run, a execução e a reversão.
-2. **Catálogo.** Acrescente a entrada em `EXECUTABLE_ACTIONS` (`src/domain/autonomy/catalog.ts`): faixa 2 ou 3, `mitigates`, `reversible`, `durationSec`, `targetKind`, `paramsSchema` estrito, `targetPattern`, `paramsText` e `description`. Ação proibida vai para `FORBIDDEN_ACTIONS`, nunca para `EXECUTABLE_ACTIONS`.
-3. **Executor.** Implemente o executor em `EXECUTORS` (`src/infra/simulated-infra.ts`). O registro é `Record<ExecutableActionType, Executor>`, então o typecheck falha até ele existir.
-4. **Regra do auditor**, se a ação precisar de evidência: `src/domain/audit/auditor-rules.ts`, com teste.
-5. **Regenerar.** Rode `npm run regen`, que atualiza `docs/autonomy-matrix.md` e os golden, e revise o diff. O catálogo entra no prompt do planejador como entrada, não no `system`: o hash da fixture não muda.
-6. **Verificar.** Rode `npm run typecheck && npm test`.
+1. **Test first.** In `tests/unit/autonomy.unit.test.ts`, assert the tier and the valid and invalid parameters. In `tests/unit/simulated-infra.unit.test.ts`, assert the dry run, execution and rollback.
+2. **Catalog.** Add the entry to `EXECUTABLE_ACTIONS` (`src/domain/autonomy/catalog.ts`): tier 2 or 3, `mitigates`, `reversible`, `durationSec`, `targetKind`, a strict `paramsSchema`, `targetPattern`, `paramsText` and `description`. A forbidden action goes in `FORBIDDEN_ACTIONS`, never in `EXECUTABLE_ACTIONS`.
+3. **Executor.** Implement the executor in `EXECUTORS` (`src/infra/simulated-infra.ts`). The registry is `Record<ExecutableActionType, Executor>`, so the typecheck fails until it exists.
+4. **Auditor rule**, if the action needs evidence: `src/domain/audit/auditor-rules.ts`, with a test.
+5. **Regenerate.** Run `npm run regen`, which updates `docs/autonomy-matrix.md` and the goldens, and review the diff. The catalog enters the planner prompt as input, not in the `system` text, so the fixture hash does not change.
+6. **Verify.** Run `npm run typecheck && npm test`.

@@ -1,77 +1,77 @@
-# 004: Portão de remediação
+# 004: Remediation gate
 
-Marco M4. Estado: implementado.
+Milestone M4. Status: implemented.
 
-## Contexto
+## Context
 
-É aqui que a tese do projeto vira código: o modelo propõe a remediação, mas quem decide o que roda é o código e, nas ações de risco, um humano. O portão:
+This is where the project's thesis becomes code: the model proposes the remediation, but what runs is decided by code and, for risky actions, by a human. The gate:
 
-- classifica cada passo pela Matriz de Autonomia;
-- roda o dry run no mundo simulado;
-- pede aprovação para a faixa 3;
-- barra a faixa 4 por construção.
+- classifies each step with the Autonomy Matrix;
+- runs the dry run in the simulated world;
+- requests approval for tier 3;
+- blocks tier 4 by construction.
 
-A execução só começa depois que todas as decisões do lote estão tomadas. Um canário confere a recuperação e reverte o que não funcionou.
+Execution only starts after every decision in the batch has been made. A canary checks recovery and reverts what did not work.
 
-## Escopo
+## Scope
 
-- Catálogo de ações e `classifyAction`: faixa do catálogo e regras de contexto que só sobem a faixa. A matriz em `docs/autonomy-matrix.md` é gerada do catálogo.
-- Máquina de estados da aprovação (`transition`, `effectiveStatus`), com expiração projetada na leitura e materializada na decisão. `parseDecision`, com lista fechada de termos.
-- Proteções com relógio injetado: circuit breaker (3 falhas, 300 s), limitador de execuções (5 por minuto, mesma ação no mesmo alvo 1 vez em 10 min) e limitador de tentativas de token (5 em 10 min bloqueiam 10 min).
-- `SimulatedInfra`: dry run, execução, reversão e séries pós-ação, com um executor por tipo em `Record<ExecutableActionType, Executor>`.
-- Nós `gate`, `executor` e `verifier`, nenhum deles com LLM.
+- Action catalog and `classifyAction`: catalog tier plus context rules that only raise the tier. The matrix in `docs/autonomy-matrix.md` is generated from the catalog.
+- Approval state machine (`transition`, `effectiveStatus`), with expiration projected on read and materialized on decision. `parseDecision`, with a closed list of terms.
+- Protections with an injected clock: circuit breaker (3 failures, 300 s), execution limiter (5 per minute, same action on the same target once per 10 min) and token attempt limiter (5 in 10 min lock for 10 min).
+- `SimulatedInfra`: dry run, execution, revert and post-action series, with one executor per type in `Record<ExecutableActionType, Executor>`.
+- `gate`, `executor` and `verifier` nodes, none of them with an LLM.
 - `ApprovalService`:
-  - corpo;
-  - token configurado;
-  - bloqueio;
+  - body;
+  - configured token;
+  - lockout;
   - token;
-  - texto ambíguo;
-  - existência;
-  - expiração;
+  - ambiguous text;
+  - existence;
+  - expiration;
   - status;
-  - transição e retomada.
-- Fixtures completas dos 2 cenários, golden de métricas, teste de injeção por log e CLI `demo`.
+  - transition and resume.
+- Complete fixtures for the 2 scenarios, metrics golden, log injection test and CLI `demo`.
 
 ## Non-goals
 
-- Ações reais em infraestrutura: tudo roda sobre o mundo simulado.
-- Autenticação multiusuário e RBAC: um token único prova o padrão.
-- Agendador que materializa a expiração sem uma tentativa de decisão (backlog v2).
-- Regra de subida de faixa por custo estimado (backlog v2).
-- Ações do catálogo sem uso nos cenários da v1 (`scale_out`, `rolling_restart` e outras, backlog v2).
-- Qualquer caminho em que o LLM decida faixa, aprovação ou execução.
+- Real infrastructure actions: everything runs on the simulated world.
+- Multi-user authentication and RBAC: a single token proves the pattern.
+- A scheduler that materializes expiration without a decision attempt (v2 backlog).
+- Tier-raising rule based on estimated cost (v2 backlog).
+- Catalog actions not used in the v1 scenarios (`scale_out`, `rolling_restart` and others, v2 backlog).
+- Any path in which the LLM decides tier, approval or execution.
 
-## Critérios de aceite (EARS)
+## Acceptance criteria (EARS)
 
-- **AC-10** O sistema deve definir a faixa de cada passo por `classifyAction`, sem ler faixa da saída do LLM, e nenhuma regra de contexto pode baixar a faixa do catálogo.
-- **AC-11** Quando um passo for de faixa 4 ou de tipo fora do catálogo, inclusive quando proposto depois de um log com instrução embutida, o sistema deve bloqueá-lo sem dry run e sem fila, com status `blocked_forbidden` ou `blocked_unknown`, gravando auditoria e `critique` do portão com `verdict: "blocked"`.
-- **AC-12** Quando o portão processar um passo executável, o sistema deve: com dry run falho, marcá-lo `rejected_by_dry_run` sem criar aprovação; em faixa 2 com dry run ok, marcá-lo `ready`; em faixa 3 com dry run ok, criar aprovação `pending` e deixar o incidente `awaiting_approval`; e não executar nenhum passo do lote antes de todas as decisões.
-- **AC-13** Quando a decisão chegar em texto livre, o sistema deve aceitar apenas as frases exatas das listas de aprovar e rejeitar, depois da normalização, e responder 422 `ambiguous_decision` a qualquer outro texto, sem mudar o estado.
-- **AC-14** Quando um humano rejeitar uma aprovação, o sistema deve cancelar o passo e os passos que dependem dele, sem registrar sucesso para nenhum deles, e marcar o incidente `escalated` com `mitigation_rejected` se nenhuma ação mitigadora for executada.
-- **AC-15** Enquanto uma aprovação `pending` estiver vencida, as leituras devem mostrá-la como `expired` sem gravar nada; quando chegar uma decisão para ela, o sistema deve materializar a expiração das aprovações vencidas do incidente, responder 409 `approval_expired` e, sem pendências restantes, retomar tratando a expiração como rejeição.
-- **AC-19** Se o circuit breaker estiver aberto ou o limite global ou por alvo de execuções for excedido, então o sistema deve marcar o passo `blocked_circuit_open` ou `throttled`, não executá-lo e escalar com `circuit_open` ou `throttled`.
-- **AC-20** Quando o canário reprovar depois de uma execução, o sistema deve reverter as ações reversíveis executadas em ordem inversa, gravar `canary_rollback`, registrar falha no breaker e escalar com `remediation_ineffective`.
-- **AC-24** Quando o cenário `cost-anomaly` terminar com todas as aprovações aprovadas, o sistema deve reportar como economia mensal a soma das economias dos achados de inventário das ações executadas, calculada a partir de `inventory.json` e `data/cloud-prices.json`.
-- **AC-38** Quando `npm run demo` rodar sem `--live`, o sistema deve usar o provedor fake mesmo com `OPENROUTER_API_KEY` no ambiente, concluir o cenário padrão em menos de 10 segundos com código 0 e indicar no cabeçalho que o provedor é fake.
+- **AC-10** The system shall set each step's tier via `classifyAction`, without reading a tier from LLM output, and no context rule may lower the catalog tier.
+- **AC-11** When a step is tier 4 or of a type outside the catalog, including when proposed after a log containing an embedded instruction, the system shall block it with no dry run and no queue, with status `blocked_forbidden` or `blocked_unknown`, recording audit and a gate `critique` with `verdict: "blocked"`.
+- **AC-12** When the gate processes an executable step, the system shall: on a failed dry run, mark it `rejected_by_dry_run` without creating an approval; on tier 2 with a successful dry run, mark it `ready`; on tier 3 with a successful dry run, create a `pending` approval and leave the incident `awaiting_approval`; and execute no step in the batch before all decisions are made.
+- **AC-13** When the decision arrives as free text, the system shall accept only the exact phrases from the approve and reject lists, after normalization, and respond 422 `ambiguous_decision` to any other text, without changing state.
+- **AC-14** When a human rejects an approval, the system shall cancel the step and the steps that depend on it, recording success for none of them, and mark the incident `escalated` with `mitigation_rejected` if no mitigating action is executed.
+- **AC-15** While a `pending` approval is past due, reads shall show it as `expired` without writing anything; when a decision arrives for it, the system shall materialize the expiration of the incident's overdue approvals, respond 409 `approval_expired` and, with no pending approvals left, resume treating the expiration as a rejection.
+- **AC-19** If the circuit breaker is open or the global or per-target execution limit is exceeded, then the system shall mark the step `blocked_circuit_open` or `throttled`, not execute it, and escalate with `circuit_open` or `throttled`.
+- **AC-20** When the canary fails after an execution, the system shall revert the executed reversible actions in reverse order, record `canary_rollback`, register a failure in the breaker and escalate with `remediation_ineffective`.
+- **AC-24** When the `cost-anomaly` scenario ends with all approvals approved, the system shall report as monthly savings the sum of the savings from the inventory findings of the executed actions, computed from `inventory.json` and `data/cloud-prices.json`.
+- **AC-38** When `npm run demo` runs without `--live`, the system shall use the fake provider even with `OPENROUTER_API_KEY` in the environment, complete the default scenario in under 10 seconds with exit code 0 and state in the header that the provider is fake.
 
-Matriz de Autonomia (seção 6.4 do design):
+Autonomy Matrix (design section 6.4):
 
-| Faixa | Regra | Ações da v1 |
+| Tier | Rule | v1 actions |
 |---|---|---|
-| 1 Decide sozinho | Leitura, risco zero | as 4 ferramentas de leitura |
-| 2 Decide e registra | Reversível ou sem efeito no serviço | `add_incident_note`, `block_image_tag`, `tag_resource_for_review`, `create_volume_snapshot` |
-| 3 Exige aprovação humana | Destrutivo ou alto impacto | `rollback_deployment`, `release_elastic_ip`, `delete_volume`, `resize_instance` |
-| 4 Proibido por construção | Expor dados, apagar auditoria ou backup, desligar controle | `delete_audit_log`, `disable_security_scanner`, `export_user_data`, `run_arbitrary_command`, `delete_backups` e qualquer tipo fora do catálogo |
+| 1 Decides alone | Read-only, zero risk | the 4 read tools |
+| 2 Decides and records | Reversible or no effect on the service | `add_incident_note`, `block_image_tag`, `tag_resource_for_review`, `create_volume_snapshot` |
+| 3 Requires human approval | Destructive or high impact | `rollback_deployment`, `release_elastic_ip`, `delete_volume`, `resize_instance` |
+| 4 Forbidden by construction | Exposes data, deletes audit or backups, disables controls | `delete_audit_log`, `disable_security_scanner`, `export_user_data`, `run_arbitrary_command`, `delete_backups` and any type outside the catalog |
 
-Regras de contexto que sobem para a faixa 3:
+Context rules that raise to tier 3:
 
-- alvo fora do serviço ou da conta do incidente;
-- passo sem `runbookRef`;
-- plano que chegou ao portão com as revisões esgotadas.
+- target outside the incident's service or account;
+- step without `runbookRef`;
+- plan that reached the gate with revisions exhausted.
 
-## Como verificar
+## How to verify
 
-| Critério | Testes |
+| Criterion | Tests |
 |---|---|
 | AC-10 | `tests/unit/autonomy.unit.test.ts` ("context rules only raise", "forbidden and unknown are tier 4") |
 | AC-11 | `tests/e2e/injection.e2e.test.ts`; `tests/e2e/scenarios.e2e.test.ts` ("cost approved: Reflection, tier 4 blocked, savings from the inventory") |
@@ -84,16 +84,16 @@ Regras de contexto que sobem para a faixa 3:
 | AC-24 | `tests/unit/inventory-audit.unit.test.ts`; `tests/e2e/scenarios.e2e.test.ts` (golden `metrics.cost-anomaly.approved.json`) |
 | AC-38 | `tests/e2e/cli.e2e.test.ts` ("demo runs offline with fake provider even with a key in the environment") |
 
-Marco demonstrável: `npm run demo` completo; `npm run demo -- --reject` termina `escalated`; `npm run demo -- --scenario cost-anomaly` mostra o Reflection, a faixa 4 bloqueada e US$ 339,59 de economia mensal.
+Demonstrable milestone: full `npm run demo`; `npm run demo -- --reject` ends `escalated`; `npm run demo -- --scenario cost-anomaly` shows Reflection, tier 4 blocked and US$ 339.59 in monthly savings.
 
-## Referência
+## Reference
 
-Documento de design do incident-copilot, revisão 2, de 2026-10-04. Ele fica no repositório do curso, fora deste repositório. Seções:
+incident-copilot design document, revision 2, dated 2026-10-04. It lives in the course repository, outside this repository. Sections:
 
-- "6.4 Matriz de Autonomia e catálogo de ações";
-- "6.5 Máquina de estados da aprovação";
-- "6.7 Circuit breaker, rate limit e canário";
-- "6.10 Modelo de ameaças";
-- "8.3 Critérios de aceite em EARS".
+- "6.4 Autonomy Matrix and action catalog";
+- "6.5 Approval state machine";
+- "6.7 Circuit breaker, rate limit and canary";
+- "6.10 Threat model";
+- "8.3 Acceptance criteria in EARS".
 
-Máquina de estados em `docs/architecture.md`; ameaças e defesas em `docs/threat-model.md`; matriz gerada em `docs/autonomy-matrix.md`.
+State machine in `docs/architecture.md`; threats and defenses in `docs/threat-model.md`; generated matrix in `docs/autonomy-matrix.md`.

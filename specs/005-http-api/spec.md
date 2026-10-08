@@ -1,53 +1,53 @@
-# 005: API HTTP
+# 005: HTTP API
 
-Marco M5. Estado: implementado.
+Milestone M5. Status: implemented.
 
-## Contexto
+## Context
 
-A API é a porta para quem quer integrar o copiloto: abrir incidentes, ler diagnóstico, trace, auditoria e post-mortem, e decidir aprovações com token. É também a única porta por onde um humano aprova. Os códigos de erro são estáveis e sem stack. Toda resposta carrega `X-Request-Id`, que chega ao trace, aos logs e à auditoria.
+The API is the port for anyone who wants to integrate the copilot: open incidents, read diagnosis, trace, audit and post-mortem, and decide approvals with a token. It is also the only port through which a human approves. Error codes are stable and carry no stack. Every response carries `X-Request-Id`, which reaches the trace, logs and audit.
 
-## Escopo
+## Scope
 
-- `buildServer(container)` em Fastify 5, sem `listen`, testável por `app.inject`. `src/index.ts` sobe a API em `127.0.0.1:3000`, com encerramento limpo.
-- Rotas:
-  - `GET /health` e `GET /scenarios`;
+- `buildServer(container)` on Fastify 5, without `listen`, testable via `app.inject`. `src/index.ts` starts the API on `127.0.0.1:3000`, with graceful shutdown.
+- Routes:
+  - `GET /health` and `GET /scenarios`;
   - `POST /incidents`, `GET /incidents`, `GET /incidents/:id`;
-  - `GET /incidents/:id/trace`, `/audit` e `/postmortem`;
-  - `GET /approvals` e `POST /approvals/:id/decision`;
+  - `GET /incidents/:id/trace`, `/audit` and `/postmortem`;
+  - `GET /approvals` and `POST /approvals/:id/decision`;
   - `GET /stats`.
-- Corpo de erro `{ error: { code, message, requestId, issues? } }`. Erros tipados traduzidos em status. Corpo até 64 KB. Redação de segredos no `onSend`.
-- `X-Request-Id` reaproveitado quando casa `^[A-Za-z0-9._-]{1,64}$`; senão, gerado.
-- `/stats` com agregações em SQL: contagens, MTTR P50 e P95 por posto mais próximo, faixas, aprovações com expiração projetada, contadores das guardas e uso do LLM.
-- Timeout de execução por `RUN_TIMEOUT_MS` (504).
+- Error body `{ error: { code, message, requestId, issues? } }`. Typed errors mapped to status codes. Body up to 64 KB. Secret redaction in `onSend`.
+- `X-Request-Id` reused when it matches `^[A-Za-z0-9._-]{1,64}$`; otherwise generated.
+- `/stats` with SQL aggregations: counts, nearest-rank MTTR P50 and P95, tiers, approvals with projected expiration, guard counters and LLM usage.
+- Run timeout via `RUN_TIMEOUT_MS` (504).
 
 ## Non-goals
 
-- CORS: nenhum navegador fala com a API na v1. O modo ao vivo da War Room está no backlog v2.
-- Rate limit HTTP (`@fastify/rate-limit`): a API escuta só em `127.0.0.1`. Há limite de execuções e bloqueio por tentativas de token.
-- Autenticação de leitura: só a decisão exige token.
-- Streaming de trace (SSE).
-- Imagem Docker e deploy do backend.
+- CORS: no browser talks to the API in v1. The War Room live mode is in the v2 backlog.
+- HTTP rate limiting (`@fastify/rate-limit`): the API listens only on `127.0.0.1`. There is an execution limit and a lockout after token attempts.
+- Read authentication: only the decision requires a token.
+- Trace streaming (SSE).
+- Docker image and backend deploy.
 
-## Critérios de aceite (EARS)
+## Acceptance criteria (EARS)
 
-- **AC-01** Quando `POST /incidents` receber um `scenarioId` existente, o sistema deve criar o incidente, executar a equipe até `awaiting_approval`, `resolved` ou `escalated`, persistir o status derivado pela tabela 4.5.2 e responder 201 com o `IncidentView`.
-- **AC-16** Se o token de aprovação estiver ausente ou errado, então o sistema deve responder 401 com mensagem genérica, gravar `approval_auth_failed` sem o valor recebido e não mudar o estado.
-- **AC-18** Se houver 5 tentativas de token erradas em 10 minutos, então o sistema deve recusar decisões por 10 minutos com 429.
-- **AC-30** Se a execução passar de `RUN_TIMEOUT_MS`, então a API deve responder 504 e o incidente deve ficar `escalated` com `timeout` e post-mortem parcial.
-- **AC-32** Quando o corpo ou a query falhar na validação Zod, a API deve responder 400 com `code: "validation_error"` e `issues`, sem stack trace; e toda resposta deve trazer `X-Request-Id`, reaproveitando o recebido quando válido.
-- **AC-33** Quando `GET /stats` for chamado, o sistema deve devolver contagens e MTTR P50 e P95 calculados por SQL sobre a janela pedida.
+- **AC-01** When `POST /incidents` receives an existing `scenarioId`, the system shall create the incident, run the team until `awaiting_approval`, `resolved` or `escalated`, persist the status derived from table 4.5.2 and respond 201 with the `IncidentView`.
+- **AC-16** If the approval token is missing or wrong, then the system shall respond 401 with a generic message, record `approval_auth_failed` without the received value, and not change state.
+- **AC-18** If there are 5 wrong token attempts within 10 minutes, then the system shall refuse decisions for 10 minutes with 429.
+- **AC-30** If the run exceeds `RUN_TIMEOUT_MS`, then the API shall respond 504 and the incident shall end `escalated` with `timeout` and a partial post-mortem.
+- **AC-32** When the body or query fails Zod validation, the API shall respond 400 with `code: "validation_error"` and `issues`, without a stack trace; and every response shall carry `X-Request-Id`, reusing the received one when valid.
+- **AC-33** When `GET /stats` is called, the system shall return counts and MTTR P50 and P95 computed in SQL over the requested window.
 
-Endpoints e erros (seção 5.3 do design):
+Endpoints and errors (design section 5.3):
 
-| Rota | Sucesso | Erros |
+| Route | Success | Errors |
 |---|---|---|
 | `POST /incidents` | 201 `IncidentView` | 400; 404 `scenario_not_found`; 503 `llm_unavailable`; 504 `run_timeout` |
-| `GET /incidents/:id/postmortem` | 200 Markdown ou JSON | 404; 409 `postmortem_not_ready` |
-| `POST /approvals/:id/decision` | 200 `{ approval, incident }`, inclusive quando a retomada escala | 400; 401 `invalid_token`; 404; 409 `approval_not_pending`, `approval_expired` ou `incident_not_accepting` (execução do incidente ainda em andamento); 422 `ambiguous_decision`; 429 `approvals_locked`; 503 `approvals_disabled` |
+| `GET /incidents/:id/postmortem` | 200 Markdown or JSON | 404; 409 `postmortem_not_ready` |
+| `POST /approvals/:id/decision` | 200 `{ approval, incident }`, including when the resume escalates | 400; 401 `invalid_token`; 404; 409 `approval_not_pending`, `approval_expired` or `incident_not_accepting` (incident run still in progress); 422 `ambiguous_decision`; 429 `approvals_locked`; 503 `approvals_disabled` |
 
-## Como verificar
+## How to verify
 
-| Critério | Testes |
+| Criterion | Tests |
 |---|---|
 | AC-01 | `tests/e2e/http.e2e.test.ts` ("POST /incidents creates and stops awaiting approval") |
 | AC-16 | `tests/e2e/http.e2e.test.ts` ("decision codes: 401, 422, 400, 200, 409"); `tests/e2e/gate.e2e.test.ts` ("token rules") |
@@ -56,16 +56,16 @@ Endpoints e erros (seção 5.3 do design):
 | AC-32 | `tests/e2e/http.e2e.test.ts` ("400 with issues, 404 for unknown scenario", "valid incoming request id is reused; invalid is replaced") |
 | AC-33 | `tests/unit/stats.unit.test.ts`; `tests/e2e/http.e2e.test.ts` ("GET /stats after an approved, a rejected and an expired run") |
 
-Marco demonstrável: a sequência de `curl` do README contra `npm start`.
+Demonstrable milestone: the README's `curl` sequence against `npm start`.
 
-## Referência
+## Reference
 
-Documento de design do incident-copilot, revisão 2, de 2026-10-04. Ele fica no repositório do curso, fora deste repositório. Seções:
+incident-copilot design document, revision 2, dated 2026-10-04. It lives in the course repository, outside this repository. Sections:
 
-- "4.4 HTTP: Fastify, não Express";
-- "5.3 Endpoints HTTP";
-- "6.1 Taxonomia de erros";
-- "6.9 Observabilidade";
-- "8.3 Critérios de aceite em EARS".
+- "4.4 HTTP: Fastify, not Express";
+- "5.3 HTTP endpoints";
+- "6.1 Error taxonomy";
+- "6.9 Observability";
+- "8.3 Acceptance criteria in EARS".
 
-Números de seção citados nos critérios (como "tabela 4.5.2") apontam para esse documento. A tabela de status está em `docs/architecture.md`.
+Section numbers cited in the criteria (such as "table 4.5.2") point to that document. The status table is in `docs/architecture.md`.

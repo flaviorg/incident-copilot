@@ -1,5 +1,5 @@
-// Specs SDD do próprio repositório (Tarefa 43; spec 9 e aulas 221505, 210745): cada feature tem non-goals e
-// critérios de aceite em EARS, e a constitution cabe em 80 linhas.
+// The repository's own SDD specs (Task 43; spec 9 and lessons 221505, 210745): each feature has non-goals and
+// EARS acceptance criteria, and the constitution fits in 80 lines.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
@@ -11,8 +11,8 @@ test("every feature spec has non-goals and EARS criteria", () => {
   for (const dir of dirs) {
     const t = readFileSync(join("specs", dir, "spec.md"), "utf8");
     assert.match(t, /^## Non-goals/m, dir);
-    assert.match(t, /^## Critérios de aceite \(EARS\)/m, dir);
-    assert.match(t, /\*\*AC-\d+\*\* (Quando|Se|Enquanto|O sistema|O servidor|A API|O pre-commit)/, dir);
+    assert.match(t, /^## Acceptance criteria \(EARS\)/m, dir);
+    assert.match(t, /\*\*AC-\d+\*\* (When|If|While|The system|The server|The API|The pre-commit hook)/, dir);
   }
   assert.ok(readFileSync("specs/constitution.md", "utf8").split("\n").length <= 80);
 });

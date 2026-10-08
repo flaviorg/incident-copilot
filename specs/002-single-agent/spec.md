@@ -1,47 +1,47 @@
-# 002: Agente único
+# 002: Single agent
 
-Marco M2. Estado: implementado.
+Milestone M2. Status: implemented.
 
-## Contexto
+## Context
 
-Antes da equipe, um agente sozinho precisa investigar de forma confiável: o analista de telemetria em laço ReAct sobre as ferramentas de leitura da spec 001. Este marco também fixa o contrato com o LLM:
+Before the team, a single agent must investigate reliably: the telemetry analyst in a ReAct loop over the read tools from spec 001. This milestone also pins down the LLM contract:
 
-- prompts versionados;
-- saída estruturada validada por Zod;
-- retry, fallback e timeout;
-- o provedor fake roteirizado, que faz a suíte e a demo rodarem sem rede.
+- versioned prompts;
+- structured output validated by Zod;
+- retry, fallback and timeout;
+- the scripted fake provider, which lets the suite and the demo run without network.
 
-## Escopo
+## Scope
 
-- `LlmProvider`, com dois provedores:
-  - `FakeLlmProvider`: hash do prompt, correspondência por `matchKeys`, erro com diagnóstico, falhas simuladas, `delayMs` abortável, modo estrito e registro de entradas;
-  - `OpenRouterProvider`: `ChatOpenAI` com `baseURL` e `withStructuredOutput`.
-- `withTimeout`, `withRetry` (2 tentativas no principal) e fallback em `resilient` (1 tentativa no modelo de reserva), em `src/llm/resilience.ts`. Cada chamada lógica vira uma linha em `llm_calls`.
-- Prompts `src/prompts/v1/*` (`supervisor.v1`, `telemetry-react.v1`, `planner.v1`, `auditor.v1` e `postmortem.v1`), com schema de entrada e de saída. `npm run fixtures:rehash`.
-- `TraceSink`: valida, redige, numera e persiste os eventos.
-- Nó `telemetry_analyst` com laço ReAct de até 12 passos dentro do nó. Erro de ferramenta vira observação. A observação entra no prompt seguinte como dado delimitado.
+- `LlmProvider`, with two providers:
+  - `FakeLlmProvider`: prompt hash, matching by `matchKeys`, errors with diagnostics, simulated failures, abortable `delayMs`, strict mode and input recording;
+  - `OpenRouterProvider`: `ChatOpenAI` with `baseURL` and `withStructuredOutput`.
+- `withTimeout`, `withRetry` (2 attempts on the primary) and fallback in `resilient` (1 attempt on the backup model), in `src/llm/resilience.ts`. Each logical call becomes one row in `llm_calls`.
+- Prompts `src/prompts/v1/*` (`supervisor.v1`, `telemetry-react.v1`, `planner.v1`, `auditor.v1` and `postmortem.v1`), with input and output schemas. `npm run fixtures:rehash`.
+- `TraceSink`: validates, redacts, numbers and persists events.
+- `telemetry_analyst` node with a ReAct loop of up to 12 steps inside the node. A tool error becomes an observation. The observation enters the next prompt as delimited data.
 - CLI `diagnose`.
 
 ## Non-goals
 
-- Tool calling nativo do modelo: o ReAct usa saída estruturada, para funcionar com modelos sem tool calling e para o fake roteirizar cada passo.
-- Subgrafo para o ReAct: ele herdaria o `recursionLimit` do grafo pai e estouraria antes do 12º passo.
-- Avaliação de qualidade do modelo ou benchmark: `test:live` só confere estrutura.
-- Memória episódica, rolling summary ou `ContextBuilder`.
-- Streaming de tokens.
+- Native model tool calling: ReAct uses structured output, so it works with models without tool calling and the fake can script each step.
+- A subgraph for ReAct: it would inherit the parent graph's `recursionLimit` and blow up before the 12th step.
+- Model quality evaluation or benchmarks: `test:live` only checks structure.
+- Episodic memory, rolling summary or `ContextBuilder`.
+- Token streaming.
 
-## Critérios de aceite (EARS)
+## Acceptance criteria (EARS)
 
-- **AC-05** Se o analista completar 12 passos ReAct sem resposta final, então o sistema deve encerrar o laço sem lançar `GraphRecursionError`, gravar diagnóstico com `confidence: "low"` e `capReached: true` e escalar com `react_cap_low_confidence` sem chamar o planejador.
-- **AC-07** Quando uma ferramenta falhar, não existir ou receber argumentos inválidos, o sistema deve devolver o problema como `observation` com `ok: false` e continuar o laço.
-- **AC-26** Se o fake receber chamada sem turno roteirizado correspondente, ou se o hash de `version + system` divergir do registrado, então deve lançar `UnscriptedLlmCallError` (com cenário, prompt, número da chamada, digest e chaves) ou `FixturePromptDriftError` antes de responder.
-- **AC-28** Se um teste de cenário em modo estrito terminar com turnos não consumidos, então o teste deve falhar listando os ids.
-- **AC-29** Se o modelo principal falhar duas vezes, então o sistema deve tentar o modelo de fallback; se ele também falhar, deve marcar o incidente `escalated` com `llm_unavailable`, gerar post-mortem parcial pelo template e a API deve responder 503.
-- **AC-31** Quando a saída estruturada do LLM falhar no `safeParse`, o sistema deve tratá-la como falha da tentativa e nunca usar dado não validado.
+- **AC-05** If the analyst completes 12 ReAct steps without a final answer, then the system shall end the loop without throwing `GraphRecursionError`, record a diagnosis with `confidence: "low"` and `capReached: true`, and escalate with `react_cap_low_confidence` without calling the planner.
+- **AC-07** When a tool fails, does not exist or receives invalid arguments, the system shall return the problem as an `observation` with `ok: false` and continue the loop.
+- **AC-26** If the fake receives a call with no matching scripted turn, or if the hash of `version + system` differs from the recorded one, then it shall throw `UnscriptedLlmCallError` (with scenario, prompt, call number, digest and keys) or `FixturePromptDriftError` before answering.
+- **AC-28** If a strict-mode scenario test ends with unconsumed turns, then the test shall fail listing their ids.
+- **AC-29** If the primary model fails twice, then the system shall try the fallback model; if that also fails, it shall mark the incident `escalated` with `llm_unavailable`, generate a partial post-mortem from the template, and the API shall respond 503.
+- **AC-31** When the LLM's structured output fails `safeParse`, the system shall treat it as a failed attempt and never use unvalidated data.
 
-## Como verificar
+## How to verify
 
-| Critério | Testes |
+| Criterion | Tests |
 |---|---|
 | AC-05 | `tests/e2e/telemetry.e2e.test.ts` ("12 steps without final: low confidence, capReached, and no GraphRecursionError inside a graph with recursionLimit 25"); `tests/e2e/team.e2e.test.ts` ("react cap escalates without calling the planner") |
 | AC-07 | `tests/unit/tools.unit.test.ts` ("invalid args and unknown tools are observations, not exceptions"); `tests/e2e/telemetry.e2e.test.ts` |
@@ -50,15 +50,15 @@ Antes da equipe, um agente sozinho precisa investigar de forma confiável: o ana
 | AC-29 | `tests/unit/resilience.unit.test.ts` ("falls back after two primary failures", "fails when primary and fallback fail"); `tests/e2e/resilience.e2e.test.ts` (503) |
 | AC-31 | `tests/unit/resilience.unit.test.ts` ("OpenRouterProvider maps usage, invalid output and HTTP errors"); `tests/unit/fake-provider.unit.test.ts` ("simulated errors and schema-invalid outputs are failures") |
 
-Marco demonstrável: `npm run cli -- diagnose --scenario deploy-5xx-rollback` imprime pensamento, ação e observação dos 3 passos e o diagnóstico `bad_deploy` com confiança alta.
+Demonstrable milestone: `npm run cli -- diagnose --scenario deploy-5xx-rollback` prints thought, action and observation for the 3 steps and the `bad_deploy` diagnosis with high confidence.
 
-## Referência
+## Reference
 
-Documento de design do incident-copilot, revisão 2, de 2026-10-04. Ele fica no repositório do curso, fora deste repositório. Seções:
+incident-copilot design document, revision 2, dated 2026-10-04. It lives in the course repository, outside this repository. Sections:
 
-- "4.3 Interfaces entre componentes";
-- "6.2 Tetos";
-- "7. Provedor fake", em especial "7.2 Formato das fixtures";
-- "8.3 Critérios de aceite em EARS".
+- "4.3 Interfaces between components";
+- "6.2 Caps";
+- "7. Fake provider", especially "7.2 Fixture format";
+- "8.3 Acceptance criteria in EARS".
 
-O formato das fixtures e as regras do fake estão em `docs/fake-provider.md`.
+The fixture format and the fake's rules are in `docs/fake-provider.md`.

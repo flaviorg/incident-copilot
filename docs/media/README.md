@@ -1,49 +1,49 @@
-# Mídia do README
+# README media
 
-| Arquivo | O que mostra | Tamanho |
+| File | What it shows | Size |
 |---|---|---|
-| `docs/media/demo.gif` | Cerca de 16 segundos (27 quadros) da War Room no cenário de deploy: escolha do cenário, conversa entre agentes, portão de aprovação, clique em Aprovar, diálogo de confirmação e cartões de números (MTTR de 11.2 min e 3.0 min aguardando aprovação), com a interface em inglês | 960 × 1200 px, cerca de 810 KB (alvo: até 3 MB, de 960 a 1280 px de largura) |
-| `docs/media/war-room.png` | A War Room parada no portão de aprovação do cenário `cost-anomaly`: três passos de faixa 3 aguardando decisão e o `delete_backups` de faixa 4 bloqueado sem dry run | 1280 × 1476 px, cerca de 370 KB (alvo: até 500 KB, 1280 px de largura) |
+| `docs/media/demo.gif` | About 16 seconds (27 frames) of the War Room in the deploy scenario: scenario choice, conversation between agents, approval gate, click on Approve, confirmation dialog and number cards (MTTR of 11.2 min and 3.0 min waiting for approval), with the interface in English | 960 × 1200 px, about 810 KB (target: up to 3 MB, 960 to 1280 px wide) |
+| `docs/media/war-room.png` | The War Room stopped at the approval gate of the `cost-anomaly` scenario: three tier 3 steps awaiting a decision and the tier 4 `delete_backups` blocked without a dry run | 1280 × 1476 px, about 370 KB (target: up to 500 KB, 1280 px wide) |
 
-Os dois mostram a reprodução gravada com provedor fake, e o rótulo "Replay of a recorded run with a scripted fake provider" aparece no topo da página (nos últimos quadros do GIF a página rola até os cartões de números).
+Both show the replay recorded with the fake provider, and the label "Replay of a recorded run with a scripted fake provider" appears at the top of the page (in the last frames of the GIF the page scrolls down to the number cards).
 
-## Como foram feitas
+## How they were made
 
-Regravadas em 2026-10-08, depois da tradução da interface para o inglês, a partir do build real da War Room (`npm run web:build`, que regrava `web/public/demo` com `demo:record`):
+Re-recorded on 2026-10-08, after the interface was translated to English, from the real War Room build (`npm run web:build`, which re-records `web/public/demo` with `demo:record`):
 
-1. `web/dist` servido em `127.0.0.1` por um servidor estático local, sem rede externa.
-2. Um Chromium em modo headless (perfil temporário, apagado no fim), controlado pelo Puppeteer: tema claro, movimento reduzido, viewport de 1280 px.
-3. **Captura:** cenário de custo, Avançar até o portão, recorte do topo da página até o fim do painel do portão.
-4. **GIF:** viewport de 1280 × 1600 (o rótulo de modo demo fica no quadro até a rolagem final para os números), um quadro a cada dois eventos, reduzido a 960 px de largura. Roteiro: cartão "5xx rate above 5% in orders-api", Step até o portão, Approve, Confirm, Step até o fim e rolagem até os cartões de números. Os quadros viraram GIF com o `ffmpeg` (paleta de 128 cores), com o tempo de cada quadro (0,3 s por passo; mais tempo na escolha do cenário, no portão, no diálogo e nos números).
+1. `web/dist` served on `127.0.0.1` by a local static server, with no external network.
+2. A headless Chromium (temporary profile, deleted at the end), driven by Puppeteer: light theme, reduced motion, 1280 px viewport.
+3. **Screenshot:** cost scenario, Step up to the gate, crop from the top of the page to the end of the gate panel.
+4. **GIF:** 1280 × 1600 viewport (the demo mode label stays in frame until the final scroll to the numbers), one frame every two events, scaled down to 960 px wide. Script: "5xx rate above 5% in orders-api" card, Step up to the gate, Approve, Confirm, Step to the end and scroll to the number cards. The frames were turned into a GIF with `ffmpeg` (128-color palette), with per-frame timing (0.3 s per step; longer on the scenario choice, the gate, the dialog and the numbers).
 
-O script de captura não faz parte do projeto, porque depende do navegador instalado na máquina. Qualquer gravação manual que siga o roteiro abaixo serve.
+The capture script is not part of the project, because it depends on the browser installed on the machine. Any manual recording that follows the script below works.
 
-## Como regravar
+## How to re-record
 
-1. Gere as gravações e suba a War Room:
+1. Generate the recordings and start the War Room:
 
    ```bash
-   npm run web:install   # só na primeira vez
+   npm run web:install   # first time only
    npm run web:demo
    ```
 
-2. Abra o endereço que o Vite mostrar (normalmente `http://localhost:5173`) numa janela de 1280 px de largura. Use o tema claro, que é o que o README assume.
-3. **GIF.** Grave a tela com a ferramenta que preferir: no macOS, Cmd+Shift+5 grava um `.mov`.
-   - Roteiro: clique no cartão "5xx rate above 5% in orders-api", avance (Step) até o portão, clique em Approve, confirme no diálogo (Confirm) e avance até os números.
-   - Converta para GIF com 10 a 12 quadros por segundo. Por exemplo, com `ffmpeg` instalado:
+2. Open the address Vite prints (usually `http://localhost:5173`) in a 1280 px wide window. Use the light theme, which is what the README assumes.
+3. **GIF.** Record the screen with any tool you like: on macOS, Cmd+Shift+5 records a `.mov`.
+   - Script: click the "5xx rate above 5% in orders-api" card, Step up to the gate, click Approve, confirm in the dialog (Confirm) and Step up to the numbers.
+   - Convert to GIF at 10 to 12 frames per second. For example, with `ffmpeg` installed:
 
      ```bash
-     ffmpeg -i gravacao.mov -vf "fps=12,scale=1280:-1:flags=lanczos" -loop 0 docs/media/demo.gif
+     ffmpeg -i recording.mov -vf "fps=12,scale=1280:-1:flags=lanczos" -loop 0 docs/media/demo.gif
      ```
 
-4. **Captura.** No cenário de custo, avance até o portão e capture a janela (no macOS, Cmd+Shift+4 e depois Espaço). Salve como `docs/media/war-room.png`.
-5. Confira o tamanho dos dois arquivos contra a tabela acima e rode `npm run check:secrets`: as gravações da War Room não carregam segredos, mas a conferência é barata.
+4. **Screenshot.** In the cost scenario, Step up to the gate and capture the window (on macOS, Cmd+Shift+4 then Space). Save it as `docs/media/war-room.png`.
+5. Check both file sizes against the table above and run `npm run check:secrets`: the War Room recordings carry no secrets, but the check is cheap.
 
-## O que não fazer
+## What not to do
 
-- Não grave a War Room com dados de um modelo real apresentando-os como demo: a demo publicada é sempre a reprodução do fake.
-- Não edite o GIF para esconder o rótulo de modo demo.
+- Do not record the War Room with data from a real model and present it as the demo: the published demo is always the fake's replay.
+- Do not edit the GIF to hide the demo mode label.
 
-## Depois de publicar
+## After publishing
 
-O README já aponta para o repositório público `flaviorg/incident-copilot`: o badge de CI usa `https://github.com/flaviorg/incident-copilot/actions/workflows/ci.yml/badge.svg?branch=main`, e a demo ao vivo fica em `https://flaviorg.github.io/incident-copilot/`. O badge só fica verde depois do primeiro push e do primeiro CI aprovado, e o endereço do Pages só responde depois de disparar à mão o workflow "Pages (War Room)". Se a War Room mudar de aparência, regrave o GIF e a captura.
+The README already points to the public repository `flaviorg/incident-copilot`: the CI badge uses `https://github.com/flaviorg/incident-copilot/actions/workflows/ci.yml/badge.svg?branch=main`, and the live demo is at `https://flaviorg.github.io/incident-copilot/`. The badge only turns green after the first push and the first passing CI run, and the Pages address only responds after the "Pages (War Room)" workflow is triggered by hand. If the War Room changes its look, re-record the GIF and the screenshot.

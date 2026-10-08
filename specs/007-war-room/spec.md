@@ -1,65 +1,65 @@
 # 007: War Room lite
 
-Marco M7. Estado: implementado.
+Milestone M7. Status: implemented.
 
-## Contexto
+## Context
 
-Quem avalia o projeto tem dois minutos e talvez não rode nada. A War Room é uma página estática, publicável no GitHub Pages, que reproduz execuções gravadas pelo próprio backend:
+Whoever evaluates the project has two minutes and may not run anything. The War Room is a static page, publishable on GitHub Pages, that replays runs recorded by the backend itself:
 
-- a conversa entre agentes;
-- o portão de aprovação, com os ramos aprovar e rejeitar;
-- os números;
-- o post-mortem.
+- the conversation between agents;
+- the approval gate, with the approve and reject branches;
+- the numbers;
+- the post-mortem.
 
-Ela deixa claro, em todas as telas, que é reprodução com provedor fake. Como as gravações carregam saída do backend, este marco também prova que nenhum segredo sai do processo por nenhuma das 7 superfícies.
+It makes clear, on every screen, that it is a replay with a fake provider. Since the recordings carry backend output, this milestone also proves that no secret leaves the process through any of the 7 surfaces.
 
-## Escopo
+## Scope
 
-- `DemoRecorder` (`recordScenario` e `recordAll`, em `src/app/demo-recorder.ts`) e CLI `record-demo`. Gravam os 2 cenários com relógio e ids determinísticos, com prefixo comum e dois ramos, validadas por `DemoRecordingSchema`. São geradas no build e não versionadas.
-- Teste de segredos nas 7 superfícies: HTTP, MCP, trace, auditoria, logs, relatórios e gravações.
-- Pacote `web/` aninhado, sem workspace: React 19, Vite 8, Vitest 5 e jsdom.
-  - Design tokens em `tokens.css`, temas claro e escuro.
-  - `check:tokens` falha com cor literal fora de `tokens.css`.
-  - Teste de contraste dos pares declarados.
-- Replay (`replay-engine.ts`) com pausa no portão e escolha de ramo. Fonte demo que só busca `./demo/` e valida por Zod.
-- 9 componentes acessíveis:
+- `DemoRecorder` (`recordScenario` and `recordAll`, in `src/app/demo-recorder.ts`) and CLI `record-demo`. They record the 2 scenarios with deterministic clock and ids, with a common prefix and two branches, validated by `DemoRecordingSchema`. They are generated at build time and not versioned.
+- Secret test across the 7 surfaces: HTTP, MCP, trace, audit, logs, reports and recordings.
+- Nested `web/` package, no workspace: React 19, Vite 8, Vitest 5 and jsdom.
+  - Design tokens in `tokens.css`, light and dark themes.
+  - `check:tokens` fails on a literal color outside `tokens.css`.
+  - Contrast test for the declared pairs.
+- Replay (`replay-engine.ts`) with a pause at the gate and branch choice. Demo source that only fetches `./demo/` and validates with Zod.
+- 9 accessible components:
   - `ModeBanner`, `ScenarioPicker`, `PlaybackControls`;
   - `AgentConversation`;
   - `ApprovalGate`, `ApprovalDialog`, `TierBadge`;
   - `MetricsCards`, `PostmortemView`.
-- `.github/workflows/pages.yml`, só com disparo manual.
+- `.github/workflows/pages.yml`, manual dispatch only.
 
 ## Non-goals
 
-- Modo ao vivo contra a API local, `SettingsDialog` e campo de token (backlog v2).
-- `Tabs`, `Sparkline`, tabela de trace filtrável e teste de `prefers-reduced-motion` (backlog v2).
-- Testes de navegador real (Playwright ou Cypress).
-- Internacionalização: interface em pt-BR.
-- Cálculo de métricas no navegador: a War Room só mostra o que a gravação traz.
+- Live mode against the local API, `SettingsDialog` and token field (v2 backlog).
+- `Tabs`, `Sparkline`, filterable trace table and `prefers-reduced-motion` test (v2 backlog).
+- Real browser tests (Playwright or Cypress).
+- Internationalization: the interface is in pt-BR.
+- Computing metrics in the browser: the War Room only shows what the recording carries.
 
-## Critérios de aceite (EARS)
+## Acceptance criteria (EARS)
 
-- **AC-17** O sistema nunca deve incluir o valor de `APPROVAL_TOKEN` ou de `OPENROUTER_API_KEY` em respostas HTTP, saídas MCP, trace, auditoria, logs, relatórios ou gravações de demo, mesmo quando o valor for enviado num campo de texto.
-- **AC-39** Enquanto estiver em modo demo, a War Room deve mostrar em todas as telas o rótulo "Reprodução de execução gravada com provedor fake roteirizado", buscar apenas arquivos de `./demo/`, recusar com erro explícito gravação que não passe no `DemoRecordingSchema`, prender o foco no diálogo de aprovação (ESC fecha e devolve o foco), comunicar a faixa por texto e ícone além da cor, e usar pares de cor com contraste mínimo de 4,5:1.
+- **AC-17** The system shall never include the value of `APPROVAL_TOKEN` or `OPENROUTER_API_KEY` in HTTP responses, MCP output, trace, audit, logs, reports or demo recordings, even when the value is sent in a text field.
+- **AC-39** While in demo mode, the War Room shall show on every screen the label "Replay of a recorded run with a scripted fake provider", fetch only files from `./demo/`, reject with an explicit error any recording that fails `DemoRecordingSchema`, trap focus in the approval dialog (ESC closes it and returns focus), convey the tier through text and icon in addition to color, and use color pairs with a minimum contrast of 4.5:1.
 
-Verificação manual, sem critério automatizado: abaixo de 600 px a War Room usa uma coluna, sem rolagem horizontal, e tudo é operável por teclado. O registro fica em `docs/accessibility.md`.
+Manual verification, with no automated criterion: below 600 px the War Room uses a single column, with no horizontal scrolling, and everything is keyboard operable. The record is in `docs/accessibility.md`.
 
-## Como verificar
+## How to verify
 
-| Critério | Testes |
+| Criterion | Tests |
 |---|---|
 | AC-17 | `tests/e2e/secrets.e2e.test.ts` ("no secret value appears in any output surface"); `tests/unit/redact.unit.test.ts` |
 | AC-39 | `tests/e2e/demo-recordings.e2e.test.ts`; `web/src/test/demo-source.test.ts`; `web/src/test/replay-engine.test.ts`; `web/src/test/ApprovalDialog.test.tsx`; `web/src/test/components.test.tsx` (axe); `web/src/test/tokens-contrast.test.ts`; `web/src/test/App.test.tsx` |
 
-Marco demonstrável: `npm run web:demo` mostra os 2 cenários com aprovar e rejeitar; `VITE_BASE=/incident-copilot/ npm run web:build` gera o site com as gravações em `web/dist/demo`.
+Demonstrable milestone: `npm run web:demo` shows the 2 scenarios with approve and reject; `VITE_BASE=/incident-copilot/ npm run web:build` generates the site with the recordings in `web/dist/demo`.
 
-## Referência
+## Reference
 
-Documento de design do incident-copilot, revisão 2, de 2026-10-04. Ele fica no repositório do curso, fora deste repositório. Seções:
+incident-copilot design document, revision 2, dated 2026-10-04. It lives in the course repository, outside this repository. Sections:
 
-- "6.6 Segredos e redação";
-- "7.6 Artefatos gerados";
-- "10.2 O que a demo da War Room mostra";
-- "8.3 Critérios de aceite em EARS".
+- "6.6 Secrets and redaction";
+- "7.6 Generated artifacts";
+- "10.2 What the War Room demo shows";
+- "8.3 Acceptance criteria in EARS".
 
-Evidências de acessibilidade em `docs/accessibility.md`.
+Accessibility evidence in `docs/accessibility.md`.

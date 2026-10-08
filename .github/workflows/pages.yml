@@ -1,5 +1,5 @@
 # Publica a War Room (modo demo) no GitHub Pages. Só manual: nada é publicado sem alguém disparar o workflow.
-# Majors das actions conferidas nas releases oficiais em 2026-10-04.
+# Action major versions checked against the official releases on 2026-10-04.
 name: Pages (War Room)
 
 on:
@@ -31,7 +31,7 @@ jobs:
             web/package-lock.json
       - run: npm ci
       - run: npm --prefix web ci
-      - name: Build da War Room com as gravações (provedor fake, sem segredos)
+      - name: Build the War Room with the recordings (fake provider, no secrets)
         run: npm run web:build
         env:
           VITE_BASE: /incident-copilot/

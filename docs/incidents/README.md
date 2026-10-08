@@ -1,78 +1,78 @@
-# Post-mortems da construção
+# Build post-mortems
 
-Esta pasta guarda falhas **reais** enfrentadas durante a construção do projeto, escritas como post-mortems sem culpa. Nada aqui é inventado. A matéria-prima é `notes.md`, onde cada falha foi anotada no dia, com sintoma e causa, enquanto o trabalho acontecia.
+This folder keeps **real** failures hit while building the project, written as blameless post-mortems. Nothing here is made up. The raw material is `notes.md`, where each failure was logged on the day, with symptom and cause, while the work was happening.
 
-| Nº | Título | Área |
+| No. | Title | Area |
 |---|---|---|
-| [0001](0001-fake-consumia-roteiro-por-processo.md) | O provedor fake consumia o roteiro por processo, e o 2º incidente da API respondia 500 | Provedor fake, API e MCP |
-| [0002](0002-foco-perdido-no-portao.md) | O foco do teclado se perdia no portão de aprovação da War Room | Acessibilidade da War Room |
+| [0001](0001-fake-consumed-script-per-process.md) | The fake provider consumed the script per process, and the API's 2nd incident returned 500 | Fake provider, API and MCP |
+| [0002](0002-focus-lost-at-the-gate.md) | Keyboard focus was lost at the War Room approval gate | War Room accessibility |
 
-As demais falhas de `notes.md` foram menores e ficaram só como nota:
+The other failures in `notes.md` were minor and stayed as notes only:
 
-- teste de herança do `recursionLimit` com topologia errada;
-- nó do grafo com nome de chave do estado;
-- modo estrito olhando todos os cenários;
-- caso de dry run falho que não passava pelo auditor;
-- ordem da reversão conferida pelo campo errado;
-- CSS vazio no Vitest;
-- comando de limpeza com glob que o zsh recusa;
-- cabeçalho do npm no stdout de `npm run mcp`;
-- aviso de script de instalação do `fsevents` ausente das notas de API;
-- decisão aceita durante a execução de abertura, achada na revisão final;
-- `check:secrets` varrendo o `.env` local, achado na revisão final.
+- `recursionLimit` inheritance test with the wrong topology;
+- graph node named after a state key;
+- strict mode checking every scenario;
+- failed dry run case that did not get past the auditor;
+- revert order checked through the wrong field;
+- empty CSS in Vitest;
+- cleanup command with a glob that zsh rejects;
+- npm header on the stdout of `npm run mcp`;
+- `fsevents` install script warning missing from the API notes;
+- decision accepted during the opening run, found in the final review;
+- `check:secrets` scanning the local `.env`, found in the final review.
 
-## Como escrever um post-mortem
+## How to write a post-mortem
 
-- **Sem culpa.** O texto descreve sistemas, suposições e sinais, não pessoas. A pergunta é "o que deixou isso possível?", não "quem errou?".
-- **Só fatos.** O que não foi medido nem registrado fica de fora ou aparece como "não registrado". Horários entram só se foram anotados.
-- **Ação com dono e prova.** Cada ação diz o que mudou e qual teste impede a volta do problema.
-- **Curto.** Uma página basta.
+- **Blameless.** The text describes systems, assumptions and signals, not people. The question is "what made this possible?", not "who got it wrong?".
+- **Facts only.** Anything not measured or recorded is left out or shown as "not recorded". Times go in only if they were logged.
+- **Actions with an owner and proof.** Each action says what changed and which test keeps the problem from coming back.
+- **Short.** One page is enough.
 
 ## Template
 
-Copie o bloco abaixo para `NNNN-<slug>.md`, com o próximo número livre.
+Copy the block below to `NNNN-<slug>.md`, with the next free number.
 
 ```markdown
-# NNNN: <título curto, no passado, descrevendo o efeito>
+# NNNN: <short title, in the past tense, describing the effect>
 
-- **Data:** AAAA-MM-DD
-- **Área:** <componente ou camada>
-- **Severidade:** <baixa | média | alta> (<por quê, em uma frase>)
-- **Status:** <resolvido | mitigado | em aberto>
+- **Date:** YYYY-MM-DD
+- **Area:** <component or layer>
+- **Severity:** <low | medium | high> (<why, in one sentence>)
+- **Status:** <resolved | mitigated | open>
 
-## Resumo
+## Summary
 
-Duas ou três frases: o que aconteceu, quem seria afetado e como terminou.
+Two or three sentences: what happened, who would be affected and how it ended.
 
-## Impacto
+## Impact
 
-Quem ou o que foi afetado, por quanto tempo e em que condições. Se nada chegou a quem usa (falha pega antes de publicar), diga isso e diga quem *teria* sido afetado.
+Who or what was affected, for how long and under what conditions. If nothing reached users (failure caught before publishing), say so and say who *would have* been affected.
 
-## Linha do tempo
+## Timeline
 
-Eventos em ordem, do primeiro sinal à correção verificada. Use horários só se foram registrados.
+Events in order, from the first signal to the verified fix. Use times only if they were recorded.
 
 1. ...
 
-## Causa
+## Cause
 
-A causa técnica e a suposição que a tornou possível. Por que os testes ou as revisões existentes não pegaram.
+The technical cause and the assumption that made it possible. Why the existing tests or reviews did not catch it.
 
-## O que funcionou
+## What worked
 
-Sinais, testes, ferramentas ou práticas que ajudaram a detectar, entender ou corrigir.
+Signals, tests, tools or practices that helped detect, understand or fix it.
 
-## O que não funcionou
+## What did not work
 
-O que atrasou a detecção ou confundiu o diagnóstico.
+What delayed detection or muddied the diagnosis.
 
-## Ações
+## Actions
 
-| Ação | Tipo | Prova |
+| Action | Type | Proof |
 |---|---|---|
-| ... | correção, prevenção ou detecção | teste ou verificação que impede a volta |
+| ... | fix, prevention or detection | test or check that keeps it from coming back |
 
-## Lições
+## Lessons
 
-Uma ou duas frases que valem para outros projetos.
+One or two sentences that apply to other projects.
 ```

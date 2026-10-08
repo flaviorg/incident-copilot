@@ -1,85 +1,85 @@
-# Notas de falhas reais durante a construção
+# Notes on real failures during the build
 
-Matéria-prima dos post-mortems (Tarefa 42). Só fatos que aconteceram, com data, sintoma e causa.
+Raw material for the post-mortems (Task 42). Only facts that happened, with date, symptom and cause.
 
-## 2026-10-04: teste de herança do `recursionLimit` passou sem lançar
+## 2026-10-04: `recursionLimit` inheritance test passed without throwing
 
-- **Sintoma:** em `api-assumptions.unit.test.ts`, o subgrafo think/act com 12 ações dentro de um nó não lançou `GraphRecursionError` com o pai em 25.
-- **Causa:** a topologia do teste terminava no nó `act` (12 think + 12 act = 24 supersteps), um a menos que o limite. Um ReAct real termina num `think` que emite a resposta final (25 supersteps), e aí estoura.
-- **Correção:** `think` decide entre ação e fim; o teste também afirma que, com o pai em 100, o mesmo subgrafo termina, o que prova herança e não só o padrão de 25.
+- **Symptom:** in `api-assumptions.unit.test.ts`, the think/act subgraph with 12 actions inside one node did not throw `GraphRecursionError` with the parent at 25.
+- **Cause:** the test topology ended at the `act` node (12 think + 12 act = 24 supersteps), one short of the limit. A real ReAct loop ends on a `think` that emits the final answer (25 supersteps), and that is where it overflows.
+- **Fix:** `think` decides between an action and the end; the test also asserts that, with the parent at 100, the same subgraph finishes, which proves inheritance and not just the default of 25.
 
-## 2026-10-04: nó do grafo com o mesmo nome de uma chave do estado
+## 2026-10-04: graph node with the same name as a state key
 
-- **Sintoma:** o plano (Tarefa 22) nomeava os nós do grafo com os `AgentId` (`supervisor`, `escalation`). Uma sondagem antes de escrever o `graph.ts` mostrou que o `addNode("supervisor", ...)` lança "supervisor is already being used as a state attribute (a.k.a. a channel), cannot also be used as a node name".
-- **Causa:** o LangGraph usa o mesmo espaço de nomes para canais do estado e nós, e `supervisor` e `escalation` são chaves do `BlackboardSchema`, que é contrato do spec 5.2 e não muda.
-- **Correção:** as rotas continuam devolvendo o nome lógico (`NodeName`); `GRAPH_NODE_ID` em `src/graph/routing.ts` dá o id registrado (`supervisor_agent`, `escalation_node`) e o `pathMap` de cada aresta faz a tradução. Um teste em `api-assumptions.unit.test.ts` e outro em `routing.unit.test.ts` travam o comportamento.
+- **Symptom:** the plan (Task 22) named the graph nodes after the `AgentId`s (`supervisor`, `escalation`). A probe before writing `graph.ts` showed that `addNode("supervisor", ...)` throws "supervisor is already being used as a state attribute (a.k.a. a channel), cannot also be used as a node name".
+- **Cause:** LangGraph uses the same namespace for state channels and nodes, and `supervisor` and `escalation` are keys of `BlackboardSchema`, which is a spec 5.2 contract and does not change.
+- **Fix:** routes still return the logical name (`NodeName`); `GRAPH_NODE_ID` in `src/graph/routing.ts` gives the registered id (`supervisor_agent`, `escalation_node`) and each edge's `pathMap` does the translation. One test in `api-assumptions.unit.test.ts` and another in `routing.unit.test.ts` lock the behavior.
 
-## 2026-10-04: modo estrito do fake conferia o roteiro de todos os cenários
+## 2026-10-04: the fake's strict mode checked every scenario's script
 
-- **Sintoma:** no primeiro verde da Tarefa 22, `c.fake.assertAllConsumed()` no teste do cenário de deploy falhou listando os turnos do `cost-anomaly` (e vice-versa).
-- **Causa:** o container de teste carrega as fixtures de todos os cenários, e `assertAllConsumed` percorria todos os arquivos.
-- **Correção:** opção `scenarioId` em `assertAllConsumed`, que confere só o roteiro do cenário executado; teste novo em `fake-provider.unit.test.ts`.
+- **Symptom:** at the first green of Task 22, `c.fake.assertAllConsumed()` in the deploy scenario test failed, listing the turns of `cost-anomaly` (and vice versa).
+- **Cause:** the test container loads the fixtures of every scenario, and `assertAllConsumed` walked all the files.
+- **Fix:** a `scenarioId` option on `assertAllConsumed`, which checks only the script of the scenario that ran; new test in `fake-provider.unit.test.ts`.
 
-## 2026-10-04: o caso "dry run falho" do plano não passava pelo auditor
+## 2026-10-04: the plan's "failed dry run" case did not get past the auditor
 
-- **Sintoma:** o plano (Tarefa 29, e spec 7.4) pede um teste de ponta a ponta com `patchFixture` trocando o rollback para `v9.9.9` e espera `[succeeded, rejected_by_dry_run, cancelled]`, sem aprovação. Lendo a regra `rollback_requires_recent_deploy` antes de escrever o teste, ficou claro que o auditor reprova esse plano: `toVersion` precisa ser a versão anterior ao deploy suspeito (`v3.7.2`). O fake pediria `plan-1`, que não existe, e o teste quebraria com `UnscriptedLlmCallError`.
-- **Causa:** as regras do auditor espelham as checagens do dry run (alvo existe, versão no histórico), então nenhum passo de faixa 3 do catálogo falha no dry run e passa no auditor com os dados do cenário. Foi um descuido do plano, não da biblioteca.
-- **Correção:** o caso puro (dry run falho sem aprovação, dependente cancelado) ficou no teste do nó (`nodes-gate.unit.test.ts`, com o estado montado depois do auditor). No teste de ponta a ponta, a fixture roteiriza as revisões 1 e 2 com o mesmo plano; esgotadas as revisões, todos os passos sobem para faixa 3, o rollback termina `rejected_by_dry_run` sem aprovação, o dependente é cancelado e só a nota pede aprovação. Aprovada a nota, o incidente escala com `no_executable_actions`.
+- **Symptom:** the plan (Task 29, and spec 7.4) asks for an end-to-end test with `patchFixture` switching the rollback to `v9.9.9` and expects `[succeeded, rejected_by_dry_run, cancelled]`, with no approval. Reading the `rollback_requires_recent_deploy` rule before writing the test made it clear that the auditor rejects that plan: `toVersion` must be the version before the suspect deploy (`v3.7.2`). The fake would request `plan-1`, which does not exist, and the test would break with `UnscriptedLlmCallError`.
+- **Cause:** the auditor rules mirror the dry run checks (target exists, version in the history), so no tier 3 step in the catalog fails the dry run and passes the auditor with the scenario data. It was an oversight in the plan, not in the library.
+- **Fix:** the pure case (failed dry run with no approval, dependent cancelled) stayed in the node test (`nodes-gate.unit.test.ts`, with the state built after the auditor). In the end-to-end test, the fixture scripts revisions 1 and 2 with the same plan; once revisions run out, every step goes up to tier 3, the rollback ends `rejected_by_dry_run` with no approval, the dependent is cancelled and only the note asks for approval. Once the note is approved, the incident escalates with `no_executable_actions`.
 
-## 2026-10-04: teste da ordem de reversão olhava a ordem errada
+## 2026-10-04: revert order test looked at the wrong order
 
-- **Sintoma:** no primeiro verde da Tarefa 28, o teste do canário reprovado falhou: esperava `["block_image_tag", "rollback_deployment"]` e recebeu `["rollback_deployment", "block_image_tag"]`.
-- **Causa:** o teste (copiado do texto do plano) filtrava `actions` por `reverted`, e `filter` preserva a ordem do plano. A reversão em si estava certa, em ordem inversa de `executedAt`.
-- **Correção:** a ordem da reversão é afirmada pelos eventos `revert:<tipo>` do verificador no trace e por `verification.revertedActionIds`.
+- **Symptom:** at the first green of Task 28, the failed canary test failed: it expected `["block_image_tag", "rollback_deployment"]` and got `["rollback_deployment", "block_image_tag"]`.
+- **Cause:** the test (copied from the plan text) filtered `actions` by `reverted`, and `filter` keeps the plan order. The revert itself was correct, in reverse `executedAt` order.
+- **Fix:** the revert order is asserted through the verifier's `revert:<type>` events in the trace and through `verification.revertedActionIds`.
 
-## 2026-10-04: segundo incidente do mesmo cenário na API respondia 500
+## 2026-10-04: second incident of the same scenario on the API returned 500
 
-- **Sintoma:** no teste da Tarefa 33 que abre dois incidentes `deploy-5xx-rollback` no mesmo `buildServer`, o segundo `POST /incidents` respondeu 500. O log trazia `UnscriptedLlmCallError` no `supervisor.v1`, "turnos deste prompt 4/5 consumidos".
-- **Causa:** o `FakeLlmProvider` marcava os turnos como consumidos por processo. A CLI e os testes sempre abriam um incidente por container, então ninguém tinha visto. Mas a API e o servidor MCP são processos de longa duração: com o fake, o segundo incidente de um cenário encontrava o roteiro gasto pelo primeiro.
-- **Correção:** a correspondência (spec 7.2, regra 2) passou a olhar os turnos consumidos pelo próprio incidente (`ctx.incidentId`), então cada incidente toca o roteiro do começo. O modo estrito continua olhando a união (turno consumido por algum incidente). Teste novo em `fake-provider.unit.test.ts`; o teste HTTP abre o segundo incidente no mesmo processo.
+- **Symptom:** in the Task 33 test that opens two `deploy-5xx-rollback` incidents on the same `buildServer`, the second `POST /incidents` returned 500. The log showed `UnscriptedLlmCallError` in `supervisor.v1`, "turns of this prompt 4/5 consumed".
+- **Cause:** `FakeLlmProvider` marked turns as consumed per process. The CLI and the tests always opened one incident per container, so nobody had seen it. But the API and the MCP server are long-running processes: with the fake, a scenario's second incident found the script spent by the first.
+- **Fix:** matching (spec 7.2, rule 2) now looks at the turns consumed by the incident itself (`ctx.incidentId`), so each incident plays the script from the start. Strict mode still looks at the union (turn consumed by any incident). New test in `fake-provider.unit.test.ts`; the HTTP test opens the second incident in the same process.
 
-## 2026-10-04: teste de contraste lia o tokens.css vazio
+## 2026-10-04: contrast test read an empty tokens.css
 
-- **Sintoma:** na Tarefa 38, o teste de contraste dos tokens falhou com "token --color-text ausente no tema light", embora o token estivesse no arquivo.
-- **Causa:** o teste importava `../styles/tokens.css?raw`, para não depender de tipos do Node no pacote `web`. Por padrão, o Vitest troca todo arquivo CSS por string vazia, inclusive com `?raw`. Uma asserção de diagnóstico mostrou o tamanho 0.
-- **Correção:** `test.css: true` no `web/vite.config.ts`. O teste passou a ler o arquivo real. Registrado em `docs/api-notes.md`.
+- **Symptom:** in Task 38, the token contrast test failed with "token --color-text missing from the light theme", even though the token was in the file.
+- **Cause:** the test imported `../styles/tokens.css?raw`, so it would not depend on Node types in the `web` package. By default, Vitest replaces every CSS file with an empty string, including with `?raw`. A diagnostic assertion showed length 0.
+- **Fix:** `test.css: true` in `web/vite.config.ts`. The test now reads the real file. Logged in `docs/api-notes.md`.
 
-## 2026-10-04: foco do teclado se perdia no portão e no fim da reprodução
+## 2026-10-04: keyboard focus was lost at the gate and at the end of playback
 
-- **Sintoma:** na conferência manual da Tarefa 41, só com teclado, a 1280 px, o foco ia para o `body` quando a reprodução chegava ao portão. O botão Avançar, que estava focado, fica desabilitado nesse ponto. Quem usa leitor de tela perdia o lugar e tinha de voltar ao começo com Tab.
-- **Causa:** um botão desabilitado perde o foco, e nenhum código o movia para outro lugar. Os testes automáticos clicavam nos botões e não percebiam.
-- **Correção:**
-  - Ao carregar uma gravação ou escolher um ramo, o foco vai para Avançar.
-  - No portão, vai para o título "Portão de aprovação", e o próximo Tab chega em Aprovar.
-  - No fim, vai para o título do post-mortem.
-  - Teste novo em `web/src/test/App.test.tsx`, escrito antes da correção e visto falhando.
+- **Symptom:** in the Task 41 manual check, keyboard only, at 1280 px, focus went to `body` when playback reached the gate. The Step button, which had focus, becomes disabled at that point. Screen reader users lost their place and had to Tab from the top again.
+- **Cause:** a disabled button loses focus, and no code moved it elsewhere. The automated tests clicked the buttons and did not notice.
+- **Fix:**
+  - On loading a recording or choosing a branch, focus goes to Step.
+  - At the gate, it goes to the "Approval gate" heading, and the next Tab reaches Approve.
+  - At the end, it goes to the post-mortem heading.
+  - New test in `web/src/test/App.test.tsx`, written before the fix and seen failing.
 
-## 2026-10-04: comando de limpeza do plano não rodava no zsh
+## 2026-10-04: the plan's cleanup command did not run in zsh
 
-- **Sintoma:** na Tarefa 47, o passo "limpar e instalar do lockfile" (`rm -rf node_modules ... data/*.db data/*.db-* && time (...)`) parou na hora com `no matches found: data/*.db`. Nada foi apagado nem instalado.
-- **Causa:** o zsh, shell padrão do macOS, trata glob sem correspondência como erro e não executa o comando. Não havia nenhum banco em `data/`. No `bash`, o glob sem correspondência passa literal e o `rm -rf` ignora.
-- **Correção:** a verificação rodou em `bash` com `shopt -s nullglob`. O comando do README para o S1 não usa glob. Registrado em `docs/api-notes.md`.
+- **Symptom:** in Task 47, the "clean and install from the lockfile" step (`rm -rf node_modules ... data/*.db data/*.db-* && time (...)`) stopped immediately with `no matches found: data/*.db`. Nothing was deleted or installed.
+- **Cause:** zsh, the macOS default shell, treats a glob with no match as an error and does not run the command. There was no database in `data/`. In `bash`, an unmatched glob passes through literally and `rm -rf` ignores it.
+- **Fix:** the check ran in `bash` with `shopt -s nullglob`. The README command for S1 uses no glob. Logged in `docs/api-notes.md`.
 
-## 2026-10-04: `npm run mcp` não deixava o stdout vazio
+## 2026-10-04: `npm run mcp` did not leave stdout empty
 
-- **Sintoma:** na nova tentativa do bloco 4, `npm run mcp < /dev/null` escreveu 82 bytes no stdout: o cabeçalho `> incident-copilot@0.1.0 mcp` e a linha do comando, que não são JSON-RPC. O log do bloco 4 e o README diziam que o stdout ficava vazio, ou que só levava JSON-RPC.
-- **Causa:** o cabeçalho é do npm 11.19.0, não do servidor. A conferência anterior olhou o processo `node`, cujo stdout de fato fica vazio, e estendeu a conclusão ao script do npm. O teste de AC-34 sobe o `node` cru, então não pega o cabeçalho. Um cliente MCP configurado com `npm run mcp` receberia duas linhas que não são JSON-RPC antes do `initialize`.
-- **Correção:** só de documentação, porque o script segue o spec 8.4 e as configurações `.vscode` e `.cursor` já chamam `node` direto. O README e `docs/api-notes.md` agora indicam `node` direto ou `npm run -s mcp`, cujo stdout foi conferido vazio.
+- **Symptom:** in the retry of block 4, `npm run mcp < /dev/null` wrote 82 bytes to stdout: the `> incident-copilot@0.1.0 mcp` header and the command line, which are not JSON-RPC. The block 4 log and the README said stdout stayed empty, or carried only JSON-RPC.
+- **Cause:** the header comes from npm 11.19.0, not from the server. The earlier check looked at the `node` process, whose stdout is indeed empty, and extended the conclusion to the npm script. The AC-34 test starts bare `node`, so it does not catch the header. An MCP client configured with `npm run mcp` would receive two non-JSON-RPC lines before `initialize`.
+- **Fix:** documentation only, because the script follows spec 8.4 and the `.vscode` and `.cursor` configurations already call `node` directly. The README and `docs/api-notes.md` now point to `node` directly or `npm run -s mcp`, whose stdout was checked to be empty.
 
-## 2026-10-04: as notas de API diziam que nenhum pacote da web pedia script de instalação
+## 2026-10-04: the API notes said no web package needed an install script
 
-- **Sintoma:** na nova tentativa do bloco 5, o passo 1 da Tarefa 47 (apagar `node_modules` e `web/node_modules`, depois `npm ci && npm --prefix web ci && npm run verify`) terminou com código 0. Mas o `npm --prefix web ci` avisou "1 package has install scripts not yet covered by allowScripts: fsevents@2.3.3". `docs/api-notes.md` dizia, nos blocos 4 e 5, que nenhum pacote da web pedia script de instalação.
-- **Causa:** o `fsevents` é dependência opcional do Vite, só no macOS, e o `web/package-lock.json` o marca com `hasInstallScript: true`. O pacote publicado não tem script `install` nem `binding.gyp` e já traz o `fsevents.node` compilado, então não há nada para rodar e o build funciona. Não ficou registrado por que as conferências anteriores não viram o aviso. Nesta execução, ele aparece logo depois do resumo do `npm --prefix web ci`, antes da saída do `verify`.
-- **Correção:** só de documentação. `docs/api-notes.md` descreve o aviso e por que ele é inofensivo. O `allowScripts` não foi mexido, e o script não foi aprovado.
+- **Symptom:** in the retry of block 5, step 1 of Task 47 (delete `node_modules` and `web/node_modules`, then `npm ci && npm --prefix web ci && npm run verify`) exited with code 0. But `npm --prefix web ci` warned "1 package has install scripts not yet covered by allowScripts: fsevents@2.3.3". `docs/api-notes.md` said, in blocks 4 and 5, that no web package needed an install script.
+- **Cause:** `fsevents` is an optional Vite dependency, macOS only, and `web/package-lock.json` marks it with `hasInstallScript: true`. The published package has no `install` script or `binding.gyp` and already ships the compiled `fsevents.node`, so there is nothing to run and the build works. Why the earlier checks did not see the warning was not recorded. In this run, it shows up right after the `npm --prefix web ci` summary, before the `verify` output.
+- **Fix:** documentation only. `docs/api-notes.md` describes the warning and why it is harmless. `allowScripts` was not touched, and the script was not approved.
 
-## 2026-10-04: decisão aceita durante a execução de abertura deixava o incidente inconsistente
+## 2026-10-04: a decision accepted during the opening run left the incident inconsistent
 
-- **Sintoma:** na revisão final, uma sonda com o portão real seguido de uma pausa de 150 ms viu `APR-0001` pendente em `GET /approvals` enquanto o `POST /incidents` ainda rodava. A decisão nessa janela respondeu 200, e o `POST /incidents` respondeu 409 `version_conflict`. O incidente ficou `open`, com blackboard sem ações, 3 linhas em `actions`, aprovação `approved`, auditoria dizendo executado e escalado, e a linha de `runs` sem desfecho. Nenhuma chamada da API recuperava.
-- **Causa:** o portão grava aprovações, ações e auditoria no meio da execução, mas o blackboard só é gravado no fim, com versão otimista. A decisão mudava o blackboard por baixo da execução, e o roteamento depois do portão lia zero pendências e mandava o lote ao executor dentro da abertura. Sem a pausa, a janela é menor que um segundo (portão, fim do grafo, gravação), por isso o teste de decisões concorrentes não a pegava. Além disso, `run()` só fechava a linha de `runs` depois da gravação final.
-- **Correção:** `applyDecision` e `expireDueApprovals` recusam com 409 `incident_not_accepting`, sem gravar nada, quando o incidente tem linha de `runs` sem fim. `run()` fecha a linha de `runs` também quando a gravação final lança. Dois testes novos em `tests/e2e/gate.e2e.test.ts`, com o portão real seguido de um gancho no mesmo superstep, escritos antes da correção e vistos falhando.
+- **Symptom:** in the final review, a probe with the real gate followed by a 150 ms pause saw `APR-0001` pending in `GET /approvals` while `POST /incidents` was still running. A decision in that window returned 200, and `POST /incidents` returned 409 `version_conflict`. The incident stayed `open`, with a blackboard without actions, 3 rows in `actions`, an `approved` approval, an audit saying executed and escalated, and the `runs` row with no outcome. No API call recovered it.
+- **Cause:** the gate writes approvals, actions and audit in the middle of the run, but the blackboard is only written at the end, with an optimistic version. The decision changed the blackboard under the run, and the routing after the gate read zero pending items and sent the batch to the executor within the opening run. Without the pause, the window is under one second (gate, end of graph, save), which is why the concurrent decisions test did not catch it. Also, `run()` only closed the `runs` row after the final save.
+- **Fix:** `applyDecision` and `expireDueApprovals` refuse with 409 `incident_not_accepting`, writing nothing, when the incident has an unfinished `runs` row. `run()` also closes the `runs` row when the final save throws. Two new tests in `tests/e2e/gate.e2e.test.ts`, with the real gate followed by a hook in the same superstep, written before the fix and seen failing.
 
-## 2026-10-04: `check:secrets` quebrava o pre-commit de quem seguia o README
+## 2026-10-04: `check:secrets` broke the pre-commit for anyone following the README
 
-- **Sintoma:** na revisão final, com um `.env` preenchido como manda "Usando um modelo real", `npm run check:secrets`, o pre-commit e `npm run verify` saíram com código 1 (`.env:1` e `.env:3`).
-- **Causa:** a varredura percorre a árvore sem `git ls-files` (a pasta vive dentro do repositório do curso) e ignorava `reports`, `web/dist`, `web/public/demo`, `coverage` e `data/*.db`, mas não o `.env`, que está no `.gitignore`. Os testes rodavam numa árvore sem `.env`.
-- **Correção:** o `.env` local fica fora da varredura enquanto o Git não o rastreia (`git ls-files --error-unmatch`); rastreado, volta a ser varrido. `.env.example` continua varrido. Dois testes novos em `tests/unit/check-secrets.unit.test.ts`, vistos falhando antes.
+- **Symptom:** in the final review, with a `.env` filled in as "Using a real model" says, `npm run check:secrets`, the pre-commit and `npm run verify` exited with code 1 (`.env:1` and `.env:3`).
+- **Cause:** the scan walks the tree without `git ls-files` (the folder lives inside the course repository) and ignored `reports`, `web/dist`, `web/public/demo`, `coverage` and `data/*.db`, but not `.env`, which is in `.gitignore`. The tests ran on a tree without `.env`.
+- **Fix:** the local `.env` stays out of the scan while Git does not track it (`git ls-files --error-unmatch`); once tracked, it is scanned again. `.env.example` is still scanned. Two new tests in `tests/unit/check-secrets.unit.test.ts`, seen failing first.

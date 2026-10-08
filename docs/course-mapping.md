@@ -1,133 +1,133 @@
-# Mapa de aulas para o código
+# Lesson-to-code map
 
-Este projeto parte de práticas do curso de Engenharia de Software com IA Aplicada (UNIPDS) e as transporta para outro domínio, com dados próprios. A tabela abaixo cita cada aula **só pelo ID e pelo tema**, o arquivo do projeto onde a prática aparece e o que o código prova. Nenhum trecho de transcrição, slide ou material autoral foi copiado. Os cenários, nomes de serviço, mensagens de log, inventário e preços são do projeto: as aulas inspiram o mecanismo, não os números.
+This project takes practices from the Software Engineering with Applied AI course (UNIPDS) and carries them into a different domain, with its own data. The table below cites each lesson **only by ID and topic**, the project file where the practice appears, and what the code proves. No excerpt of transcripts, slides, or authored material was copied. The scenarios, service names, log messages, inventory, and prices belong to the project: the lessons inspire the mechanism, not the numbers.
 
-O tema de cada linha é o tópico da aula, resumido com palavras próprias. Quando várias aulas formam uma série sobre o mesmo projeto, o tema cita a série, e a coluna "Prática provada" diz qual parte dela o projeto aproveita.
+Each row's topic is the lesson's subject, summarized in my own words. When several lessons form a series on the same project, the topic names the series, and the "Practice proven" column says which part of it the project uses.
 
-## Módulo 01: fundamentos
+## Module 01: fundamentals
 
-| Aula | Tema | Arquivo no projeto | Prática provada |
+| Lesson | Topic | Project file | Practice proven |
 |---|---|---|---|
-| 198027 | Introdução ao curso: critério de replicar com outro domínio | `fixtures/scenarios/`, `README.md` ("What I changed from the course") | Mecanismos das aulas sobre dados próprios, com a lista do que mudou |
-| 198069 | Prompt engineering: prompt em blocos e validação por schema | `src/prompts/v1/*.ts` | Prompt com papel, regras e formato, validado por schema na saída |
-| 198071 | Ferramentas de IA para devs: papéis, permissões mínimas e SDD | `src/mcp/tools/propose-remediation.ts` | Nenhuma tool MCP aprova nem executa; aprovação só por HTTP com token |
-| 198081 | RAG, embeddings e busca semântica: fluxo e configuração por ambiente | `src/infra/runbooks/runbook-repository.ts`, `src/config.ts` | Busca por seção sobre `runbooks/`; modelo e provedor trocados por variável de ambiente |
-| 198082 | RAG, embeddings e busca semântica: score mínimo, recusa e prompt versionado | `src/domain/retrieval/bm25.ts`, `src/prompts/v1/` | Escore normalizado com limiar de recusa; prompts como configuração versionada (`<id>.v1`) |
+| 198027 | Course introduction: the criterion of replicating in another domain | `fixtures/scenarios/`, `README.md` ("What I changed from the course") | Lesson mechanisms over the project's own data, with the list of what changed |
+| 198069 | Prompt engineering: block-structured prompts and schema validation | `src/prompts/v1/*.ts` | Prompt with role, rules, and format, with output validated by schema |
+| 198071 | AI tools for developers: roles, least privilege, and SDD | `src/mcp/tools/propose-remediation.ts` | No MCP tool approves or executes; approval only over HTTP with a token |
+| 198081 | RAG, embeddings, and semantic search: flow and per-environment config | `src/infra/runbooks/runbook-repository.ts`, `src/config.ts` | Section-level search over `runbooks/`; model and provider switched by environment variable |
+| 198082 | RAG, embeddings, and semantic search: minimum score, refusal, and versioned prompts | `src/domain/retrieval/bm25.ts`, `src/prompts/v1/` | Normalized score with a refusal threshold; prompts as versioned config (`<id>.v1`) |
 
-## Módulo 02: APIs, LangGraph e prompts
+## Module 02: APIs, LangGraph, and prompts
 
-| Aula | Tema | Arquivo no projeto | Prática provada |
+| Lesson | Topic | Project file | Practice proven |
 |---|---|---|---|
-| 200953 | Mercado de IA como serviço: gateway de modelos com Fastify e OpenRouter | `src/llm/openrouter-provider.ts`, `src/http/server.ts` | `ChatOpenAI` com `baseURL` configurável; Fastify como servidor HTTP |
-| 200954 | Mercado de IA como serviço: config que falha cedo, versões fixadas e testes com `app.inject` | `src/config.ts`, `.env.example`, `tests/e2e/http.e2e.test.ts` | Config validada por Zod que falha sem ecoar valores; testes HTTP sem abrir porta |
-| 200955 | Série LangChain.js (200955 a 200959): pipeline LangGraph de comandos | `src/graph/graph.ts` | Grafo com estado em Zod 4, sem gerador de template |
-| 200956 | Série LangChain.js: pipeline LangGraph de comandos | `src/graph/state.ts` | Blackboard Zod como estado único do grafo |
-| 200957 | Série LangChain.js: pipeline LangGraph de comandos | `src/graph/routing.ts` | `addConditionalEdges` com funções de rota puras e `pathMap` explícito |
-| 200958 | Série LangChain.js: pipeline LangGraph de comandos | `src/graph/nodes/escalation-node.ts` | Toda rota de falha cai no escalonamento, decidida por código |
-| 200959 | Série LangChain.js: pipeline LangGraph de comandos; leitura sobre humano no laço | `src/app/incident-service.ts` | Pausa para decisão humana com blackboard persistido e retomada explícita |
-| 200960 | Prompt chaining e JSON prompts: etapas com contrato | `src/contracts/*.ts` | Cada etapa do grafo tem schema de entrada e de saída |
-| 200961 | Prompt chaining e JSON prompts: saída estruturada nativa | `src/llm/openrouter-provider.ts` | `withStructuredOutput` com JSON Schema, sem `JSON.parse` manual |
-| 200962 | Prompt chaining e JSON prompts: testes primeiro e fallback seguro | `tests/unit/*`, `src/graph/nodes/reporter-node.ts` | TDD em todo o projeto; narrativa reprovada cai no template |
-| 200963 | Prompt chaining e JSON prompts: "confio, mas confiro", DI pela fábrica e estado parcial | `src/graph/nodes/*.ts` | `safeParse` nos nós de negócio; cada nó recebe só o que usa; nós de ação sem LLM |
-| 200968 | Memória e compactação de contexto: testar estrutura, não texto livre | `tests/e2e/scenarios.e2e.test.ts` | Asserções sobre enums, estado e números, nunca sobre a narrativa |
-| 200969 | Série prompt injection, hijacking e guardrails (200969 a 200972) | `tests/fixtures/llm/injected-logs.json` | Log hostil com instrução embutida chega ao prompt do analista |
-| 200970 | Série prompt injection, hijacking e guardrails | `src/domain/autonomy/catalog.ts` | Catálogo fechado que nega por padrão |
-| 200971 | Série prompt injection, hijacking e guardrails | `src/domain/autonomy/catalog.ts` | Faixa calculada só por código, sem campo de faixa na saída do modelo |
-| 200972 | Série prompt injection, hijacking e guardrails: testes do guardrail | `tests/e2e/injection.e2e.test.ts` | `delete_backups` proposto depois da injeção termina `blocked_forbidden`, com auditoria |
-| 200978 | RAG avançado (Text-to-Cypher): erro antes do sucesso, limite de recursão, falta de testes sem LLM | `src/app/incident-service.ts`, `src/llm/fake-provider.ts` | `recursionLimit` 25 com estado preservado; suíte inteira com fake roteirizado |
-| 200980 | Multimodais e monitoramento com Langfuse: traces, custo e avaliação | `src/llm/recording-provider.ts`, `src/app/stats-service.ts` | Cada chamada vira linha em `llm_calls` com tokens, custo e erro; `/stats` agrega |
+| 200953 | AI-as-a-service market: model gateway with Fastify and OpenRouter | `src/llm/openrouter-provider.ts`, `src/http/server.ts` | `ChatOpenAI` with configurable `baseURL`; Fastify as the HTTP server |
+| 200954 | AI-as-a-service market: fail-fast config, pinned versions, and tests with `app.inject` | `src/config.ts`, `.env.example`, `tests/e2e/http.e2e.test.ts` | Zod-validated config that fails without echoing values; HTTP tests without opening a port |
+| 200955 | LangChain.js series (200955 to 200959): LangGraph command pipeline | `src/graph/graph.ts` | Graph with Zod 4 state, no template generator |
+| 200956 | LangChain.js series: LangGraph command pipeline | `src/graph/state.ts` | Zod blackboard as the graph's single state |
+| 200957 | LangChain.js series: LangGraph command pipeline | `src/graph/routing.ts` | `addConditionalEdges` with pure routing functions and an explicit `pathMap` |
+| 200958 | LangChain.js series: LangGraph command pipeline | `src/graph/nodes/escalation-node.ts` | Every failure route ends in escalation, decided by code |
+| 200959 | LangChain.js series: LangGraph command pipeline; reading on human-in-the-loop | `src/app/incident-service.ts` | Pause for a human decision with a persisted blackboard and explicit resume |
+| 200960 | Prompt chaining and JSON prompts: steps with contracts | `src/contracts/*.ts` | Every graph step has an input and an output schema |
+| 200961 | Prompt chaining and JSON prompts: native structured output | `src/llm/openrouter-provider.ts` | `withStructuredOutput` with JSON Schema, no manual `JSON.parse` |
+| 200962 | Prompt chaining and JSON prompts: tests first and safe fallback | `tests/unit/*`, `src/graph/nodes/reporter-node.ts` | TDD across the project; a rejected narrative falls back to the template |
+| 200963 | Prompt chaining and JSON prompts: "trust, but verify", factory DI, and partial state | `src/graph/nodes/*.ts` | `safeParse` in business nodes; each node gets only what it uses; action nodes have no LLM |
+| 200968 | Memory and context compaction: test structure, not free text | `tests/e2e/scenarios.e2e.test.ts` | Assertions on enums, state, and numbers, never on the narrative |
+| 200969 | Prompt injection, hijacking, and guardrails series (200969 to 200972) | `tests/fixtures/llm/injected-logs.json` | A hostile log with an embedded instruction reaches the analyst's prompt |
+| 200970 | Prompt injection, hijacking, and guardrails series | `src/domain/autonomy/catalog.ts` | Closed catalog that denies by default |
+| 200971 | Prompt injection, hijacking, and guardrails series | `src/domain/autonomy/catalog.ts` | Tier computed only by code, with no tier field in the model's output |
+| 200972 | Prompt injection, hijacking, and guardrails series: guardrail tests | `tests/e2e/injection.e2e.test.ts` | `delete_backups` proposed after the injection ends as `blocked_forbidden`, with audit |
+| 200978 | Advanced RAG (Text-to-Cypher): failure before success, recursion limit, lack of LLM-free tests | `src/app/incident-service.ts`, `src/llm/fake-provider.ts` | `recursionLimit` 25 with state preserved; the whole suite runs on a scripted fake |
+| 200980 | Multimodal models and monitoring with Langfuse: traces, cost, and evaluation | `src/llm/recording-provider.ts`, `src/app/stats-service.ts` | Every call becomes a row in `llm_calls` with tokens, cost, and error; `/stats` aggregates |
 
-## Módulo 03: MCP
+## Module 03: MCP
 
-| Aula | Tema | Arquivo no projeto | Prática provada |
+| Lesson | Topic | Project file | Practice proven |
 |---|---|---|---|
-| 203474 | Construindo uma tool customizada no LangChain | `src/tools/registry.ts`, `src/mcp/tools/*.ts` | Descrições que dizem quando usar a ferramenta; parâmetros Zod |
-| 203477 | Entendendo agents e instructions | `AGENTS.md`, `specs/constitution.md` | Instruções factuais com menos de 100 linhas; dependência nova exige justificativa |
-| 203479 | MCP do zero: testes automatizados via cliente MCP e inspeção | `tests/helpers/mcp-client.ts`, `tests/e2e/mcp.e2e.test.ts` | `Client` e `StdioClientTransport` nos testes; stdout só com JSON-RPC |
-| 203482 | Template inicial, arquitetura e organização de código de um servidor MCP | `src/mcp/create-mcp-server.ts` | Servidor fino sobre os serviços de aplicação |
-| 203483 | Como empresas usam MCP para conectar IA a sistemas legados | `src/mcp/server.ts` | Mesmo store e mesmos schemas da API |
-| 203484 | Tools de listagem e criação | `src/mcp/tools/list-incidents.ts` | Filtro e `LIMIT` em SQL, não em memória |
-| 203485 | Tools de atualização e remoção e uso no VS Code | `src/mcp/tools/propose-remediation.ts` | Cada teste cria os próprios dados; erro sem detalhe interno |
+| 203474 | Building a custom tool in LangChain | `src/tools/registry.ts`, `src/mcp/tools/*.ts` | Descriptions that say when to use the tool; Zod parameters |
+| 203477 | Understanding agents and instructions | `AGENTS.md`, `specs/constitution.md` | Factual instructions under 100 lines; a new dependency requires justification |
+| 203479 | MCP from scratch: automated tests via an MCP client and inspection | `tests/helpers/mcp-client.ts`, `tests/e2e/mcp.e2e.test.ts` | `Client` and `StdioClientTransport` in tests; stdout carries only JSON-RPC |
+| 203482 | Starter template, architecture, and code organization of an MCP server | `src/mcp/create-mcp-server.ts` | Thin server over the application services |
+| 203483 | How companies use MCP to connect AI to legacy systems | `src/mcp/server.ts` | Same store and same schemas as the API |
+| 203484 | Listing and creation tools | `src/mcp/tools/list-incidents.ts` | Filter and `LIMIT` in SQL, not in memory |
+| 203485 | Update and delete tools, and use in VS Code | `src/mcp/tools/propose-remediation.ts` | Each test creates its own data; errors without internal details |
 
-## Módulo 04: agentes
+## Module 04: agents
 
-| Aula | Tema | Arquivo no projeto | Prática provada |
+| Lesson | Topic | Project file | Practice proven |
 |---|---|---|---|
-| 221503 | O agente de código por dentro (GitHub Copilot) | `AGENTS.md` | Instruções do repositório para agentes de código |
-| 221504 | Engenharia de contexto e contrato de permissões | `AGENTS.md` | Regras explícitas do que um agente pode e não pode fazer no repositório |
-| 221505 | Spec-driven development do zero, parte 1 | `specs/00N-*/spec.md` | Critérios de aceite em EARS por marco |
-| 221506 | Spec-driven development do zero, parte 2 | `specs/constitution.md`, `.githooks/pre-commit` | Princípios inegociáveis; hook com typecheck, testes unitários e varredura de segredos |
-| 221507 | Guardrails, revisor e delegação | `scripts/check-secrets.ts` | Guardrail determinístico que valida o resultado |
-| 221508 | Três padrões de raciocínio | `src/graph/nodes/telemetry-node.ts`, `src/graph/nodes/auditor-node.ts` | ReAct no analista e Reflection no auditor |
-| 221509 | Configurando o Spec Kit | `specs/` | Specs numeradas por feature, com constitution |
-| 221510 | Estrutura inicial do projeto com Spec Kit | `src/app/container.ts`, `fixtures/scenarios/` | Composição única para API, MCP, CLI e testes; cenários sintéticos determinísticos em vez de store mockado |
-| 221511 | Definindo o padrão ReAct para o agente | `src/graph/nodes/telemetry-node.ts` | Laço pensamento, ação e observação com teto 12, sem estourar o limite de recursão |
-| 221512 | Definindo o padrão Plan-and-Execute para o agente | `src/graph/nodes/planner-node.ts`, `src/app/trace-sink.ts` | Plano estruturado com até 8 passos; trace tipado persistido |
-| 221513 | Críticas e benchmark com o padrão Reflection | `src/graph/nodes/auditor-node.ts`, `src/domain/audit/auditor-rules.ts` | Veredito Zod com até 2 revisões e piso de regras em código |
-| 221514 | Uma API que também é um agente | `src/http/routes/incidents.ts` | Códigos 400, 422, 503 e 504; timeout de 180 s por execução |
-| 221515 | Especificando a integração com banco de dados | `src/infra/db/sqlite.ts`, `src/infra/db/incident-store.ts` | `node:sqlite`, prepared statements, `:memory:` nos testes |
-| 221516 | Criando e consultando incidentes no banco | `src/infra/db/schema.ts` | `CHECK` gerados dos enums Zod, sem divergência entre SQL e contrato |
-| 221517 | Validando a disponibilidade de provedores externos | `src/tools/registry.ts` | Ferramenta que falha vira `observation` com `ok: false` e o laço segue |
-| 221518 | Disponibilizando o agente via MCP | `src/mcp/server.ts`, `.vscode/mcp.json`, `.cursor/mcp.json` | Segunda porta sobre o mesmo store; logs em stderr |
-| 221522 | O contexto como orçamento: medição e sumarização | `src/llm/usage.ts` | Estimativa de tokens (cerca de 4 caracteres por token) no fake |
-| 221524 | LangGraph e fallback de modelo | `src/llm/resilience.ts` | 2 tentativas no principal, fallback e 503 |
-| 221525 | Criando estratégias de observabilidade | `src/http/request-id.ts`, `src/app/stats-service.ts`, `src/domain/autonomy/catalog.ts` | `X-Request-Id`, logger JSON, `/stats` com P50 e P95 em SQL, faixas 1 a 4 |
-| 221526 | Implementando a War Room | `web/src/` | War Room em React e Vite |
-| 221527 | Publicando a War Room no GitHub Pages | `.github/workflows/pages.yml`, `web/vite.config.ts` | `base` do Vite e deploy só por disparo manual; modo demo no lugar do túnel |
-| 221528 | Implementando multiagentes | `src/graph/nodes/supervisor-node.ts` | Supervisor que só orquestra, `brief`, handoffs no trace, teto de 8 |
+| 221503 | Inside the coding agent (GitHub Copilot) | `AGENTS.md` | Repository instructions for coding agents |
+| 221504 | Context engineering and the permissions contract | `AGENTS.md` | Explicit rules for what an agent may and may not do in the repository |
+| 221505 | Spec-driven development from scratch, part 1 | `specs/00N-*/spec.md` | EARS acceptance criteria per milestone |
+| 221506 | Spec-driven development from scratch, part 2 | `specs/constitution.md`, `.githooks/pre-commit` | Non-negotiable principles; hook with typecheck, unit tests, and secret scanning |
+| 221507 | Guardrails, reviewer, and delegation | `scripts/check-secrets.ts` | Deterministic guardrail that validates the result |
+| 221508 | Three reasoning patterns | `src/graph/nodes/telemetry-node.ts`, `src/graph/nodes/auditor-node.ts` | ReAct in the analyst and Reflection in the auditor |
+| 221509 | Setting up Spec Kit | `specs/` | Numbered specs per feature, with a constitution |
+| 221510 | Initial project structure with Spec Kit | `src/app/container.ts`, `fixtures/scenarios/` | Single composition for API, MCP, CLI, and tests; deterministic synthetic scenarios instead of a mocked store |
+| 221511 | Defining the ReAct pattern for the agent | `src/graph/nodes/telemetry-node.ts` | Thought, action, and observation loop capped at 12, without hitting the recursion limit |
+| 221512 | Defining the Plan-and-Execute pattern for the agent | `src/graph/nodes/planner-node.ts`, `src/app/trace-sink.ts` | Structured plan with up to 8 steps; persisted typed trace |
+| 221513 | Critiques and benchmarking with the Reflection pattern | `src/graph/nodes/auditor-node.ts`, `src/domain/audit/auditor-rules.ts` | Zod verdict with up to 2 revisions and a rule floor in code |
+| 221514 | An API that is also an agent | `src/http/routes/incidents.ts` | Codes 400, 422, 503, and 504; 180 s timeout per run |
+| 221515 | Specifying the database integration | `src/infra/db/sqlite.ts`, `src/infra/db/incident-store.ts` | `node:sqlite`, prepared statements, `:memory:` in tests |
+| 221516 | Creating and querying incidents in the database | `src/infra/db/schema.ts` | `CHECK` constraints generated from Zod enums, no drift between SQL and contract |
+| 221517 | Validating external provider availability | `src/tools/registry.ts` | A failing tool becomes an `observation` with `ok: false` and the loop continues |
+| 221518 | Exposing the agent via MCP | `src/mcp/server.ts`, `.vscode/mcp.json`, `.cursor/mcp.json` | Second port over the same store; logs on stderr |
+| 221522 | Context as a budget: measurement and summarization | `src/llm/usage.ts` | Token estimate (about 4 characters per token) in the fake |
+| 221524 | LangGraph and model fallback | `src/llm/resilience.ts` | 2 attempts on the primary, fallback, and 503 |
+| 221525 | Building observability strategies | `src/http/request-id.ts`, `src/app/stats-service.ts`, `src/domain/autonomy/catalog.ts` | `X-Request-Id`, JSON logger, `/stats` with P50 and P95 in SQL, tiers 1 to 4 |
+| 221526 | Implementing the War Room | `web/src/` | War Room in React and Vite |
+| 221527 | Publishing the War Room on GitHub Pages | `.github/workflows/pages.yml`, `web/vite.config.ts` | Vite `base` and manually triggered deploy only; demo mode instead of a tunnel |
+| 221528 | Implementing multi-agent systems | `src/graph/nodes/supervisor-node.ts` | Supervisor that only orchestrates, `brief`, handoffs in the trace, cap of 8 |
 
-## Módulo 05: UX e UI com IA
+## Module 05: UX and UI with AI
 
-| Aula | Tema | Arquivo no projeto | Prática provada |
+| Lesson | Topic | Project file | Practice proven |
 |---|---|---|---|
-| 210738 | Pix App: design tokens gerados a partir do briefing de marca | `web/src/styles/tokens.css`, `scripts/check-tokens.ts` | Cores só em tokens; varredura que falha com cor literal fora deles |
-| 210739 | Pix App: componente modal acessível | `web/src/components/ApprovalDialog.tsx` | `role="dialog"`, `aria-modal`, foco preso, Escape fecha |
-| 210742 | Pix App: correções de contraste e de layout em tela estreita | `web/src/test/tokens-contrast.test.ts`, `web/src/styles/components.css` | Contraste de 4,5:1 provado por teste; uma coluna em tela estreita |
-| 210744 | CFP Platform: biblioteca de contratos compartilhada entre front e back | `src/contracts/demo-recording.ts` | A War Room importa os schemas do backend |
-| 210745 | CFP Platform: OpenSpec com non-goals | `specs/00N-*/spec.md` | Seção `## Non-goals` em cada spec |
-| 210748 | CFP Platform: agente assíncrono entregando por PR, sem escrita na branch principal | `AGENTS.md` | Nada é publicado sem validação humana |
-| 210764 | BragBot: interface com mock primeiro | `web/src/data/demo-source.ts` | War Room que roda só com gravações, sem backend |
-| 210765 | BragBot: flow com Zod e validação em runtime | `web/src/data/demo-source.ts` | Gravação validada por `DemoRecordingSchema` no navegador; inválida vira erro explícito |
+| 210738 | Pix App: design tokens generated from the brand brief | `web/src/styles/tokens.css`, `scripts/check-tokens.ts` | Colors only in tokens; a scan that fails on literal colors outside them |
+| 210739 | Pix App: accessible modal component | `web/src/components/ApprovalDialog.tsx` | `role="dialog"`, `aria-modal`, focus trap, Escape closes |
+| 210742 | Pix App: contrast and narrow-screen layout fixes | `web/src/test/tokens-contrast.test.ts`, `web/src/styles/components.css` | 4.5:1 contrast proven by test; single column on narrow screens |
+| 210744 | CFP Platform: contract library shared between front end and back end | `src/contracts/demo-recording.ts` | The War Room imports the backend schemas |
+| 210745 | CFP Platform: OpenSpec with non-goals | `specs/00N-*/spec.md` | A `## Non-goals` section in every spec |
+| 210748 | CFP Platform: async agent delivering via PR, with no writes to the main branch | `AGENTS.md` | Nothing is published without human validation |
+| 210764 | BragBot: mock-first interface | `web/src/data/demo-source.ts` | War Room that runs on recordings alone, without a backend |
+| 210765 | BragBot: flow with Zod and runtime validation | `web/src/data/demo-source.ts` | Recording validated by `DemoRecordingSchema` in the browser; an invalid one becomes an explicit error |
 
-## Módulo 06: AIOps e engenharia agêntica
+## Module 06: AIOps and agentic engineering
 
-| Aula | Tema | Arquivo no projeto | Prática provada |
+| Lesson | Topic | Project file | Practice proven |
 |---|---|---|---|
-| 213409 | Agentes para Kubernetes (K8s AI-Ops): canário | `src/domain/canary/canary-analyzer.ts` | Limiar de 5% de 5xx em código |
-| 213410 | Agentes para Kubernetes (K8s AI-Ops): desafio de fazer o canário falhar | `tests/e2e/gate.e2e.test.ts` | Cenário com séries ruins reprova o canário e reverte as ações |
-| 213411 | Série troubleshooting e diagnóstico com ReAct (213411 a 213413) | `src/tools/query-metrics.ts` | Métricas de séries sintéticas determinísticas |
-| 213412 | Série troubleshooting e diagnóstico com ReAct | `src/tools/query-logs.ts`, `src/tools/list-deploys.ts` | Logs agrupados por mensagem e versão; deploy suspeito com versão anterior |
-| 213413 | Série troubleshooting e diagnóstico com ReAct | `src/contracts/diagnosis.ts` | Diagnóstico com categoria em enum, confiança e evidências citadas |
-| 213417 | Série ChatOps e governança com humano no laço (213417 a 213419) | `src/app/approval-service.ts` | Decisão humana por HTTP, com token |
-| 213418 | Série ChatOps e governança: o segredo de aprovação | `src/infra/redact.ts`, `tests/e2e/secrets.e2e.test.ts` | Token fora do código e redigido nas 7 superfícies de saída |
-| 213419 | Série ChatOps e governança | `src/domain/approval/parse-decision.ts` | Lista fechada de termos; o resto é ambíguo e recebe 422 |
-| 213428 | FinOps e otimização de custos (inspiração) | `src/domain/finops/inventory-audit.ts` | Volume sem anexo, IP sem associação e instância superdimensionada |
-| 213429 | FinOps e otimização de custos (inspiração) | `data/cloud-prices.json`, `tests/unit/inventory-audit.unit.test.ts` | Economia mensal calculada de inventário e preços próprios |
-| 213430 | RAG de runbooks e post-mortem automático | `runbooks/`, `src/infra/runbooks/runbook-repository.ts` | BM25 por seção, com recusa abaixo do limiar |
-| 213431 | RAG de runbooks e post-mortem automático | `src/domain/report/postmortem-template.ts` | Post-mortem com resumo, causa, ação e prevenção; template determinístico |
-| 213437 | Auto-remediação segura com guardrails | `src/infra/simulated-infra.ts`, `src/graph/nodes/gate-node.ts` | Dry run antes de qualquer fila; circuit breaker e rate limit |
-| 213438 | Auto-remediação segura com guardrails | `src/domain/approval/approval-machine.ts` | Máquina de estados em código; rejeição cancela dependentes |
-| 213439 | Projeto integrador (Nexus Manager): orquestração hierárquica | `src/graph/graph.ts` | Supervisor coordenando especialistas |
-| 213440 | Projeto integrador (Nexus Manager): delegação e relatório | `src/graph/nodes/reporter-node.ts` | Relator que só redige a partir de fatos calculados |
-| 213441 | Projeto integrador (Nexus Manager): relatório de valor e ROI | `src/domain/metrics/incident-metrics.ts`, `src/domain/report/numeric-guard.ts` | MTTR de dados; ROI só como faixa ilustrativa; guarda numérico |
-| 213487 | Série o que fazer com IA em DevOps (213487 a 213489) | `docs/architecture.md` | Arquitetura documentada para quem avalia o projeto |
-| 213488 | Série o que fazer com IA em DevOps | `fixtures/scenarios/cost-anomaly/` | Cenário FinOps com Reflection e passo proibido |
-| 213489 | Série o que fazer com IA em DevOps: portfólio com incidentes reais | `docs/incidents/` | Post-mortems de falhas reais da construção |
-| 213495 | Podcast sobre supply chain: automação determinística para ação destrutiva | `src/domain/autonomy/catalog.ts` | A regra decide a faixa de ação destrutiva, não o modelo |
+| 213409 | Agents for Kubernetes (K8s AI-Ops): canary | `src/domain/canary/canary-analyzer.ts` | 5% 5xx threshold in code |
+| 213410 | Agents for Kubernetes (K8s AI-Ops): the challenge of making the canary fail | `tests/e2e/gate.e2e.test.ts` | Scenario with bad series fails the canary and reverts the actions |
+| 213411 | Troubleshooting and diagnosis with ReAct series (213411 to 213413) | `src/tools/query-metrics.ts` | Metrics from deterministic synthetic series |
+| 213412 | Troubleshooting and diagnosis with ReAct series | `src/tools/query-logs.ts`, `src/tools/list-deploys.ts` | Logs grouped by message and version; suspect deploy with its previous version |
+| 213413 | Troubleshooting and diagnosis with ReAct series | `src/contracts/diagnosis.ts` | Diagnosis with an enum category, confidence, and cited evidence |
+| 213417 | ChatOps and governance with human-in-the-loop series (213417 to 213419) | `src/app/approval-service.ts` | Human decision over HTTP, with a token |
+| 213418 | ChatOps and governance series: the approval secret | `src/infra/redact.ts`, `tests/e2e/secrets.e2e.test.ts` | Token kept out of code and redacted on all 7 output surfaces |
+| 213419 | ChatOps and governance series | `src/domain/approval/parse-decision.ts` | Closed list of terms; anything else is ambiguous and gets 422 |
+| 213428 | FinOps and cost optimization (inspiration) | `src/domain/finops/inventory-audit.ts` | Unattached volume, unassociated IP, and oversized instance |
+| 213429 | FinOps and cost optimization (inspiration) | `data/cloud-prices.json`, `tests/unit/inventory-audit.unit.test.ts` | Monthly savings computed from the project's own inventory and prices |
+| 213430 | Runbook RAG and automatic post-mortem | `runbooks/`, `src/infra/runbooks/runbook-repository.ts` | Section-level BM25, with refusal below the threshold |
+| 213431 | Runbook RAG and automatic post-mortem | `src/domain/report/postmortem-template.ts` | Post-mortem with summary, cause, action, and prevention; deterministic template |
+| 213437 | Safe auto-remediation with guardrails | `src/infra/simulated-infra.ts`, `src/graph/nodes/gate-node.ts` | Dry run before any queue; circuit breaker and rate limit |
+| 213438 | Safe auto-remediation with guardrails | `src/domain/approval/approval-machine.ts` | State machine in code; rejection cancels dependents |
+| 213439 | Capstone project (Nexus Manager): hierarchical orchestration | `src/graph/graph.ts` | Supervisor coordinating specialists |
+| 213440 | Capstone project (Nexus Manager): delegation and reporting | `src/graph/nodes/reporter-node.ts` | Reporter that only writes from computed facts |
+| 213441 | Capstone project (Nexus Manager): value and ROI report | `src/domain/metrics/incident-metrics.ts`, `src/domain/report/numeric-guard.ts` | MTTR from data; ROI only as an illustrative range; numeric guard |
+| 213487 | What to do with AI in DevOps series (213487 to 213489) | `docs/architecture.md` | Architecture documented for whoever evaluates the project |
+| 213488 | What to do with AI in DevOps series | `fixtures/scenarios/cost-anomaly/` | FinOps scenario with Reflection and a forbidden step |
+| 213489 | What to do with AI in DevOps series: portfolio with real incidents | `docs/incidents/` | Post-mortems of real failures during the build |
+| 213495 | Podcast on supply chain: deterministic automation for destructive actions | `src/domain/autonomy/catalog.ts` | The rule decides the tier of a destructive action, not the model |
 
-## Padrões do módulo 06 em TypeScript
+## Module 06 patterns in TypeScript
 
-O módulo 06 usa Python e CrewAI. Este projeto reimplementa os padrões em TypeScript com LangGraph:
+Module 06 uses Python and CrewAI. This project reimplements the patterns in TypeScript with LangGraph:
 
-| No curso (Python e CrewAI) | No projeto (TypeScript e LangGraph) |
+| In the course (Python and CrewAI) | In the project (TypeScript and LangGraph) |
 |---|---|
-| `Agent(role, goal, backstory)` | Fábrica de nó (`createXNode(deps)`) e prompt versionado |
-| `Crew` sequencial | Arestas fixas do `StateGraph` (planejador para auditor) |
-| `manager_agent` com delegação | Nó supervisor com `SupervisorDecisionSchema` e guarda de pré-condições em código |
-| Tools simuladas por condicionais | Ferramentas com parâmetros Zod sobre séries sintéticas geradas por especificação determinística |
-| Runbook consultado por parâmetro de serviço | BM25 sobre seções de runbooks com frontmatter, limiar normalizado e recusa |
-| Senha de aprovação no código | Token em `APPROVAL_TOKEN`, comparação em tempo constante, redação em todas as saídas |
-| Aprovação "sim/não" interpretada pelo agente | Máquina de estados em código com lista fechada de termos |
-| Canário que não falhava | Função pura com cenário de métricas ruins e reversão automática |
-| ROI escrito pelo gerente | Funções puras de métricas, ROI como faixa ilustrativa e guarda numérico na narrativa |
-| Log com hash da execução | `runId`, `requestId`, trace persistido e auditoria encadeada por hash |
+| `Agent(role, goal, backstory)` | Node factory (`createXNode(deps)`) and versioned prompt |
+| Sequential `Crew` | Fixed `StateGraph` edges (planner to auditor) |
+| `manager_agent` with delegation | Supervisor node with `SupervisorDecisionSchema` and a precondition guard in code |
+| Tools simulated with conditionals | Tools with Zod parameters over synthetic series generated from a deterministic spec |
+| Runbook looked up by service parameter | BM25 over runbook sections with frontmatter, normalized threshold, and refusal |
+| Approval password in code | Token in `APPROVAL_TOKEN`, constant-time comparison, redaction on every output |
+| "Yes/no" approval interpreted by the agent | State machine in code with a closed list of terms |
+| Canary that never failed | Pure function with a bad-metrics scenario and automatic rollback |
+| ROI written by the manager | Pure metric functions, ROI as an illustrative range, and a numeric guard on the narrative |
+| Log with a run hash | `runId`, `requestId`, persisted trace, and hash-chained audit log |
