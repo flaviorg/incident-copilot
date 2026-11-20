@@ -1,5 +1,5 @@
-// Varredura de segredos do repositório (Tarefa 44; spec 6.6 e AC-41). Os valores positivos são montados em tempo de
-// execução, para o próprio arquivo de teste não casar na varredura do repositório.
+// Repository secret scan (Task 44; spec 6.6 and AC-41). The positive values are built at
+// run time, so the test file itself does not match in the repository scan.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -34,8 +34,8 @@ test("generated and ignored paths are skipped", () => {
   assert.ok(files.includes("package.json") && files.includes("src/config.ts"));
 });
 
-// Revisão final: o .env local (no .gitignore) é o caminho documentado para usar o modelo real e não pode quebrar o
-// pre-commit. Ele só entra na varredura se estiver rastreado pelo Git.
+// Final review: the local .env (in .gitignore) is the documented way to use the real model and must not break the
+// pre-commit. It only enters the scan if tracked by Git.
 function projectWithLocalEnv(): string {
   const root = mkdtempSync(join(tmpdir(), "ic-secrets-"));
   mkdirSync(join(root, "src"));
@@ -65,4 +65,9 @@ test("a local .env tracked by Git is scanned and reported", () => {
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("an API_TOKEN assignment with a value is a secret", () => {
+  assert.equal(scanText("API_TOKEN" + "=abcdefgh123", "x").length, 1);
+  assert.deepEqual(scanText("API_TOKEN=", "x"), []);
 });

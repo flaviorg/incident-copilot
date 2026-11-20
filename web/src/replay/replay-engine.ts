@@ -1,13 +1,13 @@
-// Motor de reprodução das gravações (spec 10.2; AC-39), puro e sem relógio: avança um evento por passo, para no fim
-// do prefixo comum quando há ramos e nenhum foi escolhido, e segue pelo ramo escolhido até o fim. A War Room não
-// calcula nada: o estado mostrado é sempre um dos instantâneos gravados pelo backend.
+// Recording replay engine (spec 10.2; AC-39), pure and clockless: advances one event per step, stops at the end
+// of the common prefix when there are branches and none is chosen, and follows the chosen branch to the end. The War Room does not
+// compute anything: the state shown is always one of the snapshots recorded by the backend.
 import type { DemoRecording, RecordingBranch, TraceEvent } from "@contracts";
 
 export type Branch = "approved" | "rejected";
 
 export type ReplayState = {
   recording: DemoRecording;
-  /** Quantos eventos já estão visíveis. */
+  /** How many events are already visible. */
   cursor: number;
   branch: Branch | null;
   pausedAtGate: boolean;
@@ -30,13 +30,13 @@ export function createReplay(r: DemoRecording): ReplayState {
   return settle({ recording: r, cursor: 0, branch: null, pausedAtGate: false, finished: false });
 }
 
-/** Avança um evento. Parado no portão ou no fim, devolve o mesmo estado. */
+/** Advances one event. Stopped at the gate or at the end, returns the same state. */
 export function step(s: ReplayState): ReplayState {
   if (s.pausedAtGate || s.finished) return s;
   return settle({ ...s, cursor: s.cursor + 1 });
 }
 
-/** Escolhe o ramo gravado; só vale parado no portão. */
+/** Chooses the recorded branch; only valid while stopped at the gate. */
 export function choose(s: ReplayState, b: Branch): ReplayState {
   if (!s.pausedAtGate || s.branch !== null || s.recording.branches === null) return s;
   return settle({ ...s, branch: b, pausedAtGate: false });
@@ -47,9 +47,9 @@ export function visibleEvents(s: ReplayState): TraceEvent[] {
 }
 
 /**
- * Instantâneo do ponto atual. Até o portão (e enquanto o ramo é reproduzido), incidente, métricas e post-mortem são os
- * do prefixo comum; as aprovações do ramo valem desde a escolha, porque a decisão já foi tomada. No fim do ramo, tudo
- * vem do ramo, com a auditoria acumulada.
+ * Snapshot of the current point. Up to the gate (and while the branch plays), incident, metrics and post-mortem are those
+ * of the common prefix; the branch's approvals apply from the choice onward, because the decision has already been made. At the end of the branch, everything
+ * comes from the branch, with the accumulated audit.
  */
 export function currentSnapshot(s: ReplayState): RecordingBranch {
   const { common, branches } = s.recording;

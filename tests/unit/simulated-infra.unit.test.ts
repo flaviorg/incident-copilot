@@ -43,14 +43,14 @@ test("initial world: deployments with history, inventory and a frozen copy of it
 test("rollback dry run, execution, healthy signals and revert", () => {
   const dry = infra.dryRun(w0, rollback);
   assert.deepEqual(dry, { ok: true, changes: ["deployment/orders-api: v3.8.0 -> v3.7.2 (6 replicas)"], reversible: true, estimatedDurationSec: 90, failureReason: null });
-  assert.equal(infra.facts(w0)["deployment.orders-api.version"], "v3.8.0"); // dry run não muda o mundo
+  assert.equal(infra.facts(w0)["deployment.orders-api.version"], "v3.8.0"); // dry run does not change the world
   const { world: w1, result } = infra.execute(w0, rollback, deploy);
   assert.equal(result.ok, true);
   assert.equal(result.summary, "deployment/orders-api: v3.8.0 -> v3.7.2 (6 replicas)");
   assert.equal(infra.facts(w1)["deployment.orders-api.version"], "v3.7.2");
   assert.ok(Math.max(...infra.postActionSignals(w1, deploy).metrics.http_5xx_rate!) <= 0.05);
   assert.ok(Math.min(...infra.postActionSignals(w0, deploy).metrics.http_5xx_rate!) > 0.05);
-  assert.equal(infra.postActionSignals(w1, deploy).metrics.p99_latency_ms!.length, 7); // 60 s em passos de 10 s
+  assert.equal(infra.postActionSignals(w1, deploy).metrics.p99_latency_ms!.length, 7); // 60 s in 10 s steps
   const reverted = infra.revert(w1, gated(rollback, "succeeded"));
   assert.equal(reverted.result.ok, true);
   assert.deepEqual(reverted.world.deployments["orders-api"], w0.deployments["orders-api"]);
@@ -81,7 +81,7 @@ test("apply accumulates effects for the sequential dry run of the gate", () => {
   assert.deepEqual(w0.deployments["orders-api"]!.blockedTags, []); // efeito puro
   const note = infra.apply(w0, { actionType: "add_incident_note", target: "incident/orders-api", params: { text: "rollback pedido" } });
   assert.deepEqual(note.notes, ["rollback pedido"]);
-  // Só ações reversíveis revertem.
+  // Only reversible actions revert.
   const noRevert = infra.revert(note, gated({ actionType: "add_incident_note", target: "incident/orders-api", params: { text: "x" } }, "succeeded"));
   assert.deepEqual([noRevert.result.ok, noRevert.world], [false, note]);
   assert.deepEqual(infra.revert(w2, gated(block, "succeeded")).world.deployments["orders-api"]!.blockedTags, []);
@@ -115,7 +115,7 @@ test("cost actions lower the projected monthly cost by the finding savings", () 
   assert.equal(infra.monthlySavingsFor(gated(rollback, "succeeded"), w0), 0);
   assert.deepEqual(w.snapshots, ["volume/data-platform/vol-0c41d2"]);
   assert.deepEqual(w.tagsForReview, ["volume/data-platform/vol-0c41d2"]);
-  // Reverter o resize volta ao tipo original do inventário inicial.
+  // Reverting the resize returns to the original type from the initial inventory.
   const resize = steps[4]!;
   const back = infra.revert(w, gated(resize, "succeeded")).world;
   assert.equal(back.inventory!.instances.find((i) => i.id === "i-07ab3")!.type, "r6i.2xlarge");
@@ -127,7 +127,7 @@ test("fault injection makes execute fail without changing the world", () => {
   assert.equal(r.result.ok, false);
   assert.match(r.result.summary, /failure injected/);
   assert.equal(r.world, w0);
-  // Dry run que passou no portão pode falhar na execução se o mundo mudou.
+  // A dry run that passed the gate can fail on execution if the world changed.
   const moved = infra.apply(w0, rollback);
   const again = infra.execute(moved, rollback, deploy);
   assert.deepEqual([again.result.ok, again.result.summary], [false, "deployment/orders-api already runs v3.7.2"]);

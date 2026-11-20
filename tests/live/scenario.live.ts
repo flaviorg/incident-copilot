@@ -1,6 +1,6 @@
-// Teste ao vivo opcional (spec 8.1 e 8.2): roda o cenário de deploy contra o OpenRouter e afirma só estrutura.
-// Fica fora do glob do npm test e é pulado sem OPENROUTER_API_KEY. Rode com `npm run test:live` e um .env com
-// OPENROUTER_API_KEY e OPENROUTER_MODEL. Não mede qualidade do modelo: só confere que os contratos se mantêm.
+// Optional live test (spec 8.1 and 8.2): runs the deploy scenario against OpenRouter and asserts structure only.
+// It is outside the npm test glob and is skipped without OPENROUTER_API_KEY. Run with `npm run test:live` and a .env with
+// OPENROUTER_API_KEY and OPENROUTER_MODEL. It does not measure model quality: it only checks that the contracts hold.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
@@ -25,13 +25,13 @@ test("deploy scenario against OpenRouter keeps the contracts", { skip: !process.
     try {
       view = await c.incidents.open({ scenarioId: SCENARIO }, { requestId: "live-test" });
     } catch (e) {
-      // LLM indisponível ou timeout: o incidente já foi gravado escalado, com relatório parcial pelo template.
+      // LLM unavailable or timeout: the incident was already saved as escalated, with a partial report from the template.
       if (!(e instanceof LlmUnavailableError || e instanceof RunTimeoutError)) throw e;
       view = c.incidents.get(c.incidents.list({ limit: 1 })[0]!.id);
     }
     const id = view.incident.id;
 
-    // O humano do teste aprova tudo o que o portão pedir; a retomada roda pelo mesmo caminho da API.
+    // The test human approves everything the gate asks for; the resume runs through the same path as the API.
     for (;;) {
       const pending = c.store.listApprovals({ incidentId: id }).find((a) => effectiveStatus(a, c.clock.now()) === "pending");
       if (!pending) break;
@@ -44,12 +44,12 @@ test("deploy scenario against OpenRouter keeps the contracts", { skip: !process.
     for (const step of view.plan?.steps ?? []) {
       const action = view.actions.find((a) => a.order === step.order && a.actionType === step.actionType);
       const blocked = action !== undefined && ["blocked_forbidden", "blocked_unknown"].includes(action.status);
-      assert.ok(isExecutable(step.actionType) || blocked, `passo ${step.order} (${step.actionType}) fora do catálogo e não bloqueado`);
+      assert.ok(isExecutable(step.actionType) || blocked, `step ${step.order} (${step.actionType}) is outside the catalog and was not blocked`);
     }
     for (const a of view.actions) assert.ok(a.tier >= 1 && a.tier <= 4);
 
     const pm = c.incidents.postmortem(id);
-    assert.ok(pm.numericGuard.passed || pm.numericGuard.usedTemplate, "a narrativa reprovou no guarda numérico e o template não foi usado");
+    assert.ok(pm.numericGuard.passed || pm.numericGuard.usedTemplate, "the narrative failed the numeric guard and the template was not used");
   } finally {
     c.close();
   }

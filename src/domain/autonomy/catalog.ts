@@ -1,6 +1,6 @@
-// Matriz de Autonomia e catálogo de ações (spec 6.4). Puro. A faixa vem só daqui e de regras de contexto que só sobem;
-// a saída do LLM não tem campo de faixa. Faixa 4 é proibida por construção: os tipos proibidos não pertencem a
-// ExecutableActionType, então nenhum registro de executores tipado por ele consegue executá-los.
+// Autonomy Matrix and action catalog (spec 6.4). Pure. The tier comes only from here and from context rules that only raise it;
+// the LLM output has no tier field. Tier 4 is forbidden by construction: the forbidden types do not belong to
+// ExecutableActionType, so no executor registry typed by it can execute them.
 import * as z from "zod";
 import type { Tier } from "../../contracts/index.ts";
 
@@ -13,7 +13,7 @@ export type ActionSpec = {
   durationSec: number;
   targetKind: TargetKind;
   paramsSchema: z.ZodType<Record<string, unknown>>;
-  /** Alvo esperado e parâmetros como texto, para o prompt do planejador e para a matriz. */
+  /** Expected target and parameters as text, for the planner prompt and for the matrix. */
   targetPattern: string;
   paramsText: string;
   description: string;
@@ -79,7 +79,7 @@ export type ForbiddenActionType = (typeof FORBIDDEN_ACTIONS)[number];
 
 export const EXECUTABLE_ACTION_TYPES = Object.keys(EXECUTABLE_ACTIONS) as ExecutableActionType[];
 
-/** Motivos (texto fixo, usados em trace e auditoria). */
+/** Reasons (fixed text, used in trace and audit). */
 export const REASONS = {
   forbidden: "forbidden by construction (tier 4)",
   unknown: "type not in catalog: deny by default",
@@ -135,7 +135,7 @@ export function runbookRefsOf(matches: readonly { runbookId: string; section: st
 }
 export type Classification = { tier: Tier; reasons: string[]; known: boolean; executable: boolean; paramsOk: boolean; params: Record<string, unknown> | null };
 
-/** incident/<id do incidente> sempre; senão o 2º segmento do alvo (antes de ":") precisa ser o serviço ou a conta. */
+/** incident/<incident id> always; otherwise the target's 2nd segment (before ":") must be the service or the account. */
 export function targetInScope(target: string, scope: ClassificationContext["scope"]): boolean {
   const segments = target.split("/");
   if (segments.length < 2) return false;

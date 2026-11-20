@@ -1,8 +1,8 @@
-// Portão de remediação (spec 4.6, 5.1 passo 8, 6.4 e AC-10 a AC-12). Sem LLM: classifica cada passo pelo catálogo,
-// valida parâmetros e roda o dry run em sequência sobre um mundo hipotético que acumula o efeito dos passos aceitos.
-// Faixa 4 ou tipo desconhecido é bloqueado sem dry run; faixa 2 com dry run ok fica pronta; faixa 3 com dry run ok
-// pede aprovação humana. Nada executa aqui. As decisões do lote saem juntas no fim (um dry run leva 2 s simulados),
-// então os pedidos de aprovação têm o instante em que o portão entrega o lote ao humano.
+// Remediation gate (spec 4.6, 5.1 step 8, 6.4 and AC-10 to AC-12). No LLM: classifies each step by the catalog,
+// validates parameters and runs the dry run in sequence over a hypothetical world that accumulates the effect of accepted steps.
+// Tier 4 or unknown type is blocked without a dry run; tier 2 with a good dry run becomes ready; tier 3 with a good dry run
+// asks for human approval. Nothing executes here. The batch decisions come out together at the end (a dry run takes 2 simulated s),
+// so the approval requests carry the instant at which the gate hands the batch to the human.
 import type { Approval, AuditEntry, AuditEvent, GatedAction, PlanStep } from "../../contracts/index.ts";
 import type { NewAuditEntry } from "../../infra/db/incident-store.ts";
 import type { SimulatedInfra } from "../../infra/simulated-infra.ts";
@@ -14,17 +14,17 @@ import type { TraceSink } from "../../app/trace-sink.ts";
 import { runContextOf } from "../run-context.ts";
 import type { NodeFn } from "../run-context.ts";
 
-/** Gravação das ações, aprovações e auditoria (container: store.upsertAction, store.createApproval, store.appendAudit). */
+/** Writes of actions, approvals and audit (container: store.upsertAction, store.createApproval, store.appendAudit). */
 export type GatePersist = { action(a: GatedAction): void; approval(a: Approval): void; audit(e: NewAuditEntry): AuditEntry };
 
 export type GateDeps = { infra: SimulatedInfra; trace: TraceSink; clock: Clock; ids: Ids; approvalTtlMin: number; persist: GatePersist };
 
-/** Duração simulada de um dry run (spec 7.5). */
+/** Simulated duration of a dry run (spec 7.5). */
 export const DRY_RUN_SEC = 2;
 
 const ACCEPTED: readonly GatedAction["status"][] = ["ready", "awaiting_approval"];
 
-/** Argumentos do evento `action` no trace: o alvo primeiro, depois os parâmetros. */
+/** Arguments of the `action` event in the trace: the target first, then the parameters. */
 export function actionArgs(a: Pick<GatedAction, "target" | "params">): Record<string, unknown> {
   const { target: _ignored, ...params } = a.params;
   return { target: a.target, ...params };
@@ -41,7 +41,7 @@ export function createGateNode(d: GateDeps): NodeFn {
     const knownRunbookRefs = runbookRefsOf(state.runbookMatches);
     const steps: PlanStep[] = [...state.plan.steps].sort((a, b) => a.order - b.order);
 
-    // 1. Avalia o lote em ordem, com o mundo hipotético acumulando o efeito dos passos aceitos.
+    // 1. Evaluates the batch in order, with the hypothetical world accumulating the effect of accepted steps.
     let world = state.world;
     const evaluated: Evaluated[] = [];
     for (const step of steps) {
@@ -81,7 +81,7 @@ export function createGateNode(d: GateDeps): NodeFn {
       action.dryRun = dry;
       if (!dry.ok) {
         action.status = "rejected_by_dry_run";
-        evaluated.push({ action, event: "action_dry_run_failed", summary: `${head}: dry run falhou (${dry.failureReason})` });
+        evaluated.push({ action, event: "action_dry_run_failed", summary: `${head}: dry run failed (${dry.failureReason})` });
         continue;
       }
       world = d.infra.apply(world, validated);
@@ -95,7 +95,7 @@ export function createGateNode(d: GateDeps): NodeFn {
       }
     }
 
-    // 2. Publica as decisões do lote no mesmo instante: aprovações, trace, ações e auditoria, na ordem do plano.
+    // 2. Publishes the batch decisions at the same instant: approvals, trace, actions and audit, in plan order.
     const now = d.clock.now();
     const expiresAt = new Date(now.getTime() + d.approvalTtlMin * 60_000).toISOString();
     const pending: string[] = [];

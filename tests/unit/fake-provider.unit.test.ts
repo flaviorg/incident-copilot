@@ -44,7 +44,7 @@ test("each incident replays the script from the start (same scenario, same proce
   const r3 = await f.generate(echo, { n: 1 }, ctx);
   assert.ok(r3.success && r3.data.ok === false, "the 1st incident continues from where it stopped");
   assert.deepEqual(f.consumedIds(), ["a", "a", "b"]);
-  f.assertAllConsumed(); // a e b foram consumidos por algum incidente
+  f.assertAllConsumed(); // a and b were consumed by some incident
   await assert.rejects(f.generate(echo, { n: 1 }, ctx), (e) => e instanceof UnscriptedLlmCallError && e.turnsConsumed === 2);
 });
 
@@ -96,7 +96,7 @@ test("assertAllConsumed lists leftovers and honors except", async () => {
   await f.generate(echo, { n: 1 }, ctx);
   assert.throws(() => f.assertAllConsumed(), /\bb\b/);
   assert.doesNotThrow(() => f.assertAllConsumed({ except: ["b"] }));
-  // Com scenarioId, só o roteiro daquele cenário conta (o container carrega as fixtures de todos).
+  // With scenarioId, only that scenario's script counts (the container loads the fixtures of all).
   const other: FixtureFile = { ...fx([T("z", { n: 1 }, { ok: true })]), scenarioId: "s2" };
   const g = new FakeLlmProvider({ fixtures: [fx([T("a", { n: 1 }, { ok: true })]), other] });
   await g.generate(echo, { n: 1 }, ctx);

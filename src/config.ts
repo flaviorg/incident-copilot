@@ -1,4 +1,4 @@
-// Lê e valida o ambiente com Zod e falha cedo (spec 5.6). Não lê `.env`: o Node faz isso com --env-file-if-exists.
+// Reads and validates the environment with Zod and fails early (spec 5.6). It does not read `.env`: Node does that with --env-file-if-exists.
 import * as z from "zod";
 
 export type LlmProviderName = "fake" | "openrouter";
@@ -14,7 +14,13 @@ export type Config = {
   dbPath: string;
   host: string;
   port: number;
+  /** Extra names accepted in the Host header (lowercase, `name` or `name:port`), besides the loopback names and HOST. */
+  allowedHosts: string[];
+  /** Incident runs started by POST /incidents allowed at the same time. */
+  maxConcurrentRuns: number;
   approvalToken: string | null;
+  /** Bearer token for every HTTP route but /health. Required when HOST is not loopback (assertApiExposureSafe). */
+  apiToken: string | null;
   approvalTtlMin: number;
   actionRateLimitPerMin: number;
   actionRepeatWindowMin: number;
@@ -24,7 +30,7 @@ export type Config = {
   logLevel: "debug" | "info" | "warn" | "error";
 };
 
-/** Erro de configuração. A mensagem lista as variáveis com problema e a regra, nunca os valores. */
+/** Configuration error. The message lists the offending variables and the rule, never the values. */
 export class ConfigError extends Error {
   readonly variables: string[];
   constructor(problems: { variable: string; rule: string }[]) {
@@ -36,14 +42,17 @@ export class ConfigError extends Error {
 
 const APPROVAL_TOKEN_MIN_LENGTH = 16;
 
-// Regra legível por variável. A mensagem de erro usa só isto, nunca o texto do Zod (que poderia citar a entrada).
+// Readable rule per variable. The error message uses only this, never Zod's text (which could quote the input).
 const RULES: Record<string, string> = {
   LLM_PROVIDER: "use fake or openrouter",
   LLM_BASE_URL: "must be a URL",
   LLM_TIMEOUT_MS: "positive integer",
   RUN_TIMEOUT_MS: "positive integer",
   PORT: "positive integer",
+  ALLOWED_HOSTS: "comma-separated host names, optionally with :port",
+  MAX_CONCURRENT_RUNS: "positive integer",
   APPROVAL_TOKEN: `at least ${APPROVAL_TOKEN_MIN_LENGTH} characters when set`,
+  API_TOKEN: `at least ${APPROVAL_TOKEN_MIN_LENGTH} characters when set`,
   APPROVAL_TTL_MIN: "positive integer",
   ACTION_RATE_LIMIT_PER_MIN: "positive integer",
   ACTION_REPEAT_WINDOW_MIN: "positive integer",
@@ -66,7 +75,10 @@ const EnvSchema = z.object({
   DB_PATH: z.string().default("./data/incident-copilot.db"),
   HOST: z.string().default("127.0.0.1"),
   PORT: positiveInt(3000),
+  ALLOWED_HOSTS: z.string().regex(/^[A-Za-z0-9.\-:\[\], ]+$/).optional(),
+  MAX_CONCURRENT_RUNS: positiveInt(2),
   APPROVAL_TOKEN: z.string().min(APPROVAL_TOKEN_MIN_LENGTH).optional(),
+  API_TOKEN: z.string().min(APPROVAL_TOKEN_MIN_LENGTH).optional(),
   APPROVAL_TTL_MIN: positiveInt(30),
   ACTION_RATE_LIMIT_PER_MIN: positiveInt(5),
   ACTION_REPEAT_WINDOW_MIN: positiveInt(10),
@@ -77,7 +89,7 @@ const EnvSchema = z.object({
 });
 
 export function loadConfig(env: Record<string, string | undefined>, opts: { forceFake?: boolean } = {}): Config {
-  // Strings vazias (ou só espaços) contam como ausentes.
+  // Empty strings (or whitespace only) count as unset.
   const cleaned: Record<string, string> = {};
   for (const key of Object.keys(EnvSchema.shape)) {
     const value = env[key];
@@ -98,9 +110,14 @@ export function loadConfig(env: Record<string, string | undefined>, opts: { forc
   }
   const e = parsed.data;
 
-  // Autodetecção (spec 5.6): sem LLM_PROVIDER, a chave liga o openrouter; LLM_PROVIDER=fake e forceFake vencem a chave.
+  // Autodetection (spec 5.6): without LLM_PROVIDER, the key turns on openrouter; LLM_PROVIDER=fake and forceFake win over the key.
   let llmProvider: LlmProviderName = e.LLM_PROVIDER ?? (e.OPENROUTER_API_KEY ? "openrouter" : "fake");
   if (opts.forceFake) llmProvider = "fake";
+
+  // One token must not open both doors: the API token reaches every route, the approval token decides tier 3.
+  if (e.API_TOKEN && e.API_TOKEN === e.APPROVAL_TOKEN) {
+    throw new ConfigError([{ variable: "API_TOKEN", rule: "must differ from APPROVAL_TOKEN" }]);
+  }
 
   if (llmProvider === "openrouter") {
     const problems: { variable: string; rule: string }[] = [];
@@ -120,7 +137,10 @@ export function loadConfig(env: Record<string, string | undefined>, opts: { forc
     dbPath: e.DB_PATH,
     host: e.HOST,
     port: e.PORT,
+    allowedHosts: (e.ALLOWED_HOSTS ?? "").split(",").map((h) => h.trim().toLowerCase()).filter((h) => h !== ""),
+    maxConcurrentRuns: e.MAX_CONCURRENT_RUNS,
     approvalToken: e.APPROVAL_TOKEN ?? null,
+    apiToken: e.API_TOKEN ?? null,
     approvalTtlMin: e.APPROVAL_TTL_MIN,
     actionRateLimitPerMin: e.ACTION_RATE_LIMIT_PER_MIN,
     actionRepeatWindowMin: e.ACTION_REPEAT_WINDOW_MIN,
@@ -129,4 +149,21 @@ export function loadConfig(env: Record<string, string | undefined>, opts: { forc
     clock: e.CLOCK,
     logLevel: e.LOG_LEVEL,
   };
+}
+
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
+
+/** True for the names that only this machine can reach. */
+export function isLoopbackHost(host: string): boolean {
+  return LOOPBACK_HOSTS.has(host.trim().toLowerCase());
+}
+
+/**
+ * Checked by the API entry point only (the MCP server and the CLI do not listen): binding HOST beyond loopback
+ * without API_TOKEN would expose every incident, trace and audit, and let anyone start runs, so startup fails.
+ */
+export function assertApiExposureSafe(c: Pick<Config, "host" | "apiToken">): void {
+  if (!isLoopbackHost(c.host) && c.apiToken === null) {
+    throw new ConfigError([{ variable: "API_TOKEN", rule: "required when HOST is not a loopback address" }]);
+  }
 }

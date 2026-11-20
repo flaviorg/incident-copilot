@@ -1,4 +1,4 @@
-// Formato das fixtures do provedor fake (spec 7.2): um arquivo por cenário em fixtures/llm/<cenário>.json.
+// Format of the fake provider's fixtures (spec 7.2): one file per scenario in fixtures/llm/<scenario>.json.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as z from "zod";
@@ -38,7 +38,7 @@ export type FixtureErrorKind = z.infer<typeof FixtureErrorKindSchema>;
 export type FixtureTurn = z.infer<typeof FixtureTurnSchema>;
 export type FixtureFile = z.infer<typeof FixtureFileSchema>;
 
-/** Lê e valida `<dir>/*.json` em ordem de nome. Pasta ausente devolve lista vazia. */
+/** Reads and validates `<dir>/*.json` in name order. A missing folder returns an empty list. */
 export function loadFixtures(dir: string): FixtureFile[] {
   if (!existsSync(dir)) return [];
   return readdirSync(dir)

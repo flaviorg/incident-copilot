@@ -1,4 +1,4 @@
-// Lê runbooks/*.md, valida o frontmatter, quebra por seção e calcula a versão (hash do conteúdo). Ranqueia com o BM25 do domínio.
+// Reads runbooks/*.md, validates the frontmatter, splits by section and computes the version (content hash). Ranks with the domain's BM25.
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { RunbookMatch } from "../../contracts/index.ts";
@@ -10,27 +10,27 @@ import { sha256Hex } from "../crypto.ts";
 
 export type RunbookSection = {
   runbookId: string;
-  version: string; // 6 hex do sha256 do arquivo
-  section: string; // slug do título da seção, ex.: "mitigacao"
-  title: string; // título do runbook
-  heading: string; // título da seção como escrito, ex.: "Mitigação"
+  version: string; // 6 hex of the file's sha256
+  section: string; // slug of the section title, e.g.: "mitigation"
+  title: string; // runbook title
+  heading: string; // section heading as written, e.g.: "Mitigation"
   text: string;
   services: string[];
   categories: string[];
 };
 
-// Limiar de recusa. 1ª calibração em 2026-10-04 (Tarefa 10, passo 5) com os runbooks desta pasta:
-// - consultas golden do bm25.unit.test.ts: recusa (tls/ingress, billing-api) = 0 (nenhuma seção pontua);
-//   menor seção relevante aceita = 0,1830 (deploy, orders-5xx#prevencao) e 0,1868 (custo, cloud-cost#prevencao);
-//   maior ruído na consulta de deploy (seções de outros runbooks, inclusive o distrator) = 0,0366.
-// Recalibrado em 2026-10-04 (Tarefa 20) com a consulta real de buildRunbookQuery (regra do alerta + hipótese +
-// evidências + palavras da categoria, cerca de 450 caracteres) sobre os diagnósticos das fixtures:
-//   deploy: orders-5xx §mitigacao 0,0760, §diagnostico 0,0751, §sintomas 0,0722, §prevencao 0,0663; maior ruído 0,0141;
-//   custo: cloud-cost §diagnostico 0,0915, §mitigacao 0,0557, §sintomas 0,0404; maior ruído 0,0157;
-//   recusa tls (billing-api): 0,0167.
-// Com 0,06 a seção de mitigação do custo (a mais útil para o planejador) ficava de fora. 0,045 fica entre o maior
-// ruído ou recusa medido em qualquer consulta (0,0366) e a menor seção que precisa passar (0,0557).
-// Se o texto da consulta crescer muito (o escore é normalizado pelo teto da consulta), recalibre com estes mesmos números.
+// Refusal threshold (section names below use the current English slugs). 1st calibration on 2026-10-04 (Task 10, step 5) with the runbooks in this folder:
+// - golden queries from bm25.unit.test.ts: refusal (tls/ingress, billing-api) = 0 (no section scores);
+//   lowest accepted relevant section = 0.1830 (deploy, orders-5xx#prevention) and 0.1868 (cost, cloud-cost#prevention);
+//   highest noise on the deploy query (sections of other runbooks, including the distractor) = 0.0366.
+// Recalibrated on 2026-10-04 (Task 20) with the real buildRunbookQuery query (alert rule + hypothesis +
+// evidence + category words, about 450 characters) over the fixtures' diagnoses:
+//   deploy: orders-5xx §mitigation 0.0760, §diagnosis 0.0751, §symptoms 0.0722, §prevention 0.0663; highest noise 0.0141;
+//   cost: cloud-cost §diagnosis 0.0915, §mitigation 0.0557, §symptoms 0.0404; highest noise 0.0157;
+//   tls refusal (billing-api): 0.0167.
+// With 0.06 the cost mitigation section (the most useful one for the planner) was left out. 0.045 sits between the highest
+// measured noise or refusal on any query (0.0366) and the lowest section that must pass (0.0557).
+// If the query text grows a lot (the score is normalized by the query's cap), recalibrate with these same numbers.
 const RUNBOOK_MIN_NORMALIZED_SCORE = 0.045;
 
 const EXCERPT_MAX = 400;
@@ -103,7 +103,7 @@ export class RunbookRepository {
     return this.all;
   }
 
-  /** Filtra por serviço (ou "*"), ranqueia por BM25 e aplica o limiar normalizado: abaixo dele, recusa em vez do menos ruim. */
+  /** Filters by service (or "*"), ranks by BM25 and applies the normalized threshold: below it, refuses instead of returning the least bad. */
   search(q: { text: string; service: string | null }, o: { limit?: number; minNormalizedScore?: number } = {}): RunbookMatch[] {
     const limit = o.limit ?? 3;
     const allowed = new Map<string, RunbookSection>(

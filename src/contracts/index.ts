@@ -1,4 +1,4 @@
-// Ponto único de importação dos contratos: schemas Zod e os tipos inferidos deles.
+// Single import point for the contracts: Zod schemas and the types inferred from them.
 import type * as z from "zod";
 
 import {
@@ -106,6 +106,8 @@ export type Escalation = z.infer<typeof EscalationSchema>;
 export type Incident = z.infer<typeof IncidentSchema>;
 export type NewIncident = Omit<Incident, "status" | "resolvedAt" | "escalation">;
 export type LlmCallRecord = z.infer<typeof LlmCallRecordSchema>;
+/** What a writer passes: attempts, usedFallback and usageEstimated may be left out (defaults 1, false, false). */
+export type LlmCallRecordInput = z.input<typeof LlmCallRecordSchema>;
 export type RunRecord = z.infer<typeof RunRecordSchema>;
 export type WorldState = z.infer<typeof WorldStateSchema>;
 export type CanaryCheckResult = z.infer<typeof CanaryCheckResultSchema>;
@@ -136,7 +138,7 @@ export type ProposeRemediationResult = z.infer<typeof ProposeRemediationResultSc
 export type RecordingBranch = z.infer<typeof RecordingBranchSchema>;
 export type DemoRecording = z.infer<typeof DemoRecordingSchema>;
 
-/** Tetos padrão do spec 6.2. */
+/** Default caps from spec 6.2. */
 export const DEFAULT_LIMITS: Limits = Object.freeze({
   reactMaxSteps: 12, maxTelemetryRuns: 2, teamMaxIterations: 8, recursionLimit: 25, maxPlanRevisions: 2,
 });

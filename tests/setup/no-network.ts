@@ -1,4 +1,4 @@
-// Carregado com --import no processo de teste e nos filhos (CLI, MCP): nenhum teste usa rede (AC-27).
+// Loaded with --import in the test process and the children (CLI, MCP): no test uses the network (AC-27).
 class NetworkDisabledInTests extends Error {
   constructor(target: string) {
     super(`rede desativada nos testes: ${target}`);
@@ -10,7 +10,7 @@ function describeTarget(input: unknown): string {
   if (typeof input === "string") return input;
   if (input instanceof URL) return input.href;
   if (input && typeof input === "object" && "url" in input) return String((input as { url: unknown }).url);
-  return "destino desconhecido";
+  return "unknown destination";
 }
 
 globalThis.fetch = (async (input: unknown) => {

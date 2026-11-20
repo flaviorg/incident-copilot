@@ -1,6 +1,6 @@
-// Analista de telemetria (spec 4.5, 4.6 e 5.1, passo 4): laço ReAct dentro do nó, com teto rígido.
-// Nenhum passo do laço é superstep do grafo, então 12 passos não consomem o recursionLimit (motivo de não usar subgrafo).
-// Erro de ferramenta vira observação ok: false e o laço continua (221517); falha de LLM vira escalonamento llm_unavailable.
+// Telemetry analyst (spec 4.5, 4.6 and 5.1, step 4): ReAct loop inside the node, with a hard cap.
+// No step of the loop is a graph superstep, so 12 steps do not consume the recursionLimit (reason for not using a subgraph).
+// A tool error becomes an ok: false observation and the loop continues (221517); an LLM failure becomes llm_unavailable escalation.
 import type { Diagnosis, Evidence, Limits, ReadToolName } from "../../contracts/index.ts";
 import type { ScenarioRepository } from "../../infra/scenarios/scenario-loader.ts";
 import type { Clock } from "../../infra/clock.ts";
@@ -65,15 +65,15 @@ export function createTelemetryNode(d: TelemetryDeps): NodeFn {
       if (res.ok && out.tool in SOURCE_BY_TOOL) okObservations.push({ tool: out.tool as ReadToolName, summary: res.summary, evidenceRef: res.evidenceRef });
     }
 
-    // Teto atingido sem resposta final: diagnóstico fraco com o que as observações válidas mostraram.
+    // Cap reached without a final answer: weak diagnosis from what the valid observations showed.
     const evidence: Evidence[] = okObservations.slice(0, 8).map((o) => ({
       source: SOURCE_BY_TOOL[o.tool],
       ref: o.evidenceRef ?? `${SOURCE_BY_TOOL[o.tool]}:${o.tool}`,
       summary: clip(o.summary, 300),
     }));
     if (evidence.length === 0) {
-      const scope = state.alert.service ?? state.alert.account ?? "desconhecido";
-      evidence.push({ source: "metrics", ref: `metrics:${scope}:${state.alert.signal}@alerta`, summary: clip(`alerta: ${state.alert.rule}`, 300) });
+      const scope = state.alert.service ?? state.alert.account ?? "unknown";
+      evidence.push({ source: "metrics", ref: `metrics:${scope}:${state.alert.signal}@alert`, summary: clip(`alert: ${state.alert.rule}`, 300) });
     }
     const diagnosis: Diagnosis = {
       hypothesis: `Investigation stopped at the cap of ${maxSteps} steps without a conclusion`,

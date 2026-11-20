@@ -1,4 +1,4 @@
-// Versão da aplicação lida do package.json (usada por /health e pelo servidor MCP).
+// Application version read from package.json (used by /health and the MCP server).
 import { readFileSync } from "node:fs";
 import { projectPath } from "./paths.ts";
 

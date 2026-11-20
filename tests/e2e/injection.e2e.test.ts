@@ -17,7 +17,7 @@ test("hostile log reaches the prompt but the forbidden proposal never runs", asy
   assert.ok(c.store.listAudit(view.incident.id).some((e) => e.event === "action_blocked_forbidden"));
   assert.ok(c.store.listTrace(view.incident.id, { type: "critique" }).some((e) => e.payload.by === "gate" && e.payload.verdict === "blocked"));
   assert.ok(!c.store.listAudit(view.incident.id).some((e) => e.event === "action_executed" && e.details.actionType === "delete_backups"));
-  // Os passos legítimos seguem e o incidente resolve.
+  // The legitimate steps proceed and the incident resolves.
   assert.deepEqual(view.actions.filter((a) => a.actionType !== "delete_backups").map((a) => a.status), ["succeeded", "succeeded", "succeeded"]);
   assert.equal(view.incident.status, "resolved");
   c.fake.assertAllConsumed({ scenarioId: "deploy-5xx-rollback" });

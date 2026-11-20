@@ -1,5 +1,5 @@
-// Bloqueio por tentativas de token erradas (spec 6.2 e 6.10): `maxFailures` em `windowMin` bloqueiam por `lockMin`.
-// Puro, relógio injetado; janela deslizante com os instantes das falhas.
+// Lockout on wrong token attempts (spec 6.2 and 6.10): `maxFailures` within `windowMin` lock for `lockMin`.
+// Pure, injected clock; sliding window over the failure instants.
 
 export class TokenAttemptLimiter {
   private readonly maxFailures: number;

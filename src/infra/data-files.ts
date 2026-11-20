@@ -1,4 +1,4 @@
-// Carrega e valida os arquivos de dados próprios em data/ (preços ilustrativos e premissas sintéticas).
+// Loads and validates the project's own data files in data/ (illustrative prices and synthetic assumptions).
 import { readFileSync } from "node:fs";
 import { basename } from "node:path";
 import * as z from "zod";

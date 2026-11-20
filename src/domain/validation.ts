@@ -1,4 +1,4 @@
-// Validação com mensagens em inglês por chamada (sem mudar a configuração global do Zod).
+// Validation with per-call English messages (without changing Zod's global configuration).
 import * as z from "zod";
 import type { Issue } from "./errors.ts";
 

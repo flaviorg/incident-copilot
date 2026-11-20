@@ -1,4 +1,4 @@
-// Frontmatter num subconjunto restrito e testado (sem parser YAML): só "chave: valor" e "chave: [a, b]". Puro.
+// Frontmatter in a restricted, tested subset (no YAML parser): only "key: value" and "key: [a, b]". Pure.
 
 export class FrontmatterError extends Error {
   readonly line: number;
@@ -16,7 +16,7 @@ function unquote(v: string): string {
   return v.length >= 2 && ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) ? v.slice(1, -1) : v;
 }
 
-/** Sem cerca de abertura: devolve dados vazios e o texto inteiro como corpo. */
+/** No opening fence: returns empty data and the whole text as the body. */
 export function parseFrontmatter(md: string): { data: Record<string, string | string[]>; body: string } {
   const lines = md.replace(/\r\n/g, "\n").split("\n");
   if (lines[0]?.trim() !== FENCE) return { data: {}, body: md };

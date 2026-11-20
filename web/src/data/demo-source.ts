@@ -1,5 +1,5 @@
-// Fonte do modo demo (spec 10.2; AC-39): só busca arquivos em ./demo/ e só aceita o que passa no schema. Erro de
-// rede, HTTP, JSON ou schema vira mensagem explícita, sem devolver nada parcial.
+// Demo mode source (spec 10.2; AC-39): only fetches files under ./demo/ and only accepts what passes the schema. A
+// network, HTTP, JSON or schema error becomes an explicit message, returning nothing partial.
 import { DemoRecordingSchema, ScenarioSummarySchema } from "@contracts";
 import type { DemoRecording, ScenarioSummary } from "@contracts";
 import type * as z from "zod";
@@ -16,7 +16,7 @@ function describeIssues(error: z.ZodError): string {
     .join("; ");
 }
 
-/** `invalid` é o prefixo da mensagem de conteúdo inválido ("invalid recording", "invalid index"). */
+/** `invalid` is the prefix of the invalid-content message ("invalid recording", "invalid index"). */
 async function loadJson<T>(url: string, schema: z.ZodType<T>, invalid: string, fetchImpl: typeof fetch): Promise<LoadResult<T>> {
   let response: Response;
   try {

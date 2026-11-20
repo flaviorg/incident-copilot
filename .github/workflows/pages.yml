@@ -1,4 +1,5 @@
-# Publica a War Room (modo demo) no GitHub Pages. Só manual: nada é publicado sem alguém disparar o workflow.
+# Publishes the War Room (demo mode) to GitHub Pages. Manual only: nothing is published unless someone dispatches the workflow.
+# The deploy runs the web typecheck, the web tests and check:tokens first, so a War Room that fails AC-39 is never published.
 # Action major versions checked against the official releases on 2026-10-04.
 name: Pages (War Room)
 
@@ -31,6 +32,9 @@ jobs:
             web/package-lock.json
       - run: npm ci
       - run: npm --prefix web ci
+      - run: npm run typecheck:web
+      - run: npm run check:tokens
+      - run: npm run web:test
       - name: Build the War Room with the recordings (fake provider, no secrets)
         run: npm run web:build
         env:

@@ -1,7 +1,7 @@
-// Séries determinísticas a partir de especificação com PRNG semeado (spec 7.3). Puro.
+// Deterministic series from a specification with a seeded PRNG (spec 7.3). Pure.
 import type { MetricName, SeriesPoint, SeriesSegment, SeriesSpec } from "../../contracts/index.ts";
 
-/** PRNG mulberry32: mesma semente, mesma sequência em [0, 1). */
+/** mulberry32 PRNG: same seed, same sequence in [0, 1). */
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
@@ -13,7 +13,7 @@ export function mulberry32(seed: number): () => number {
   };
 }
 
-/** Métricas que são frações (presas em [0, 1]); as demais são presas em >= 0. */
+/** Metrics that are fractions (clamped to [0, 1]); the rest are clamped to >= 0. */
 const FRACTION_METRICS: readonly MetricName[] = ["http_5xx_rate"];
 export const clampFor = (metric: MetricName): "unit" | "nonnegative" => (FRACTION_METRICS.includes(metric) ? "unit" : "nonnegative");
 
@@ -26,10 +26,10 @@ function segmentValue(s: SeriesSegment, t: number): number {
 }
 
 function baseValueAt(segments: readonly SeriesSegment[], t: number): number {
-  // Segmento que contém t em [fromSec, toSec); o último instante pertence ao segmento que termina nele.
+  // Segment containing t in [fromSec, toSec); the last instant belongs to the segment that ends at it.
   const inside = segments.find((s) => s.fromSec <= t && t < s.toSec) ?? segments.find((s) => s.toSec === t);
   if (inside) return segmentValue(inside, t);
-  // Fora de todos: antes do primeiro, o valor inicial dele; depois, o final do último que já terminou.
+  // Outside all of them: before the first, its initial value; after, the final value of the last one that has ended.
   const sorted = [...segments].sort((a, b) => a.fromSec - b.fromSec);
   const first = sorted[0]!;
   if (t < first.fromSec) return segmentValue(first, first.fromSec);
@@ -37,7 +37,7 @@ function baseValueAt(segments: readonly SeriesSegment[], t: number): number {
   return segmentValue(ended, ended.toSec);
 }
 
-/** Pontos a cada `resolutionSec` de 0 a `durationSec`, inclusive o ponto final. Ruído: value + (rng() * 2 - 1) * amplitude. */
+/** Points every `resolutionSec` from 0 to `durationSec`, including the end point. Noise: value + (rng() * 2 - 1) * amplitude. */
 export function materializeSeries(
   spec: SeriesSpec,
   start: Date,
@@ -60,12 +60,12 @@ export function materializeSeries(
   return points;
 }
 
-/** ts da primeira amostra acima do limiar, ou null. */
+/** ts of the first sample above the threshold, or null. */
 export function firstViolation(points: readonly SeriesPoint[], threshold: number): string | null {
   return points.find((p) => p.value > threshold)?.ts ?? null;
 }
 
-/** Média das amostras com ts em [fromIso, toIso], ou null se não houver nenhuma. */
+/** Mean of the samples with ts in [fromIso, toIso], or null if there are none. */
 export function meanBetween(points: readonly SeriesPoint[], fromIso: string, toIso: string): number | null {
   const from = Date.parse(fromIso);
   const to = Date.parse(toIso);
@@ -77,7 +77,7 @@ export function meanBetween(points: readonly SeriesPoint[], fromIso: string, toI
   return inside.reduce((acc, p) => acc + p.value, 0) / inside.length;
 }
 
-/** Amostras com ts em [fromIso, toIso]. */
+/** Samples with ts in [fromIso, toIso]. */
 export function pointsBetween(points: readonly SeriesPoint[], fromIso: string, toIso: string): SeriesPoint[] {
   const from = Date.parse(fromIso);
   const to = Date.parse(toIso);

@@ -1,12 +1,12 @@
-// Defesa em profundidade (spec 6.6): troca ocorrências literais dos segredos por [REDACTED] em todo texto que sai do processo.
+// Defense in depth (spec 6.6): replaces literal occurrences of the secrets with [REDACTED] in any text leaving the process.
 import type { Config } from "../config.ts";
 
 export const REDACTED = "[REDACTED]";
 const MIN_SECRET_LENGTH = 8;
 
-/** Segredos conhecidos da configuração, só os definidos e com 8 caracteres ou mais. */
-export function collectSecrets(c: Pick<Config, "approvalToken" | "openrouterApiKey">): string[] {
-  return [c.approvalToken, c.openrouterApiKey].filter((s): s is string => typeof s === "string" && s.length >= MIN_SECRET_LENGTH);
+/** Known secrets from the config, only the defined ones with 8 characters or more. */
+export function collectSecrets(c: Pick<Config, "approvalToken" | "openrouterApiKey"> & Partial<Pick<Config, "apiToken">>): string[] {
+  return [c.approvalToken, c.openrouterApiKey, c.apiToken ?? null].filter((s): s is string => typeof s === "string" && s.length >= MIN_SECRET_LENGTH);
 }
 
 function redactString(text: string, secrets: readonly string[]): string {
@@ -22,11 +22,32 @@ function isPlainObject(value: object): boolean {
   return proto === Object.prototype || proto === null;
 }
 
-/** Recursivo sobre strings, arrays e objetos simples; `Error` vira `{ name, message }` redigido. Não altera a entrada. */
+/**
+ * Each secret plus its JSON-escaped form when that differs (a token with `"` or `\\` appears escaped in a serialized
+ * body, so the literal match alone would miss it).
+ */
+function withEscapedForms(secrets: readonly string[]): string[] {
+  const out = new Set<string>();
+  for (const s of secrets) {
+    if (s.length < MIN_SECRET_LENGTH) continue;
+    out.add(s);
+    const escaped = JSON.stringify(s).slice(1, -1);
+    if (escaped !== s) out.add(escaped);
+  }
+  return [...out];
+}
+
+/** Recursive over strings, arrays and plain objects; `Error` becomes a redacted `{ name, message }`. Does not mutate the input. */
 export function redactSecrets<T>(value: T, secrets: readonly string[]): T {
-  // O mais longo primeiro, para um segredo que contém outro não sobrar pela metade.
-  const ordered = [...secrets].filter((s) => s.length >= MIN_SECRET_LENGTH).sort((a, b) => b.length - a.length);
+  // Longest first, so a secret that contains another is not left half-redacted.
+  const ordered = withEscapedForms(secrets).sort((a, b) => b.length - a.length);
   return walk(value, ordered) as T;
+}
+
+/** Redacts first, then clips to `max` characters (with "…"), so a secret straddling the cut can never leak a prefix. */
+export function redactThenClip(text: string, max: number, secrets: readonly string[]): string {
+  const redacted = redactSecrets(text, secrets);
+  return redacted.length <= max ? redacted : redacted.slice(0, max - 1) + "…";
 }
 
 function walk(value: unknown, secrets: readonly string[]): unknown {

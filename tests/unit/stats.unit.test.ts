@@ -1,4 +1,4 @@
-// /stats por SQL (spec 5.3; AC-33): percentis por posto mais próximo, janela, projeção da expiração e contadores.
+// /stats via SQL (spec 5.3; AC-33): nearest-rank percentiles, window, expiry projection and counters.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { openDatabase } from "../../src/infra/db/sqlite.ts";
@@ -33,7 +33,7 @@ const action = (id: string, incidentId: string, tier: 2 | 3 | 4, status: GatedAc
 test("nearest-rank percentiles in SQL", () => {
   const { incident, stats } = setup();
   for (const m of [40, 10, 30, 20]) incident({ openedMinAgo: 30, status: "resolved", mttrMin: m });
-  incident({ openedMinAgo: 30, status: "escalated" }); // escalado não entra no MTTR
+  incident({ openedMinAgo: 30, status: "escalated" }); // escalated is not counted in MTTR
   assert.deepEqual(stats().get("24h").mttrMin, { p50: 20, p95: 40 });
   assert.equal(nearestRankOffset(4, 0.5), 1);
   assert.equal(nearestRankOffset(4, 0.95), 3);
@@ -58,7 +58,7 @@ test("empty database: zeros, exhaustive keys and null percentiles", () => {
 test("window filters by time and approvals project expiry without writing", () => {
   const { store, clock, incident, stats } = setup();
   const recent = incident({ openedMinAgo: 30, status: "resolved", mttrMin: 12 });
-  incident({ openedMinAgo: 2 * 24 * 60, status: "resolved", mttrMin: 99 }); // fora de 24h, dentro de 7d
+  incident({ openedMinAgo: 2 * 24 * 60, status: "resolved", mttrMin: 99 }); // outside 24h, within 7d
   store.upsertAction(action("ACT-0001", recent, 2, "succeeded"));
   store.upsertAction(action("ACT-0002", recent, 3, "approved"));
   store.upsertAction(action("ACT-0003", recent, 4, "blocked_forbidden"));
@@ -101,9 +101,9 @@ test("guard counters come from trace critiques", () => {
   store.appendTrace([
     critique("supervisor_guard", "coerced", "gate without a plan"),
     critique("supervisor_guard", "coerced", "gate without a plan again"),
-    // O contador lê o campo estruturado, não o texto: o feedback vem do modelo e pode ter qualquer palavra.
+    // The counter reads the structured field, not the text: the feedback comes from the model and can contain any word.
     critique("auditor", "revise", "rules: snapshot_before_delete", true),
-    critique("auditor", "revise", "x".repeat(600), true), // feedback cortado em 600: nenhum marcador de texto sobrevive
+    critique("auditor", "revise", "x".repeat(600), true), // feedback truncated at 600: no text marker survives
     critique("auditor", "revise", "the model wrote that the previous plan was overridden", false),
     critique("auditor", "revise", "missing snapshot", false),
     critique("numeric_guard", "reject", "numbers without a source: 20%"),

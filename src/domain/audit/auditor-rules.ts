@@ -1,5 +1,5 @@
-// Regras do auditor (spec 4.7): o código é o piso do veredito. O LLM pode endurecer, nunca afrouxar. Puro.
-// O alvo de cada passo é resolvido pelo último segmento do caminho (instance/data-platform/i-0db51 -> i-0db51).
+// Auditor rules (spec 4.7): the code is the floor of the verdict. The LLM can harden it, never loosen it. Pure.
+// Each step's target is resolved by the last path segment (instance/data-platform/i-0db51 -> i-0db51).
 import type { AuditCheck, Deploy, Inventory, PlanStep, RemediationPlan } from "../../contracts/index.ts";
 import { IDLE_CPU_MAX_PCT } from "../finops/inventory-audit.ts";
 
@@ -11,10 +11,11 @@ export const AUDITOR_RULE_IDS = [
   "release_requires_unassociated",
   "rollback_requires_recent_deploy",
   "depends_on_valid",
+  "unique_orders",
 ] as const;
 export type AuditorRuleId = (typeof AUDITOR_RULE_IDS)[number];
 
-/** Janela do deploy suspeito antes do início do impacto. */
+/** Window of the suspect deploy before the impact start. */
 const RECENT_DEPLOY_WINDOW_MIN = 60;
 const NOT_APPLICABLE = "not applicable";
 
@@ -22,7 +23,7 @@ const targetId = (target: string): string => target.split("/").filter(Boolean).a
 
 const clip = (s: string) => (s.length <= 300 ? s : s.slice(0, 299) + "…");
 
-/** Ordem de tamanho dentro da família: nano < micro < small < medium < large < xlarge < 2xlarge < ... */
+/** Size order within the family: nano < micro < small < medium < large < xlarge < 2xlarge < ... */
 function sizeRank(type: string): number | null {
   const size = type.split(".")[1];
   if (!size) return null;
@@ -103,10 +104,19 @@ export function runAuditorRules(plan: RemediationPlan, e: AuditEvidence): AuditC
       : { ok: false, detail: `dependsOn points to a missing or later step: ${bad.join(", ")}` };
   });
 
-  return [snapshot, resize, release, rollback, deps];
+  // Review 2026-11: the gate, executor and cascade resolve dependsOn with find(order === n); a repeated order makes that
+  // ambiguous, so the plan goes back for revision.
+  const counts = new Map<number, number>();
+  for (const s of steps) counts.set(s.order, (counts.get(s.order) ?? 0) + 1);
+  const repeated = [...counts].filter(([, n]) => n > 1);
+  const unique: AuditCheck = repeated.length === 0
+    ? { rule: "unique_orders", passed: true, detail: `${steps.length} step(s), every order unique` }
+    : { rule: "unique_orders", passed: false, detail: clip(repeated.map(([o, n]) => `order ${o} appears ${n} times`).join("; ")) };
+
+  return [snapshot, resize, release, rollback, deps, unique];
 }
 
-/** Tabela do spec 4.7: regra falha mais approve do LLM vira revise sobrescrito; sem LLM, valem as regras. */
+/** Table from spec 4.7: a failed rule plus an LLM approve becomes an overridden revise; with no LLM, the rules apply. */
 export function combineAuditorVerdict(checks: AuditCheck[], llm: "approve" | "revise" | null): { verdict: "approve" | "revise"; overridden: boolean } {
   const allPass = checks.every((c) => c.passed);
   if (llm === null) return { verdict: allPass ? "approve" : "revise", overridden: false };

@@ -1,4 +1,4 @@
-// Gravação reproduzida pela War Room (spec 5.2 e 10.2).
+// Recording replayed by the War Room (spec 5.2 and 10.2).
 import * as z from "zod";
 import { ScenarioSummarySchema } from "./scenario.ts";
 import { TraceEventSchema } from "./trace.ts";
@@ -21,8 +21,8 @@ export const RecordingBranchSchema = z.object({
 export const DemoRecordingSchema = z.object({
   schemaVersion: z.literal(1),
   label: z.literal(DEMO_LABEL),
-  recordedWith: z.object({ provider: z.literal("fake"), promptVersions: z.array(z.string()) }), // sem appVersion
+  recordedWith: z.object({ provider: z.literal("fake"), promptVersions: z.array(z.string()) }), // no appVersion
   scenario: ScenarioSummarySchema,
-  common: RecordingBranchSchema, // até o portão (ou até o fim, se não houver aprovação)
+  common: RecordingBranchSchema, // up to the gate (or to the end, if there is no approval)
   branches: z.object({ approved: RecordingBranchSchema, rejected: RecordingBranchSchema }).nullable(),
 });

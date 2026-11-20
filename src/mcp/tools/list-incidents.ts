@@ -1,4 +1,4 @@
-// Tool list_incidents (spec 5.4): incidentes recentes, com filtro e LIMIT em SQL.
+// list_incidents tool (spec 5.4): recent incidents, with filter and LIMIT in SQL.
 import * as z from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Container } from "../../app/container.ts";

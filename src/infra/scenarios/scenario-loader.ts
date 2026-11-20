@@ -1,5 +1,5 @@
-// Carrega e valida cenários de fixtures/scenarios/<id>/ e materializa as séries (spec 4.2 e 7.3). Não chama LLM.
-// Erro de dado no disco vira ValidationError com o nome do arquivo e o campo, sem derrubar o processo com stack.
+// Loads and validates scenarios from fixtures/scenarios/<id>/ and materializes the series (spec 4.2 and 7.3). Does not call the LLM.
+// A data error on disk becomes ValidationError with the file name and the field, without crashing the process with a stack.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type * as z from "zod";
@@ -27,7 +27,7 @@ export type LoadedScenario = {
 };
 
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
-/** Mesmo teto do CreateIncidentBodySchema: id fora do formato nunca volta na mensagem de erro. */
+/** Same cap as CreateIncidentBodySchema: an id outside the format never comes back in the error message. */
 const SCENARIO_ID_MAX = 64;
 
 const shiftIso = (iso: string, offsetSec: number) => (offsetSec === 0 ? iso : new Date(Date.parse(iso) + offsetSec * 1000).toISOString());
@@ -46,7 +46,7 @@ export class ScenarioRepository {
     this.transform = o.transform;
   }
 
-  /** Resumos ordenados por id. */
+  /** Summaries sorted by id. */
   list(): ScenarioSummary[] {
     if (!existsSync(this.rootDir)) return [];
     return readdirSync(this.rootDir)

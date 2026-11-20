@@ -1,5 +1,5 @@
-// Comportamentos de biblioteca dos quais o design depende (spec, "Instrução obrigatória").
-// Se algum destes testes falhar depois de uma atualização, o design precisa ser revisto antes de seguir.
+// Library behaviors the design depends on (spec, "Mandatory instruction").
+// If any of these tests fail after an upgrade, the design must be revisited before proceeding.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as z from "zod";
@@ -9,7 +9,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 const S = z.object({ n: z.number() });
 
-// Grafo a <-> b sem saída: cada nó soma 1.
+// Graph a <-> b with no exit: each node adds 1.
 function loop() {
   return new StateGraph(S)
     .addNode("a", (s) => ({ n: s.n + 1 }))
@@ -51,7 +51,7 @@ test("stream values keeps the last emitted state when GraphRecursionError is thr
 
 test("a subgraph invoked inside a node inherits recursionLimit (reason for the in-node ReAct loop)", async () => {
   const R = z.object({ steps: z.number() });
-  // Subgrafo ReAct think/act: think decide (ação ou final); 12 ações = 12 think + 12 act + 1 think final = 25 supersteps.
+  // ReAct think/act subgraph: think decides (action or final); 12 actions = 12 think + 12 act + 1 final think = 25 supersteps.
   const sub = new StateGraph(R)
     .addNode("think", (s) => ({ steps: s.steps }))
     .addNode("act", (s) => ({ steps: s.steps + 1 }))
@@ -65,7 +65,7 @@ test("a subgraph invoked inside a node inherits recursionLimit (reason for the i
     .addEdge("analyst", END)
     .compile();
   await assert.rejects(parentWithSubgraph.invoke({ steps: 0 }, { recursionLimit: 25 }), (e) => e instanceof GraphRecursionError);
-  // Prova de herança (e não do padrão 25): com o pai em 100, o mesmo subgrafo termina.
+  // Proof of inheritance (not of the default 25): with the parent at 100, the same subgraph finishes.
   assert.deepEqual(await parentWithSubgraph.invoke({ steps: 0 }, { recursionLimit: 100 }), { steps: 12 });
 
   const parentWithLoop = new StateGraph(R)

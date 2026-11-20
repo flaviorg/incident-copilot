@@ -1,5 +1,5 @@
-// Estados de cenário para testar nós isolados: o blackboard parte do incidente gravado e recebe os artefatos
-// que os nós anteriores teriam produzido, tirados das próprias fixtures do fake.
+// Scenario states for testing isolated nodes: the blackboard starts from the saved incident and receives the artifacts
+// the previous nodes would have produced, taken from the fake's own fixtures.
 import type { Container } from "../../src/app/container.ts";
 import type { Alert, AuditReview, Blackboard, Diagnosis, Escalation, RemediationPlan } from "../../src/contracts/index.ts";
 import { initialBlackboard } from "./container.ts";
@@ -16,7 +16,7 @@ export function turnOutput<T>(scenarioId: string, turnId: string): T {
   return structuredClone(t.output) as T;
 }
 
-/** Diagnóstico final roteirizado do analista (tel-4 no deploy, tel-3 no custo). */
+/** Scripted final diagnosis from the analyst (tel-4 in deploy, tel-3 in cost). */
 export function scenarioDiagnosis(scenarioId: string): Diagnosis {
   const id = scenarioId === "cost-anomaly" ? "tel-3" : "tel-4";
   return { ...turnOutput<{ diagnosis: Omit<Diagnosis, "capReached"> }>(scenarioId, id).diagnosis, capReached: false };
@@ -43,7 +43,7 @@ export function planOfTurn(scenarioId: string, revision: number): RemediationPla
   return turnOutput<RemediationPlan>(scenarioId, `plan-${revision}`);
 }
 
-/** Estado do custo com diagnóstico, busca de runbooks feita e o plano da revisão pedida (sem auditoria). */
+/** Cost state with diagnosis, runbook search done and the plan of the requested revision (no audit). */
 export function costStateWithPlan(c: Container, revision: number): Blackboard {
   const bb = withDiagnosis(c, "cost-anomaly", costDiagnosis());
   const runbookMatches = c.runbooks.search({ text: "cost idle volume snapshot", service: null });
@@ -67,8 +67,8 @@ export function escalatedState(c: Container, reason: Escalation["reason"]): Blac
 const at = (hms: string) => `2026-10-04T${hms}.000Z`;
 
 /**
- * Deploy depois do canário saudável, na linha do tempo do spec 10.3: aprovação pedida às 09:46:05 e decidida às 09:49:05,
- * execução das 3 ações, canário saudável às 09:51:41 e supervisor escolhendo o relator às 09:52:01.
+ * Deploy after the healthy canary, on the spec 10.3 timeline: approval requested at 09:46:05 and decided at 09:49:05,
+ * execution of the 3 actions, healthy canary at 09:51:41 and supervisor choosing the reporter at 09:52:01.
  */
 export function verifiedDeployState(c: Container): Blackboard {
   const bb = deployStateWithPlan(c);

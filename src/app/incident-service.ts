@@ -1,6 +1,6 @@
-// Serviço de aplicação dos incidentes (spec 4.2, 4.5 e 5.1): abre, executa o grafo por stream, retoma e lê.
-// Usado pelas três portas (CLI, HTTP, MCP). Persiste antes de sinalizar erro: quem chama sempre encontra o incidente
-// gravado, escalado e com relatório parcial, mesmo quando open sobe LlmUnavailableError ou RunTimeoutError.
+// Application service for incidents (spec 4.2, 4.5 and 5.1): opens, runs the graph as a stream, resumes and reads.
+// Used by the three ports (CLI, HTTP, MCP). Persists before signaling an error: the caller always finds the incident
+// saved, escalated and with a partial report, even when open throws LlmUnavailableError or RunTimeoutError.
 import { GraphRecursionError } from "@langchain/langgraph";
 import { ProposeRemediationInputSchema } from "../contracts/index.ts";
 import type {
@@ -38,26 +38,35 @@ export type IncidentServiceDeps = {
   runTimeoutMs: number;
   logger: Logger;
   infra: { initialWorld(s: LoadedScenario): WorldState; dryRun(w: WorldState, step: ValidatedStep): DryRunResult };
-  /** Nós chamados fora do grafo quando a invocação estoura o recursionLimit ou o tempo (spec 4.5). */
+  /** Nodes called outside the graph when the invocation overruns recursionLimit or time (spec 4.5). */
   direct: { escalation: NodeFn; reporter: NodeFn };
-  /** Trace das propostas externas (agente mcp_client). */
+  /** Trace of external proposals (mcp_client agent). */
   trace: TraceSink;
   approvalTtlMin: number;
 };
 
 export type RunCtx = { requestId: string | null };
 
-/** Status de ação que a rejeição ou a expiração de uma dependência cancela (spec 6.5, transitivamente). */
+/** Action status that the rejection or expiry of a dependency cancels (spec 6.5, transitively). */
 const CANCELLABLE: readonly GatedAction["status"][] = ["ready", "awaiting_approval", "approved"];
+
+/**
+ * Lease of a run (review 2026-11): a runs row with no end that this process is not running, and that started more than
+ * runTimeoutMs plus this margin ago, belongs to a process that crashed or was killed. No live run can be that old
+ * (the deadline aborts it), so it is closed as abandoned instead of blocking the incident forever.
+ */
+export const RUN_LEASE_MARGIN_MS = 60_000;
 
 export class IncidentService {
   private readonly d: IncidentServiceDeps;
+  /** Runs this process is executing right now; only rows outside this set can be abandoned. */
+  private readonly activeRuns = new Set<string>();
 
   constructor(d: IncidentServiceDeps) {
     this.d = d;
   }
 
-  /** Cria o incidente (status open, phase new, auditoria incident_opened) e executa a primeira invocação. */
+  /** Creates the incident (status open, phase new, incident_opened audit) and runs the first invocation. */
   async open(i: { scenarioId: string; title?: string }, ctx: RunCtx): Promise<IncidentView> {
     const { incident } = openIncidentRecord(
       { store: this.d.store, scenarios: this.d.scenarios, clock: this.d.clock, ids: this.d.ids, initialWorld: (s) => this.d.infra.initialWorld(s) },
@@ -73,8 +82,8 @@ export class IncidentService {
   }
 
   /**
-   * Retomada depois das decisões humanas (o ApprovalService grava phase "resume" antes). Nunca lança por LLM ou
-   * timeout: devolve a view escalada (foco de revisão 4).
+   * Resume after human decisions (ApprovalService writes phase "resume" first). Never throws for LLM or
+   * timeout: returns the escalated view (review focus 4).
    */
   async resume(incidentId: string, ctx: RunCtx): Promise<IncidentView> {
     this.requireIncident(incidentId);
@@ -82,15 +91,17 @@ export class IncidentService {
     if (blackboard.phase !== "resume") {
       throw new ConflictError("incident_not_accepting", `incident ${incidentId} is not waiting to resume (phase ${blackboard.phase})`);
     }
+    // Also the retry path after a failed resume (POST /incidents/:id/resume): never two runs on one incident.
+    this.d.store.transaction(() => this.requireNoRunInProgress(incidentId));
     await this.run(incidentId, ctx);
     return this.get(incidentId);
   }
 
   /**
-   * Materializa a expiração de todas as aprovações vencidas do incidente (spec 6.5): aprovação expired com
-   * decisionSource expiry, ação expired, dependentes cancelados e auditoria approval_expired. Sem pendências restantes,
-   * grava phase "resume" na mesma transação; quem chama dispara a retomada. Com execução em andamento no incidente,
-   * recusa com incident_not_accepting antes de gravar qualquer coisa (ver requireNoRunInProgress).
+   * Materializes the expiry of all the incident's overdue approvals (spec 6.5): approval expired with
+   * decisionSource expiry, action expired, dependents canceled and approval_expired audit. With no pending left,
+   * writes phase "resume" in the same transaction; the caller triggers the resume. With a run in progress on the incident,
+   * refuses with incident_not_accepting before writing anything (see requireNoRunInProgress).
    */
   expireDueApprovals(incidentId: string, now: Date, ctx: RunCtx = { requestId: null }): { expired: Approval[]; pendingLeft: number } {
     const { store } = this.d;
@@ -111,9 +122,9 @@ export class IncidentService {
   }
 
   /**
-   * Grava a decisão humana (aprovação com versão otimista, ação approved ou rejected, auditoria) e, na rejeição,
-   * cancela os dependentes transitivamente. Sem pendências restantes, grava phase "resume" na mesma transação. Com
-   * execução em andamento no incidente, recusa com incident_not_accepting antes de gravar qualquer coisa.
+   * Writes the human decision (approval with optimistic version, action approved or rejected, audit) and, on rejection,
+   * cancels dependents transitively. With no pending left, writes phase "resume" in the same transaction. With a
+   * run in progress on the incident, refuses with incident_not_accepting before writing anything.
    */
   applyDecision(approval: Approval, next: Approval, ctx: RunCtx = { requestId: null }): { pendingLeft: number } {
     const { store, clock } = this.d;
@@ -159,13 +170,21 @@ export class IncidentService {
   }
 
   /**
-   * O portão grava as aprovações no meio da execução, mas o blackboard só é gravado no fim dela (versão otimista).
-   * Uma decisão ou expiração nessa janela mudaria o blackboard por baixo da execução: o roteamento depois do portão
-   * leria zero pendências, o lote rodaria dentro da abertura e a gravação final cairia em version_conflict, deixando o
-   * incidente inconsistente. Por isso as duas escritas exigem que nenhuma linha de runs do incidente esteja sem fim.
+   * The gate writes approvals in the middle of the run, but the blackboard is only written at the end of it (optimistic version).
+   * A decision or expiry in that window would change the blackboard under the run: routing after the gate
+   * would read zero pending, the batch would run inside the open call and the final write would hit version_conflict, leaving the
+   * incident inconsistent. So both writes require that no runs row of the incident be without an end.
    */
   private requireNoRunInProgress(incidentId: string): void {
-    if (this.d.store.listRuns(incidentId).some((r) => r.endedAt === null)) {
+    const { store, clock } = this.d;
+    const now = clock.now();
+    for (const r of store.listRuns(incidentId).filter((x) => x.endedAt === null)) {
+      const ageMs = now.getTime() - Date.parse(r.startedAt);
+      if (!this.activeRuns.has(r.id) && ageMs > this.d.runTimeoutMs + RUN_LEASE_MARGIN_MS) {
+        store.recordRun({ ...r, endedAt: now.toISOString(), outcome: "abandoned" });
+        this.d.logger.warn("run row left open by another process closed as abandoned", { event: "run_abandoned", incidentId, runId: r.id, startedAt: r.startedAt });
+        continue;
+      }
       throw new ConflictError("incident_not_accepting", `incident ${incidentId} has a run in progress; try again when it finishes`);
     }
   }
@@ -227,12 +246,12 @@ export class IncidentService {
     });
   }
 
-  /** Aprovações do incidente com status efetivo pending. */
+  /** Incident approvals with effective status pending. */
   private pendingCount(incidentId: string, now: Date): number {
     return this.d.store.listApprovals({ incidentId }).filter((a) => effectiveStatus(a, now) === "pending").length;
   }
 
-  /** Aplica a transição e grava com versão otimista; transição recusada é defeito de quem chama. */
+  /** Applies the transition and writes with optimistic version; a refused transition is a defect of the caller. */
   private closeApproval(a: Approval, ev: Parameters<typeof transition>[1], now: Date): Approval {
     let next = transition(a, ev, now);
     if (next instanceof ApprovalTransitionError && next.code === "expired") next = transition(a, { type: "expire" }, now);
@@ -242,8 +261,8 @@ export class IncidentService {
   }
 
   /**
-   * Cancela os passos que dependem de `root` (dependsOn, transitivamente). Um dependente que esperava a própria
-   * aprovação tem o pedido fechado junto (rejeitado em cascata ou expirado), para nenhum pedido sem objeto ficar pendente.
+   * Cancels the steps that depend on `root` (dependsOn, transitively). A dependent that was waiting for its own
+   * approval has the request closed too (rejected by cascade or expired), so no request without an object stays pending.
    */
   private cancelDependents(
     actions: GatedAction[],
@@ -281,12 +300,12 @@ export class IncidentService {
   }
 
   /**
-   * Proposta de ação vinda de fora da equipe (servidor MCP, spec 5.4; AC-35 e AC-36). Mesmo caminho do portão:
-   * classifyAction (faixa só por código, raio de impacto sobe a faixa), parâmetros pelo catálogo e dry run sobre o
-   * mundo atual do blackboard. Faixa 2 fica ready e faixa 3 cria aprovação pending; as duas rodam na retomada
-   * disparada pela última decisão humana, junto com o lote. Faixa 4, tipo desconhecido, parâmetros inválidos e dry run
-   * falho ficam gravados e auditados e viram UnprocessableError com motivo curto. Nunca executa nem dispara retomada.
-   * Tudo numa transação, com a versão do blackboard lida antes do dry run (versão divergente: ConflictError).
+   * Action proposal coming from outside the team (MCP server, spec 5.4; AC-35 and AC-36). Same path as the gate:
+   * classifyAction (tier by code only, blast radius raises the tier), parameters by the catalog and dry run on the
+   * current world of the blackboard. Tier 2 becomes ready and tier 3 creates a pending approval; both run on the resume
+   * triggered by the last human decision, together with the batch. Tier 4, unknown type, invalid parameters and failed dry run
+   * are recorded and audited and become UnprocessableError with a short reason. Never executes or triggers a resume.
+   * All in one transaction, with the blackboard version read before the dry run (divergent version: ConflictError).
    */
   proposeExternalAction(input: ProposeRemediationInput, actor: string): ProposeRemediationResult {
     const parsed = parseWithIssues(ProposeRemediationInputSchema, input);
@@ -390,7 +409,7 @@ export class IncidentService {
     return result;
   }
 
-  /** Só incidente aguardando aprovação recebe proposta (spec 5.4, regra 1). */
+  /** Only an incident awaiting approval receives a proposal (spec 5.4, rule 1). */
   private requireAcceptingProposals(incident: Incident, bb: Blackboard): void {
     if (incident.status !== "awaiting_approval" || bb.phase !== "awaiting_approval") {
       throw new ConflictError("incident_not_accepting", "the incident does not accept proposals in this state");
@@ -436,30 +455,39 @@ export class IncidentService {
   }
 
   /**
-   * Uma invocação do grafo (spec 4.5): stream de estados com recursionLimit e AbortSignal.timeout; guarda o último
-   * estado emitido. Recursão ou timeout viram escalonamento sobre esse estado, com os nós escalation e reporter
-   * chamados direto (sem LLM). Erros de fixture e defeitos sobem. Ao fim: blackboard com versão, status derivado,
-   * auditoria incident_resolved e a linha em runs.
+   * One graph invocation (spec 4.5): stream of states with recursionLimit and AbortSignal.timeout; keeps the last
+   * emitted state. Recursion or timeout become escalation over that state, with the escalation and reporter nodes
+   * called directly (no LLM). Fixture errors and defects propagate. At the end: blackboard with version, derived status,
+   * incident_resolved audit and the row in runs.
    */
   private async run(incidentId: string, ctx: RunCtx): Promise<Blackboard> {
+    const runId = this.d.ids.run();
+    this.activeRuns.add(runId);
+    try {
+      return await this.runWithId(incidentId, ctx, runId);
+    } finally {
+      this.activeRuns.delete(runId);
+    }
+  }
+
+  private async runWithId(incidentId: string, ctx: RunCtx, runId: string): Promise<Blackboard> {
     const { store, clock, limits } = this.d;
     const { blackboard, version } = store.loadBlackboard(incidentId);
-    const runId = this.d.ids.run();
     const log = this.d.logger.child({ requestId: ctx.requestId, incidentId, runId });
     const startedAt = clock.now().toISOString();
     const t0 = Date.now();
     store.recordRun({ id: runId, incidentId, startedAt, endedAt: null, outcome: null });
     log.info("run started", { event: "run_started", phase: blackboard.phase });
-    /** Fecha a linha em runs com o nome do erro (nunca fica sem fim) e devolve o erro para quem relança. */
+    /** Closes the row in runs with the error name (never left without an end) and returns the error for the caller to rethrow. */
     const failRun = (e: unknown, msg: string): unknown => {
       store.recordRun({ id: runId, incidentId, startedAt, endedAt: clock.now().toISOString(), outcome: `error: ${(e as Error)?.name ?? "unknown"}`.slice(0, 60) });
       log.error(msg, { event: "run_failed", error: (e as Error)?.name, latencyMs: Date.now() - t0 });
       return e;
     };
 
-    // AbortSignal.timeout só dispara quando o event loop roda timers. Uma execução sem I/O (fake sem atraso, SQLite
-    // síncrono, awaits em microtarefa) nunca cede, então o prazo também é conferido pelo relógio a cada estado emitido:
-    // o teto vale com granularidade de um superstep mesmo assim.
+    // AbortSignal.timeout only fires when the event loop runs timers. A run without I/O (fake with no delay, synchronous SQLite,
+    // awaits in microtasks) never yields, so the deadline is also checked against the clock on each emitted state:
+    // the cap holds at superstep granularity anyway.
     const deadline = new AbortController();
     const signal = AbortSignal.any([AbortSignal.timeout(this.d.runTimeoutMs), deadline.signal]);
     const config: NodeConfig = { configurable: { requestId: ctx.requestId } };
@@ -501,7 +529,7 @@ export class IncidentService {
     return last;
   }
 
-  /** Salva o blackboard com a versão esperada, deriva e grava o status e audita a resolução. */
+  /** Saves the blackboard with the expected version, derives and writes the status and audits the resolution. */
   private persist(incidentId: string, bb: Blackboard, expectedVersion: number, ctx: RunCtx): IncidentStatus {
     const { store, clock } = this.d;
     return store.transaction(() => {

@@ -1,5 +1,5 @@
-// `tool <nome> --scenario <id> [--args '<json>']`: executa uma ferramenta determinística de leitura.
-// Usa como "agora" o detectedAt do cenário e o mundo inicial do cenário.
+// `tool <name> --scenario <id> [--args '<json>']`: runs a deterministic read tool.
+// Uses the scenario's detectedAt as "now" and the scenario's initial world.
 import { parseArgs } from "node:util";
 import { loadConfig } from "../config.ts";
 import { createContainer } from "../app/container.ts";

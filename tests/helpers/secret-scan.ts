@@ -1,4 +1,4 @@
-// Varredura de segredos nas superfícies de saída (spec 6.6; AC-17): ocorrência literal de cada segredo em cada texto.
+// Secret scan over the output surfaces (spec 6.6; AC-17): literal occurrence of each secret in each text.
 export function findSecretOccurrences(surfaces: { name: string; text: string }[], secrets: string[]): { surface: string; secret: string }[] {
   const found: { surface: string; secret: string }[] = [];
   for (const s of surfaces) {

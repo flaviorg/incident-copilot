@@ -29,7 +29,7 @@ export const IncidentSchema = z.object({
   escalation: EscalationSchema.nullable(),
 });
 
-// Uma linha por chamada de LLM (spec 6.9).
+// One row per LLM call (spec 6.9).
 export const LlmCallRecordSchema = z.object({
   incidentId: z.string(),
   runId: z.string(),
@@ -42,9 +42,14 @@ export const LlmCallRecordSchema = z.object({
   success: z.boolean(),
   errorKind: LlmErrorKindSchema.nullable(),
   ts: z.string(),
+  /** Attempts behind this logical call (retries and fallback); tokens and cost are summed over all of them. */
+  attempts: z.number().int().positive().default(1),
+  usedFallback: z.boolean().default(false),
+  /** The provider reported no usage, so the tokens are an estimate. */
+  usageEstimated: z.boolean().default(false),
 });
 
-// Uma linha por invocação do grafo (spec 6.9). `outcome` é o status derivado ao fim, ou null enquanto roda.
+// One row per graph invocation (spec 6.9). `outcome` is the status derived at the end, or null while running.
 export const RunRecordSchema = z.object({
   id: z.string(),
   incidentId: z.string(),

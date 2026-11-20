@@ -100,7 +100,7 @@ test("target scope: the incident itself, the service or the account", () => {
 });
 
 test("forbidden types are not executable at the type level", () => {
-  // @ts-expect-error delete_backups não pertence a ExecutableActionType
+  // @ts-expect-error delete_backups does not belong to ExecutableActionType
   const t: ExecutableActionType = "delete_backups";
   void t;
 });

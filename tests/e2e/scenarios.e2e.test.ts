@@ -45,7 +45,7 @@ test("cost approved: Reflection, tier 4 blocked, savings from the inventory", as
   assert.equal(view.approvals.length, 3);
   const expected = auditInventory(c.scenarios.get("cost-anomaly").inventory!, c.prices).totalMonthlySavingsUsd;
   assert.equal(expected, 339.59);
-  assert.equal(view.metrics!.monthlySavingsUsd, expected); // 339,59 com os dados do projeto
+  assert.equal(view.metrics!.monthlySavingsUsd, expected); // 339.59 with the project data
   assert.equal(view.verification!.checks[0]!.observed, 356.94);
   const pm = c.incidents.postmortem(view.incident.id);
   assert.deepEqual([pm.status, pm.generatedBy.model, pm.numericGuard.passed, pm.impact.monthlySavingsUsd], ["final", "fake/scripted", true, 339.59]);

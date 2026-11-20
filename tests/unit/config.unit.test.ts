@@ -35,9 +35,9 @@ test("invalid numbers fail and empty strings count as unset", () => {
   assert.equal(loadConfig({ APPROVAL_TOKEN: "" }).approvalToken, null);
 });
 
-// Revisão final: os pontos de entrada só rodam dentro de `if (import.meta.main)`, que só existe a partir do Node 24.2.
-// Num Node 24.0 ou 24.1, check:secrets e check:tokens passariam calados (código 0, sem varrer nada). A versão fica
-// presa em dois lugares: .nvmrc (nvm e CI) e engine-strict (npm ci recusa um Node abaixo de engines).
+// Final review: the entry points only run inside `if (import.meta.main)`, which exists only from Node 24.2 on.
+// On Node 24.0 or 24.1, check:secrets and check:tokens would pass silently (code 0, scanning nothing). The version is
+// pinned in two places: .nvmrc (nvm and CI) and engine-strict (npm ci refuses a Node below engines).
 test("the Node version is pinned where tools read it", () => {
   const minor = (v: string) => v.trim().replace(/^>=\s*v?/, "").split(".").slice(0, 2).map(Number);
   const engines = (JSON.parse(readFileSync("package.json", "utf8")) as { engines: { node: string } }).engines.node;
@@ -48,4 +48,29 @@ test("the Node version is pinned where tools read it", () => {
   assert.match(existsSync(".npmrc") ? readFileSync(".npmrc", "utf8") : "", /^engine-strict=true$/m);
   const [pMajor, pMinor] = minor(process.versions.node);
   assert.ok(pMajor! > eMajor! || (pMajor === eMajor && pMinor! >= eMinor!), `Node ${process.versions.node} below engines`);
+});
+
+// Review 2026-11: Host allowlist and run concurrency cap.
+test("ALLOWED_HOSTS and MAX_CONCURRENT_RUNS", () => {
+  const d = loadConfig({});
+  assert.deepEqual(d.allowedHosts, []); assert.equal(d.maxConcurrentRuns, 2);
+  const c = loadConfig({ ALLOWED_HOSTS: " Box.local:3000 , api.test ", MAX_CONCURRENT_RUNS: "4" });
+  assert.deepEqual(c.allowedHosts, ["box.local:3000", "api.test"]); assert.equal(c.maxConcurrentRuns, 4);
+  assert.throws(() => loadConfig({ MAX_CONCURRENT_RUNS: "0" }), (e) => e instanceof ConfigError && /MAX_CONCURRENT_RUNS/.test(e.message));
+});
+
+// Review 2026-11 follow-up: an API token is required whenever the API listens beyond loopback.
+test("API_TOKEN: optional on loopback, required on a non-loopback HOST, never echoed", async () => {
+  const { assertApiExposureSafe, isLoopbackHost } = await import("../../src/config.ts");
+  assert.equal(loadConfig({}).apiToken, null);
+  for (const h of ["127.0.0.1", "localhost", "::1", "[::1]"]) assert.equal(isLoopbackHost(h), true, h);
+  for (const h of ["0.0.0.0", "::", "10.0.0.5", "box.local"]) assert.equal(isLoopbackHost(h), false, h);
+  assert.doesNotThrow(() => assertApiExposureSafe(loadConfig({})));
+  assert.throws(() => assertApiExposureSafe(loadConfig({ HOST: "0.0.0.0" })), (e) => e instanceof ConfigError && /API_TOKEN/.test(e.message));
+  const token = "api-token-" + "x".repeat(20);
+  const c = loadConfig({ HOST: "0.0.0.0", API_TOKEN: token });
+  assert.equal(c.apiToken, token);
+  assert.doesNotThrow(() => assertApiExposureSafe(c));
+  assert.throws(() => loadConfig({ API_TOKEN: "short-one" }), (e) => e instanceof ConfigError && /API_TOKEN/.test(e.message) && !e.message.includes("short-one"));
+  assert.throws(() => loadConfig({ API_TOKEN: token, APPROVAL_TOKEN: token }), (e) => e instanceof ConfigError && /API_TOKEN/.test(e.message));
 });

@@ -1,5 +1,5 @@
-// Persistência com prepared statements, transações escritas à mão e versão otimista (spec 4.2 e 4.3).
-// Não decide regra de negócio. JSON vai em colunas TEXT; toda leitura é validada com o schema Zod correspondente.
+// Persistence with prepared statements, hand-written transactions and optimistic version (spec 4.2 and 4.3).
+// Decides no business rules. JSON goes in TEXT columns; every read is validated with the matching Zod schema.
 import type { DatabaseSync, StatementSync } from "node:sqlite";
 import {
   ApprovalSchema, AuditEntrySchema, BlackboardSchema, GatedActionSchema, IncidentSchema, IncidentSummarySchema,
@@ -7,7 +7,7 @@ import {
 } from "../../contracts/index.ts";
 import type {
   AgentId, Approval, ApprovalStatus, AuditEntry, AuditEvent, Blackboard, EscalationReason, GatedAction, Incident,
-  IncidentStatus, IncidentSummary, LlmCallRecord, NewIncident, RunRecord, Tier, TraceEvent, TraceType,
+  IncidentStatus, IncidentSummary, LlmCallRecord, LlmCallRecordInput, NewIncident, RunRecord, Tier, TraceEvent, TraceType,
 } from "../../contracts/index.ts";
 import { canonicalJson } from "../../domain/canonical-json.ts";
 import { ConflictError, NotFoundError } from "../../domain/errors.ts";
@@ -25,7 +25,7 @@ export type IncidentStatusPatch = {
   mttrMin?: number | null;
 };
 export type IncidentFilter = { status?: IncidentStatus; service?: string; limit: number };
-/** `types` filtra por um conjunto de tipos (em SQL, via json_each); combina com `type` por AND. */
+/** `types` filters by a set of types (in SQL, via json_each); combines with `type` by AND. */
 export type TraceFilter = { type?: TraceType; types?: readonly TraceType[]; agent?: AgentId; limit?: number; last?: number };
 export type ApprovalFilter = { status?: ApprovalStatus; incidentId?: string };
 
@@ -40,6 +40,7 @@ type AuditRow = { id: string; ts: string; incident_id: string; actor: string; ev
 type LlmCallRow = {
   incident_id: string; run_id: string; prompt_version: string; model: string; prompt_tokens: number; completion_tokens: number;
   cost_usd: number; latency_ms: number; success: number; error_kind: string | null; ts: string;
+  attempts: number; used_fallback: number; usage_estimated: number;
 };
 type RunRow = { id: string; incident_id: string; started_at: string; ended_at: string | null; outcome: string | null };
 
@@ -72,7 +73,7 @@ export class SqliteIncidentStore {
     this.stmt = {
       nextSequence: p("INSERT INTO sequences (name, value) VALUES (?, 1) ON CONFLICT (name) DO UPDATE SET value = value + 1 RETURNING value"),
       // auditoria
-      // Uma cadeia por incidente: a trilha que a API devolve fecha sozinha, desde o hash gênese.
+      // One chain per incident: the trail the API returns closes on its own, from the genesis hash.
       lastAuditHash: p("SELECT hash FROM audit_log WHERE incident_id = ? ORDER BY seq DESC LIMIT 1"),
       insertAudit: p("INSERT INTO audit_log (id, ts, incident_id, actor, event, tier, details, prev_hash, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"),
       listAudit: p("SELECT * FROM audit_log WHERE incident_id = ? ORDER BY seq"),
@@ -111,7 +112,7 @@ export class SqliteIncidentStore {
          ) ORDER BY seq ASC`,
       ),
       nextTraceSeq: p("SELECT COALESCE(MAX(seq), 0) + 1 AS next FROM trace_events WHERE incident_id = ?"),
-      // ações
+      // actions
       upsertAction: p(
         `INSERT INTO actions (id, incident_id, ord, action_type, target, tier, status, executed_at, created_at, json)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -119,7 +120,7 @@ export class SqliteIncidentStore {
            tier = excluded.tier, status = excluded.status, executed_at = excluded.executed_at, json = excluded.json`,
       ),
       listActions: p("SELECT json FROM actions WHERE incident_id = ? ORDER BY ord, rowid"),
-      // aprovações
+      // approvals
       insertApproval: p(
         "INSERT INTO approvals (id, incident_id, action_id, status, requested_at, expires_at, decided_at, version, json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
       ),
@@ -130,10 +131,11 @@ export class SqliteIncidentStore {
          WHERE ($status IS NULL OR status = $status) AND ($incident IS NULL OR incident_id = $incident)
          ORDER BY requested_at, id`,
       ),
-      // chamadas de LLM e execuções
+      // LLM calls and runs
       insertLlmCall: p(
-        `INSERT INTO llm_calls (incident_id, run_id, prompt_version, model, prompt_tokens, completion_tokens, cost_usd, latency_ms, success, error_kind, ts)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO llm_calls (incident_id, run_id, prompt_version, model, prompt_tokens, completion_tokens, cost_usd, latency_ms, success, error_kind, ts,
+           attempts, used_fallback, usage_estimated)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ),
       listLlmCalls: p("SELECT * FROM llm_calls WHERE incident_id = ? ORDER BY id"),
       upsertRun: p(
@@ -151,9 +153,9 @@ export class SqliteIncidentStore {
     return st;
   }
 
-  // ---------- transação e sequências ----------
+  // ---------- transaction and sequences ----------
 
-  /** BEGIN IMMEDIATE / COMMIT / ROLLBACK escrito à mão (DatabaseSync não tem transaction()). Aninhada reaproveita a externa. */
+  /** Hand-written BEGIN IMMEDIATE / COMMIT / ROLLBACK (DatabaseSync has no transaction()). A nested one reuses the outer one. */
   transaction<T>(fn: () => T): T {
     if (this.txDepth > 0) {
       this.txDepth++;
@@ -186,8 +188,8 @@ export class SqliteIncidentStore {
   // ---------- auditoria ----------
 
   /**
-   * Acrescenta uma linha encadeada na trilha do incidente: hash = sha256(prev_hash + "\n" + canonicalJson({ id, ts,
-   * incidentId, actor, event, tier, details })), com prev_hash = hash da última linha do mesmo incidente (ou o gênese).
+   * Appends a chained row to the incident's trail: hash = sha256(prev_hash + "\n" + canonicalJson({ id, ts,
+   * incidentId, actor, event, tier, details })), with prev_hash = hash of the last row of the same incident (or the genesis).
    */
   appendAudit(e: NewAuditEntry): AuditEntry {
     return this.transaction(() => {
@@ -229,7 +231,7 @@ export class SqliteIncidentStore {
     return row ? toIncident(row) : null;
   }
 
-  /** Campos ausentes do patch ficam como estão; `null` limpa. */
+  /** Fields missing from the patch stay as they are; `null` clears. */
   updateIncidentStatus(id: string, status: IncidentStatus, patch: IncidentStatusPatch): void {
     this.transaction(() => {
       const row = this.s("getIncident").get(id) as IncidentRow | undefined;
@@ -242,13 +244,13 @@ export class SqliteIncidentStore {
         detail = patch.escalation?.detail ?? null;
       }
       const mttr = patch.mttrMin !== undefined ? patch.mttrMin : row.mttr_min;
-      // valida antes de gravar (status e motivo vêm de enums)
+      // validates before writing (status and reason come from enums)
       toIncident({ ...row, status, resolved_at: resolvedAt, escalation_reason: reason, escalation_detail: detail });
       this.s("updateIncident").run(status, resolvedAt, reason, detail, mttr, id);
     });
   }
 
-  /** WHERE e LIMIT em SQL; ORDER BY opened_at DESC, id DESC. */
+  /** WHERE and LIMIT in SQL; ORDER BY opened_at DESC, id DESC. */
   listIncidents(f: IncidentFilter): IncidentSummary[] {
     const rows = this.s("listIncidents").all({ status: f.status ?? null, service: f.service ?? null, limit: f.limit }) as IncidentRow[];
     return rows.map(toSummary);
@@ -262,7 +264,7 @@ export class SqliteIncidentStore {
     return { blackboard: BlackboardSchema.parse(JSON.parse(row.json)), version: Number(row.version) };
   }
 
-  /** Versão otimista: grava só se a versão atual for `expectedVersion` (0 = ainda não existe). Devolve a nova versão. */
+  /** Optimistic version: writes only if the current version is `expectedVersion` (0 = does not exist yet). Returns the new version. */
   saveBlackboard(incidentId: string, bb: Blackboard, expectedVersion: number): number {
     const json = JSON.stringify(BlackboardSchema.parse(bb));
     const result = expectedVersion === 0
@@ -285,7 +287,7 @@ export class SqliteIncidentStore {
     });
   }
 
-  /** Em ordem de seq. `limit` = os N primeiros; `last` = os N mais recentes, ainda em ordem crescente. Com `type`, o tipo do evento é estreitado. */
+  /** In seq order. `limit` = the first N; `last` = the N most recent, still in ascending order. With `type`, the event type is narrowed. */
   listTrace<T extends TraceType>(incidentId: string, f: TraceFilter & { type: T }): Extract<TraceEvent, { type: T }>[];
   listTrace(incidentId: string, f?: TraceFilter): TraceEvent[];
   listTrace(incidentId: string, f: TraceFilter = {}): TraceEvent[] {
@@ -300,7 +302,7 @@ export class SqliteIncidentStore {
     return Number((this.s("nextTraceSeq").get(incidentId) as { next: number }).next);
   }
 
-  // ---------- ações ----------
+  // ---------- actions ----------
 
   upsertAction(a: GatedAction): void {
     const action = GatedActionSchema.parse(a);
@@ -314,7 +316,7 @@ export class SqliteIncidentStore {
     return (this.s("listActions").all(incidentId) as { json: string }[]).map((r) => GatedActionSchema.parse(JSON.parse(r.json)));
   }
 
-  // ---------- aprovações ----------
+  // ---------- approvals ----------
 
   createApproval(a: Approval): void {
     const ap = ApprovalSchema.parse(a);
@@ -326,7 +328,7 @@ export class SqliteIncidentStore {
     return row ? ApprovalSchema.parse(JSON.parse(row.json)) : null;
   }
 
-  /** Versão otimista: grava só se a versão atual for `expectedVersion`; a versão gravada é sempre `expectedVersion + 1`. */
+  /** Optimistic version: writes only if the current version is `expectedVersion`; the written version is always `expectedVersion + 1`. */
   transitionApproval(id: string, next: Approval, expectedVersion: number): void {
     if (next.id !== id) throw new TypeError(`transitionApproval: id divergente (${id} e ${next.id})`);
     const ap = ApprovalSchema.parse({ ...next, version: expectedVersion + 1 });
@@ -336,19 +338,20 @@ export class SqliteIncidentStore {
     }
   }
 
-  /** Status gravado (a projeção de expiração é do serviço). */
+  /** Stored status (the expiry projection belongs to the service). */
   listApprovals(f: ApprovalFilter): Approval[] {
     const rows = this.s("listApprovals").all({ status: f.status ?? null, incident: f.incidentId ?? null }) as { json: string }[];
     return rows.map((r) => ApprovalSchema.parse(JSON.parse(r.json)));
   }
 
-  // ---------- chamadas de LLM e execuções ----------
+  // ---------- LLM calls and runs ----------
 
-  recordLlmCall(c: LlmCallRecord): void {
+  recordLlmCall(c: LlmCallRecordInput): void {
     const call = LlmCallRecordSchema.parse(c);
     this.s("insertLlmCall").run(
       call.incidentId, call.runId, call.promptVersion, call.model, call.promptTokens, call.completionTokens,
       call.costUsd, call.latencyMs, call.success ? 1 : 0, call.errorKind, call.ts,
+      call.attempts, call.usedFallback ? 1 : 0, call.usageEstimated ? 1 : 0,
     );
   }
 
@@ -358,11 +361,12 @@ export class SqliteIncidentStore {
         incidentId: r.incident_id, runId: r.run_id, promptVersion: r.prompt_version, model: r.model,
         promptTokens: Number(r.prompt_tokens), completionTokens: Number(r.completion_tokens), costUsd: Number(r.cost_usd),
         latencyMs: Number(r.latency_ms), success: Number(r.success) === 1, errorKind: r.error_kind, ts: r.ts,
+        attempts: Number(r.attempts), usedFallback: Number(r.used_fallback) === 1, usageEstimated: Number(r.usage_estimated) === 1,
       }),
     );
   }
 
-  /** Upsert por id: grava o início e, depois, o fim e o desfecho. */
+  /** Upsert by id: writes the start and, later, the end and the outcome. */
   recordRun(r: RunRecord): void {
     const run = RunRecordSchema.parse(r);
     this.s("upsertRun").run(run.id, run.incidentId, run.startedAt, run.endedAt, run.outcome);

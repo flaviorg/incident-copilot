@@ -46,7 +46,7 @@ test("valid narrative is kept", async () => {
   assert.equal(pm.status, "final");
   assert.match(pm.summary, /11\.2 min/);
   assert.equal(out.phase, "done");
-  // Números calculados, não redigidos pelo LLM.
+  // Computed numbers, not written by the LLM.
   assert.equal(out.metrics!.resolvedAt, "2026-10-04T09:51:41.000Z");
   assert.ok(Math.abs(out.metrics!.mttrMin! - 11.18) < 0.01);
   assert.equal(out.metrics!.timeAwaitingApprovalMin, 3);
@@ -54,7 +54,7 @@ test("valid narrative is kept", async () => {
   assert.deepEqual(pm.actions.map((a) => [a.actionType, a.tier, a.status, a.decidedBy]), [
     ["add_incident_note", 2, "succeeded", null], ["rollback_deployment", 3, "succeeded", "ana"], ["block_image_tag", 2, "succeeded", null],
   ]);
-  // Linha do tempo determinística, em ordem, com aprovação e canário.
+  // Deterministic timeline, in order, with approval and canary.
   assert.ok(pm.timeline.every((t, i) => i === 0 || t.ts >= pm.timeline[i - 1]!.ts));
   assert.ok(pm.timeline.some((t) => /APR-0001.*ana/.test(t.text)));
   assert.ok(pm.timeline.some((t) => /canary/.test(t.text)));

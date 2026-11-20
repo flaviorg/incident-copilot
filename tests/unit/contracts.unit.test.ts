@@ -64,7 +64,7 @@ const action = () => ({
   resultSummary: null,
 });
 
-/** Lista recursiva de arquivos .ts; devolve [] se a pasta não existir. */
+/** Recursive list of .ts files; returns [] if the folder does not exist. */
 function walk(dir: string): string[] {
   if (!existsSync(dir)) return [];
   const out: string[] = [];
@@ -99,7 +99,7 @@ test("contracts and domain import neither node: nor outer layers", () => {
   }
 });
 
-// Spec 7.2, regra 4, e 8.2: fixture inválida falha aqui, não no meio da demo.
+// Spec 7.2, rule 4, and 8.2: an invalid fixture fails here, not in the middle of the demo.
 function fixtureProblems(raw: unknown, prompts: PromptDef<any, any>[]): string[] {
   const parsed = FixtureFileSchema.safeParse(raw);
   if (!parsed.success) return parsed.error.issues.map((i) => `formato: ${i.path.join(".")}`);
@@ -112,7 +112,7 @@ function fixtureProblems(raw: unknown, prompts: PromptDef<any, any>[]): string[]
   }
   for (const t of parsed.data.turns) {
     const p = byVersion.get(t.prompt);
-    if (!p) { problems.push(`${t.id}: prompt desconhecido ${t.prompt}`); continue; }
+    if (!p) { problems.push(`${t.id}: unknown prompt ${t.prompt}`); continue; }
     if (!(t.prompt in parsed.data.promptHashes)) problems.push(`${t.id}: prompt ${t.prompt} has no registered hash`);
     if (t.output !== undefined && !p.outputSchema.safeParse(t.output).success) problems.push(`${t.id}: output outside the schema of ${t.prompt}`);
   }
@@ -123,7 +123,7 @@ test("every LLM fixture parses, has current prompt hashes and outputs that pass 
   const files = fixtureFiles();
   assert.ok(files.length >= 5, `expected at least 5 fixtures, found ${files.length}`);
   for (const file of files) assert.deepEqual(fixtureProblems(JSON.parse(readFileSync(file, "utf8")), ALL_PROMPTS), [], file);
-  // O próprio verificador pega uma saída inválida e um hash velho.
+  // The verifier itself catches an invalid output and a stale hash.
   const broken = JSON.parse(readFileSync(files[0]!, "utf8"));
   broken.turns[0].output = { next: "escalation" };
   broken.promptHashes["planner.v1"] = "sha256:old";
@@ -131,7 +131,7 @@ test("every LLM fixture parses, has current prompt hashes and outputs that pass 
   assert.ok(found.some((p) => p.includes("output outside the schema")) && found.some((p) => p.includes("stale hash")), found.join("; "));
 });
 
-// Revisão final: os campos livres que chegam pelo MCP (sem autenticação) e pelo planejador têm teto de tamanho.
+// Final review: the free-form fields that arrive via MCP (unauthenticated) and via the planner have a size cap.
 test("MCP proposal input caps every free-text field", () => {
   const base = { incidentId: "INC-0001", actionType: "add_incident_note", target: "incident/INC-0001", params: { text: "oi" }, rationale: "r", runbookRef: "rb#s" };
   assert.equal(ProposeRemediationInputSchema.safeParse(base).success, true);

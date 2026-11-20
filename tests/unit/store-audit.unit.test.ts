@@ -18,7 +18,7 @@ import {
 const mk = () => new SqliteIncidentStore(openDatabase(":memory:"), { secrets: ["supersecret-token"], now: () => new Date("2026-10-04T10:00:00Z") });
 const entry = (details: Record<string, unknown>) => ({ incidentId: "INC-0001", actor: "system:test", event: "incident_opened" as const, tier: null, details });
 
-/** Lê o CREATE TABLE em sqlite_master e extrai a lista do CHECK (col IN (...)). */
+/** Reads the CREATE TABLE from sqlite_master and extracts the CHECK list (col IN (...)). */
 function checkValues(db: DatabaseSync, table: string, column: string): (string | number)[] {
   const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get(table) as { sql: string } | undefined;
   assert.ok(row, `table ${table} does not exist`);
@@ -69,8 +69,8 @@ test("audit rows are chained by hash over canonical JSON", () => {
 });
 
 test("each incident trail is its own chain, verifiable from genesis even when incidents interleave", () => {
-  // Revisão final: a cadeia era global ao banco, e o GET /incidents/:id/audit de um incidente intercalado com outro
-  // trazia um prevHash apontando para uma linha alheia, impossível de conferir pelo cliente.
+  // Final review: the chain was global to the database, and GET /incidents/:id/audit for an incident interleaved with another
+  // returned a prevHash pointing to a foreign row, impossible for the client to verify.
   const s = mk();
   const other = (n: number) => ({ ...entry({ n }), incidentId: "INC-0002" });
   s.appendAudit(entry({ n: 1 }));
@@ -110,7 +110,7 @@ test("constant-time comparison over SHA-256", () => {
 });
 
 test("audit order comes from an explicit INTEGER PRIMARY KEY, not the implicit rowid", () => {
-  // Sem INTEGER PRIMARY KEY, o SQLite pode renumerar o rowid num VACUUM; a cadeia de hash depende da ordem.
+  // Without INTEGER PRIMARY KEY, SQLite may renumber the rowid on a VACUUM; the hash chain depends on order.
   const s = mk();
   const cols = s.db.prepare("PRAGMA table_info(audit_log)").all() as { name: string; type: string; pk: number }[];
   assert.deepEqual(cols.filter((c) => c.pk > 0).map((c) => [c.name, c.type]), [["seq", "INTEGER"]]);
@@ -119,7 +119,7 @@ test("audit order comes from an explicit INTEGER PRIMARY KEY, not the implicit r
   assert.equal((s.db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, SCHEMA_VERSION);
 });
 
-// audit_log da versão 1 do schema (sem seq), para o teste de migração.
+// audit_log from schema version 1 (no seq), for the migration test.
 const V1_AUDIT_DDL = `
 CREATE TABLE audit_log (
   id TEXT NOT NULL UNIQUE, ts TEXT NOT NULL, incident_id TEXT NOT NULL, actor TEXT NOT NULL, event TEXT NOT NULL,
@@ -136,7 +136,7 @@ test("a version 1 database is migrated keeping the audit order, the chain and th
     const path = join(dir, "v1.db");
     const old = new DatabaseSync(path);
     old.exec(V1_AUDIT_DDL);
-    // ids fora de ordem lexicográfica de propósito: a ordem é a de inserção.
+    // ids deliberately out of lexicographic order: the order is insertion order.
     let prev = "0".repeat(64);
     for (const [i, id] of ["AUD-9999", "AUD-10000", "AUD-10001"].entries()) {
       const body = { id, ts: `2026-10-04T10:00:0${i}.000Z`, incidentId: "INC-0001", actor: "system:test", event: "incident_opened", tier: null, details: { i } };

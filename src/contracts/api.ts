@@ -1,4 +1,4 @@
-// Contratos da borda HTTP e MCP (spec 5.3 e 5.4).
+// HTTP and MCP edge contracts (spec 5.3 and 5.4).
 import * as z from "zod";
 import {
   ActionStatusSchema, AgentIdSchema, ApprovalStatusSchema, EscalationReasonSchema,
@@ -13,7 +13,7 @@ import { ApprovalSchema } from "./approval.ts";
 import { RunbookMatchSchema, VerificationSchema } from "./blackboard.ts";
 import { IncidentMetricsSchema } from "./metrics.ts";
 
-// Entradas
+// Inputs
 export const CreateIncidentBodySchema = z.object({
   scenarioId: z.string().min(1).max(64),
   title: z.string().min(1).max(120).optional(),
@@ -50,7 +50,7 @@ export const DecisionBodySchema = z
 export const StatsWindowSchema = z.enum(["1h", "24h", "7d"]);
 export const StatsQuerySchema = z.object({ since: StatsWindowSchema.default("24h") });
 
-// Saídas
+// Outputs
 export const IncidentSummarySchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -72,7 +72,7 @@ export const IncidentViewSchema = z.object({
   planRevision: z.number().int(),
   audit: AuditReviewSchema.nullable(),
   actions: z.array(GatedActionSchema),
-  approvals: z.array(ApprovalSchema), // status efetivo
+  approvals: z.array(ApprovalSchema), // effective status
   verification: VerificationSchema.nullable(),
   metrics: IncidentMetricsSchema.nullable(),
   postmortemReady: z.boolean(),
@@ -86,7 +86,7 @@ export const AuditEntryViewSchema = z.object({
   event: AuditEventSchema,
   tier: TierSchema.nullable(),
   details: z.record(z.string(), z.unknown()),
-  // Com prevHash, o cliente recalcula cada hash (incidentId vem da URL) e confere o encadeamento.
+  // With prevHash, the client recomputes each hash (incidentId comes from the URL) and checks the chaining.
   prevHash: z.string(),
   hash: z.string(),
 });
@@ -115,9 +115,9 @@ export const ErrorBodySchema = z.object({
   }),
 });
 
-// MCP: propose_remediation. O cliente MCP não se autentica, então todo campo livre tem teto: um alvo ou parâmetro
-// gigante seria classificado, iria para a fila do humano e entraria inteiro no trace e no blackboard.
-/** Teto do JSON de `params`: o maior parâmetro do catálogo (a nota, 500 caracteres) com folga. */
+// MCP: propose_remediation. The MCP client does not authenticate, so every free-form field has a cap: a huge target or parameter
+// would be classified, go to the human queue and land whole in the trace and the blackboard.
+/** Cap on the `params` JSON: the largest parameter in the catalog (the note, 500 characters) with headroom. */
 export const MCP_PARAMS_MAX_JSON_CHARS = 2000;
 
 const jsonLength = (v: unknown): number => {

@@ -1,5 +1,5 @@
-// Planejador de remediação (spec 4.6 e 5.1, passo 6): sem ferramentas; vê o catálogo como texto e o feedback do auditor.
-// A saída é validada pelo RemediationPlanSchema na borda do provedor (no máximo 8 passos).
+// Remediation planner (spec 4.6 and 5.1, step 6): no tools; sees the catalog as text and the auditor's feedback.
+// The output is validated by RemediationPlanSchema at the provider edge (at most 8 steps).
 import type { LlmProvider } from "../../llm/provider.ts";
 import { plannerPrompt } from "../../prompts/v1/index.ts";
 import { clip, llmInfoOf } from "../../app/trace-sink.ts";

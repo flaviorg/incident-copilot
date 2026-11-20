@@ -1,8 +1,8 @@
-// Erros tipados do domínio (spec 6.1). Cada um tem `code` estável; a borda (HTTP, MCP, CLI) traduz para status e texto curto.
+// Typed domain errors (spec 6.1). Each has a stable `code`; the edge (HTTP, MCP, CLI) translates it to a status and short text.
 
 export type Issue = { path: string; message: string };
 
-/** Entrada inválida na borda ou arquivo de dados inválido. */
+/** Invalid input at the edge or invalid data file. */
 export class ValidationError extends Error {
   readonly code = "validation_error";
   readonly issues: Issue[];
@@ -33,7 +33,7 @@ export class ConflictError extends Error {
   }
 }
 
-/** 422: pedido bem formado que não pode ser processado (decisão ambígua, ação recusada pelo portão). */
+/** 422: well-formed request that cannot be processed (ambiguous decision, action refused by the gate). */
 export class UnprocessableError extends Error {
   readonly code: string;
   constructor(code: string, message: string) {
@@ -83,7 +83,7 @@ export class RunTimeoutError extends Error {
   }
 }
 
-/** Chamada ao provedor fake sem turno roteirizado (spec 7.2, regra 3). Defeito do repositório, não do incidente. */
+/** Call to the fake provider with no scripted turn (spec 7.2, rule 3). A repository defect, not an incident one. */
 export class UnscriptedLlmCallError extends Error {
   readonly code = "unscripted_llm_call";
   readonly scenarioId: string;
@@ -112,7 +112,7 @@ export class UnscriptedLlmCallError extends Error {
   }
 }
 
-/** Hash de `version + system` diferente do registrado na fixture (spec 7.2, regra 1). */
+/** Hash of `version + system` differs from the one recorded in the fixture (spec 7.2, rule 1). */
 export class FixturePromptDriftError extends Error {
   readonly code = "fixture_prompt_drift";
   readonly prompt: string;
@@ -127,7 +127,7 @@ export class FixturePromptDriftError extends Error {
   }
 }
 
-/** Valor devolvido (não lançado) pela máquina de aprovação quando a transição não é permitida. */
+/** Value returned (not thrown) by the approval machine when the transition is not allowed. */
 export class ApprovalTransitionError {
   readonly code: "not_pending" | "expired";
   constructor(code: "not_pending" | "expired") {

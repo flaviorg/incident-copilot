@@ -1,16 +1,16 @@
-// Processos filhos dos testes (CLI e servidor MCP), com a rede bloqueada também no filho (AC-27) e sem herdar o
-// ambiente (só PATH e HOME).
+// Child processes of the tests (CLI and MCP server), with the network blocked in the child too (AC-27) and without inheriting the
+// environment (only PATH and HOME).
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 export const PROJECT_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 
-/** Argumentos do node em todo filho de teste: o mesmo bloqueio de fetch do processo de teste. */
+/** Node arguments for every test child: the same fetch block as the test process. */
 export const CHILD_NODE_ARGS: readonly string[] = ["--import", "./tests/setup/no-network.ts"];
 
 export type ChildResult = { code: number; stdout: string; stderr: string; ms: number };
 
-/** `node <CHILD_NODE_ARGS> <args>` na raiz do projeto. */
+/** `node <CHILD_NODE_ARGS> <args>` at the project root. */
 export function runNode(args: string[], env: Record<string, string> = {}): Promise<ChildResult> {
   const started = Date.now();
   return new Promise((resolve, reject) => {

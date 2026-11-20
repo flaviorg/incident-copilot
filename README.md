@@ -8,8 +8,8 @@
 [![MIT License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Node 24.21](https://img.shields.io/badge/node-24.21-brightgreen?logo=nodedotjs&logoColor=white)](.nvmrc)
 [![TypeScript 7](https://img.shields.io/badge/TypeScript-7.0-3178c6?logo=typescript&logoColor=white)](tsconfig.json)
-[![Tests](https://img.shields.io/badge/tests-351%20backend%20%2B%2037%20web-brightgreen)](#tests-and-quality)
-[![Version 0.2.0](https://img.shields.io/badge/version-0.2.0-blue)](CHANGELOG.md)
+[![Tests](https://img.shields.io/badge/tests-378%20backend%20%2B%2037%20web-brightgreen)](#tests-and-quality)
+[![Version 0.3.0](https://img.shields.io/badge/version-0.3.0-blue)](CHANGELOG.md)
 
 [**Live War Room demo**](https://flaviorg.github.io/incident-copilot/) · [Quick start](#quick-start) · [Architecture](docs/architecture.md) · [Threat model](docs/threat-model.md) · [Changelog](CHANGELOG.md)
 
@@ -54,7 +54,7 @@ LLM agents can already investigate an incident and propose a fix. The problem is
 - **Four entry points, one core:** CLI, HTTP API (Fastify), MCP server (stdio) and War Room (React 19, published on GitHub Pages).
 - **Insert-only audit** with a hash chain over canonical JSON, verifiable by the client.
 - **Runs offline**, with no Docker, no key and no network after `npm install`, using a scripted fake LLM; OpenRouter plugs in with two environment variables.
-- **351 backend tests and 37 War Room tests, none using the network**, plus SDD specs with 41 acceptance criteria in EARS.
+- **378 backend tests and 37 War Room tests, none using the network**, plus SDD specs with 41 acceptance criteria in EARS.
 
 ## Architecture
 
@@ -112,7 +112,7 @@ Full diagrams (components, graph, approval state machine), route table and depen
 | Telemetry analyst | yes (`telemetry-react.v1`), ReAct loop up to 12 steps | `query_metrics`, `query_logs`, `list_deploys`, `audit_cloud_inventory` (tier 1) | diagnosis with an enum category, confidence and evidence |
 | Runbook retriever | no | BM25 over `runbooks/` | passages above the threshold, or a refusal |
 | Remediation planner | yes (`planner.v1`) | none (sees the catalog as text) | plan of up to 8 steps |
-| Plan auditor | yes (`auditor.v1`), plus 5 rules in code as a floor | inventory and deploy queries made by the code | `approve` or `revise`, with up to 2 revisions |
+| Plan auditor | yes (`auditor.v1`), plus 6 rules in code as a floor | inventory and deploy queries made by the code | `approve` or `revise`, with up to 2 revisions |
 | Remediation gate | no | `classifyAction`, dry run, approval queue | actions by tier |
 | Executor | no | simulated world, circuit breaker, rate limiter | executed actions |
 | Verifier | no | canary (`analyzeCanary`), rollback | healthy canary or rollback |
@@ -143,7 +143,7 @@ scenario deploy-5xx-rollback · service orders-api · sev1
 (...)
 09:44:19  telemetry analyst → supervisor: diagnosis bad_deploy (faulty deploy, high confidence, 3 pieces of evidence)
 (...)
-09:45:39  auditor → supervisor: plan revision 0 approved (5 of 5 rules ok)
+09:45:39  auditor → supervisor: plan revision 0 approved (6 of 6 rules ok)
 (...)
 09:46:05    obs   rollback_deployment tier 3: dry run ok (deployment/orders-api: v3.8.0 -> v3.7.2 (6 replicas)) → awaiting APR-0001
 (...)
@@ -160,7 +160,7 @@ MTTR                    11.2 min        measured (simulated timeline, 09:40:30 �
 MTTD                    2.0 min         measured
 Minutes saved           33.8 to 83.8    illustrative (synthetic baseline of 45 to 95 min)
 ROI                     18.9x to 48.2x  illustrative (assumptions in data/business-assumptions.json)
-LLM cost                US$ 0.00        measured (12 calls, 13956 tokens)
+LLM cost                US$ 0.00        measured (12 calls, 13984 tokens)
 
 trace 41 events (thought 4 · action 10 · observation 10 · plan 1 · critique 2 · answer 2 · handoff 12)
 post-mortem: reports/INC-0001-postmortem.md
@@ -188,6 +188,7 @@ The full output of both scenarios, line by line, is in [`docs/demo-output.md`](d
 | Route | What it does |
 |---|---|
 | `POST /incidents` | opens an incident and runs the team until `awaiting_approval`, `resolved` or `escalated` |
+| `POST /incidents/:id/resume` | retries a resume whose run failed (every approval already decided) |
 | `GET /incidents`, `GET /incidents/:id` | list with SQL filtering; full view of the incident |
 | `GET /incidents/:id/trace`, `/audit`, `/postmortem` | trace, verifiable audit trail and post-mortem (Markdown or JSON) |
 | `GET /approvals`, `POST /approvals/:id/decision` | approval queue; decision with `X-Approval-Token`, which resumes the incident |
@@ -219,7 +220,7 @@ The last command shows the [numeric guard](#numbers-without-invention) at work: 
 
 </details>
 
-All routes with their error codes and the full sequence (`/health`, `/stats`, post-mortem in Markdown): [`docs/http-api.md`](docs/http-api.md).
+With `API_TOKEN` set (required when `HOST` is not loopback), every route except `/health` needs `Authorization: Bearer <API_TOKEN>`. Requests whose `Host` is not a loopback name, `HOST` or one of `ALLOWED_HOSTS` get 421 (DNS rebinding); writes with a cross-site `Origin` get 403; more than `MAX_CONCURRENT_RUNS` runs at once get 429. All routes with their error codes and the full sequence (`/health`, `/stats`, post-mortem in Markdown): [`docs/http-api.md`](docs/http-api.md).
 
 ### MCP server
 
@@ -303,7 +304,7 @@ npm run web:demo      # generates the recordings and starts Vite
    - `npm run test:live`: runs the deploy scenario against the real model and checks structure only (category in the enum, steps in the catalog or blocked, numeric guard passed or template used). Without a key, the test is skipped.
    - `npm run cli -- demo --live`: the terminal demo with the real model. The `cli` script reads `.env`; the `demo` script deliberately does not, so the default demo never picks up a key by accident. Without `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` (or with `LLM_PROVIDER=fake`), `--live` ends with an error and exit code 1 instead of falling back to the fake.
 
-Any endpoint compatible with the OpenAI API will work (`LLM_BASE_URL`). Every call is recorded in `llm_calls` with tokens, estimated cost ([`data/model-prices.json`](data/model-prices.json)), latency and error type.
+Any endpoint compatible with the OpenAI API will work (`LLM_BASE_URL`). Every logical call is recorded in `llm_calls` with tokens and estimated cost summed over all its attempts ([`data/model-prices.json`](data/model-prices.json)), latency, error type, the attempt count, whether the fallback answered, and whether the usage was estimated because the provider reported none. Retries wait with exponential backoff and jitter (or `Retry-After`); a 4xx other than 408 or 429 is not retried, and 401, 402 and 403 also skip the fallback, which uses the same key.
 
 > **Add your model's price first.** The price table ships empty on purpose (prices change; check the current one on OpenRouter). A model with no entry is recorded at $0.00, so at startup the API, MCP server and CLI log a `warn` line with `"event": "llm_price_missing"` and the unpriced model ids. Add an entry per model (primary and fallback), for example `"models": { "<vendor>/<model>": { "inputPerMTokUsd": 3, "outputPerMTokUsd": 15 } }`.
 
@@ -338,11 +339,12 @@ Full action catalog and context rules: [`docs/autonomy-matrix.md`](docs/autonomy
 |---|---|---|
 | Autonomy Matrix | Tier from the catalog; context rules can only raise it. Tier 1 reads; 2 runs and is logged; 3 requires human approval; 4 is forbidden by construction (the type does not even exist in the executor registry) | `autonomy.unit.test.ts`, `scenarios.e2e.test.ts` |
 | Supervisor guard | A choice without its precondition becomes a `critique` (`coerced`) and follows the canonical route | `supervisor-guard.unit.test.ts`, `team.e2e.test.ts` |
-| Auditor with a floor in code | The LLM can tighten the verdict, never loosen it; the override is recorded in the `overridden` field of the `critique`, which `/stats` counts | `auditor-rules.unit.test.ts`, `nodes-planning.unit.test.ts`, `stats.unit.test.ts` |
+| Auditor with a floor in code | Six rules, including unique step orders. The LLM can tighten the verdict, never loosen it; the override is recorded in the `overridden` field of the `critique`, which `/stats` counts | `auditor-rules.unit.test.ts`, `nodes-planning.unit.test.ts`, `stats.unit.test.ts` |
 | Caps | ReAct 12, analyst rounds 2, team 8, recursion 25, revisions 2, steps per plan 8, observation 600 characters; `RUN_TIMEOUT_MS` is also checked against the clock at every superstep | `telemetry.e2e.test.ts`, `team.e2e.test.ts`, `tools.unit.test.ts` (observation), `resilience.e2e.test.ts` (timeout) |
 | Approval | Pure state machine; free text only with exact terms; expiry projected on read and materialized on decision; rejection cancels dependents; decision refused (409 `incident_not_accepting`) while the incident's run is still in progress | `approval-machine.unit.test.ts`, `parse-decision.unit.test.ts`, `gate.e2e.test.ts` |
+| API token | `API_TOKEN` as `Authorization: Bearer` on every route but `/health`, constant-time; required (startup fails otherwise) when `HOST` is not loopback; must differ from `APPROVAL_TOKEN`; redacted like every secret | `config.unit.test.ts`, `http.e2e.test.ts` |
 | Approval token | Constant-time comparison; 5 errors in 10 min lock for 10 min (a process-wide lock, see limitations); never echoed | `guards.unit.test.ts`, `http.e2e.test.ts` |
-| Secrets | `redactSecrets` on every output; scan of the 7 surfaces; `check:secrets` in the pre-commit hook and in CI (the local `.env` is skipped as long as Git does not track it) | `secrets.e2e.test.ts`, `check-secrets.unit.test.ts` |
+| Secrets | `redactSecrets` on every output, also matching each secret's JSON-escaped form, and always before clipping; scan of the 7 surfaces; `check:secrets` in the pre-commit hook and in CI (the local `.env` is skipped as long as Git does not track it) | `secrets.e2e.test.ts`, `check-secrets.unit.test.ts` |
 | Circuit breaker and rate limit | 3 failures open it for 300 s; 5 executions per minute; the same action on the same target once per 10 min | `guards.unit.test.ts`, `gate.e2e.test.ts` |
 | Canary | Threshold in code; a failed canary reverts reversible actions in reverse order | `canary.unit.test.ts`, `gate.e2e.test.ts` |
 | Audit | Insert-only (database triggers), hash chain over canonical JSON, one chain per incident from the genesis hash, ordered by `seq INTEGER PRIMARY KEY`; the API returns `prevHash` and `hash` so the client can recompute the chain | `store-audit.unit.test.ts`, `http.e2e.test.ts` |
@@ -387,7 +389,7 @@ npm run web:test     # War Room
 npm run verify       # what CI runs: typecheck, tests, web tests and build, check:tokens, check:secrets
 ```
 
-Current count: **351 backend tests**, all passing (270 unit tests in 40 files and 81 end-to-end tests in 11 files), and **37 in the War Room**, in 6 files. The live test is skipped without a key.
+Current count: **378 backend tests**, all passing (287 unit tests in 41 files and 91 end-to-end tests in 11 files), and **37 in the War Room**, in 6 files. The live test is skipped without a key.
 
 - **No network.** `fetch` is replaced by a function that throws, in the test process and in child processes (CLI and MCP); one test starts a child through the same helpers and checks that the block holds inside it.
 - **Strict fake.** Scenario tests assert that every turn of the script was consumed and that the metrics match the golden files.
@@ -560,14 +562,14 @@ The most important point first: **the fake provider proves the mechanics, not th
 - **Simulated world.** No action touches real infrastructure.
 - **Simulated clock in the demo.** The demo MTTR is the simulated timeline, not a measured time.
 - **Scripted narrative.** With the system clock, the numbers in the fake's narrative do not match and the post-mortem comes out through the template (the numeric guard working, but without a narrative).
-- **Open findings from the November 2026 review.** A full review with verification lives in [`docs/code-review-2026-11.md`](docs/code-review-2026-11.md): 31 confirmed findings, of which 13 are fixed in 0.2.0: the only high-severity one (a half-open circuit breaker that could stay blocked until a restart) and all six medium ones. The 18 open items are low severity; the review lists each one with a suggested fix.
+- **November 2026 review.** A full review with verification lives in [`docs/code-review-2026-11.md`](docs/code-review-2026-11.md): 31 confirmed findings, all fixed (13 in 0.2.0, the 18 low-severity ones in 0.3.0). The two follow-ups it left open, an API token for a non-loopback `HOST` and translating the Portuguese code comments, are done too.
 - **In-memory protections.** The circuit breaker, the execution rate limiter and the token-attempt lock are per process; restarting the API resets all three. Half-open, the breaker treats a whole execution batch as its single trial: the verifier records the outcome, a failure reopens it, and a batch with no outcome (throttled, or nothing mitigated) hands the trial back.
 - **Global token lock.** The 5 wrong attempts (or attempts without a token) count for the whole process, not per client: whoever gets it wrong 5 times in 10 min blocks decisions for everyone, including the operator with the right token, for 10 min. The API only listens on `127.0.0.1`; the risk is accepted in the [threat model](docs/threat-model.md).
 - **Single token.** There are no users or roles.
 - **Numbers spelled out.** The numeric guard only extracts digits; "three minutes" in a narrative passes without being checked.
 - **Unpriced models cost $0.00.** Real-provider cost comes from `data/model-prices.json`, which ships empty; an unpriced model is recorded at 0 and the process warns at startup (`llm_price_missing`). Reading the provider's own reported cost is future work.
 - **Expiry without a scheduler.** An incident whose operator never tries to decide stays `awaiting_approval` in the database, although reads show the approval as `expired`.
-- **Run interrupted by a process crash.** Decisions are only accepted when no run of the incident is in progress (a `runs` row with no end). If the process crashes mid-run, that row stays open and the incident starts refusing decisions with 409 `incident_not_accepting`; there is no recovery command in v1.
+- **Run interrupted by a process crash.** Decisions are only accepted when no run of the incident is in progress (a `runs` row with no end). A row left open by a crashed process is closed as `abandoned` once it is older than `RUN_TIMEOUT_MS` plus 60 s, so for up to about 4 minutes (with the defaults) the incident still refuses decisions with 409. The crashed run's partial work is lost.
 - **Time waiting for approval** is the sum of the decided approvals (18.0 min in the cost scenario), not the wall-clock time the incident sat idle (9 min).
 
 <details>

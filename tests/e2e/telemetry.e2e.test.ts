@@ -25,7 +25,7 @@ test("deploy diagnosis via ReAct with typed trace", async () => {
   assert.ok(actions.every((e) => e.payload.tier === 1 && e.agent === "telemetry_analyst"));
   const handoff = c.store.listTrace(bb.incidentId, { type: "handoff" })[0]!;
   assert.deepEqual([handoff.payload.from, handoff.payload.to], ["telemetry_analyst", "supervisor"]);
-  // Pensamentos carregam o uso do LLM; o relógio simulado avança 20 s por chamada e 3 s por ferramenta.
+  // Thoughts carry the LLM usage; the simulated clock advances 20 s per call and 3 s per tool.
   const thoughts = c.store.listTrace(bb.incidentId, { type: "thought" });
   assert.ok(thoughts.every((e) => e.llm?.promptVersion === "telemetry-react.v1" && e.llm.model === "fake/scripted"));
   assert.deepEqual(c.store.listTrace(bb.incidentId, { type: "observation" }).map((e) => e.ts.slice(11, 19)), ["09:42:53", "09:43:16", "09:43:39"]);

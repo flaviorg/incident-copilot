@@ -1,9 +1,9 @@
-// Formatação de saída da CLI (texto para pessoas, em pt-BR).
+// CLI output formatting (text for people, in English with en-US number formats).
 import type { ToolResult } from "../tools/registry.ts";
 import type { IncidentMetrics, TraceEvent } from "../contracts/index.ts";
 import { AGENT_LABELS } from "../domain/report/postmortem-template.ts";
 
-/** Tabela com colunas alinhadas por espaços. */
+/** Table with columns aligned by spaces. */
 export function renderTable(headers: string[], rows: string[][]): string {
   const widths = headers.map((h, i) => Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length)));
   const line = (cells: string[]) => cells.map((c, i) => (i === cells.length - 1 ? c : c.padEnd(widths[i]!))).join("  ").trimEnd();
@@ -37,7 +37,7 @@ const CRITIC_LABELS: Record<string, string> = {
   auditor: "auditor", supervisor_guard: "supervisor guard", gate: "gate", numeric_guard: "numeric guard", canary: "canary",
 };
 
-/** Uma linha por evento no formato do spec 10.3: horário, recuo de 2 espaços para conversa e de 4 para passos. */
+/** One line per event in the spec 10.3 format: time, 2-space indent for chat and 4 for steps. */
 export function renderEvent(e: TraceEvent): string | null {
   const t = time(e.ts);
   switch (e.type) {
@@ -48,7 +48,7 @@ export function renderEvent(e: TraceEvent): string | null {
     case "action":
       return `${t}    act   ${e.payload.tool}(${oneLine(argValues(e.payload.args), 160)})${e.payload.tier === null ? "" : ` · tier ${e.payload.tier}`}`;
     case "observation":
-      // No portão, ok=false quer dizer "não passou no portão" (o resumo já diz por quê), não falha de ferramenta.
+      // At the gate, ok=false means "did not pass the gate" (the summary already says why), not a tool failure.
       return `${t}    obs   ${e.payload.ok || e.agent === "gate" ? "" : "failed: "}${oneLine(e.payload.summary)}`;
     case "plan":
       return `${t}  ${AGENT_LABELS[e.agent]}: plan revision ${e.payload.revision} with ${e.payload.steps.length} step${e.payload.steps.length === 1 ? "" : "s"}: ${oneLine(e.payload.summary, 160)}`;
@@ -65,8 +65,8 @@ const times = (x: number) => `${x.toLocaleString("en-US", { maximumFractionDigit
 const row = (label: string, value: string, note: string) => `${label.padEnd(24)}${value.padEnd(16)}${note}`;
 
 /**
- * Quadro de números (spec 5.7 e 10.3): MTTR e tempo aguardando aprovação em destaque; minutos economizados e ROI como
- * faixa rotulada "ilustrativo"; economia mensal quando houver.
+ * Numbers panel (spec 5.7 and 10.3): MTTR and time waiting for approval highlighted; minutes saved and ROI as a
+ * range labeled "illustrative"; monthly savings when present.
  */
 export function renderMetrics(m: IncidentMetrics): string[] {
   const lines: string[] = [];

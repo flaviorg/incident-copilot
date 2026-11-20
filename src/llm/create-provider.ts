@@ -1,4 +1,4 @@
-// Monta o provedor a partir da config: fake roteirizado por padrão; openrouter com timeout, retry, fallback e registro.
+// Builds the provider from the config: scripted fake by default; openrouter with timeout, retry, fallback and recording.
 import type { Config } from "../config.ts";
 import type { SqliteIncidentStore } from "../infra/db/incident-store.ts";
 import type { Clock } from "../infra/clock.ts";
@@ -9,6 +9,9 @@ import type { LlmProvider } from "./provider.ts";
 import { LLM_CALL_TICK_SEC, withCallRecording } from "./recording-provider.ts";
 import { resilient } from "./resilience.ts";
 import type { ModelPrices } from "./usage.ts";
+
+/** Base wait before the second attempt against the real provider. */
+export const LLM_RETRY_BACKOFF_MS = 500;
 
 export function createLlmProvider(
   c: Config,
@@ -22,5 +25,6 @@ export function createLlmProvider(
   if (!c.openrouterApiKey || !c.openrouterModel) throw new Error("openrouter provider without a key or model (the config should have failed earlier)");
   const make = (model: string) => new OpenRouterProvider({ apiKey: c.openrouterApiKey!, model, baseUrl: c.llmBaseUrl, prices: d.prices });
   const fallback = c.openrouterModelFallback ? make(c.openrouterModelFallback) : null;
-  return { provider: record(resilient(make(c.openrouterModel), { fallback, attempts: 2, timeoutMs: c.llmTimeoutMs })), fake: null };
+  // Real provider: wait between retries (exponential with jitter, or Retry-After); the fake retries at once.
+  return { provider: record(resilient(make(c.openrouterModel), { fallback, attempts: 2, timeoutMs: c.llmTimeoutMs, backoffMs: LLM_RETRY_BACKOFF_MS })), fake: null };
 }

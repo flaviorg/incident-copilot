@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { openDatabase } from "../../src/infra/db/sqlite.ts";
 import { SqliteIncidentStore } from "../../src/infra/db/incident-store.ts";
 import { ConflictError, NotFoundError } from "../../src/domain/errors.ts";
-import type { Approval, Blackboard, GatedAction, IncidentStatus, LlmCallRecord, NewIncident, TraceEvent } from "../../src/contracts/index.ts";
+import type { Approval, Blackboard, GatedAction, IncidentStatus, LlmCallRecord, LlmCallRecordInput, NewIncident, TraceEvent } from "../../src/contracts/index.ts";
 
 const mk = () => new SqliteIncidentStore(openDatabase(":memory:"), { secrets: [], now: () => new Date("2026-10-04T10:00:00Z") });
 
@@ -38,7 +38,7 @@ const approval = (o: Partial<Approval> = {}): Approval => ({
   expiresAt: "2026-10-04T10:15:00.000Z", decidedAt: null, approver: null, comment: null, decisionSource: null, version: 0, ...o,
 });
 
-const llmCall = (o: Partial<LlmCallRecord> = {}): LlmCallRecord => ({
+const llmCall = (o: Partial<LlmCallRecord> = {}): LlmCallRecordInput => ({
   incidentId: "INC-0001", runId: "RUN-0001", promptVersion: "supervisor.v1", model: "fake/scripted", promptTokens: 800,
   completionTokens: 60, costUsd: 0, latencyMs: 0, success: true, errorKind: null, ts: "2026-10-04T09:42:50.000Z", ...o,
 });
@@ -82,7 +82,7 @@ test("trace order, filters, last N and unique seq", () => {
   assert.equal(s.listTrace("INC-0001", { agent: "telemetry_analyst" }).length, 1);
   assert.deepEqual(s.listTrace("INC-0001", { last: 2 }).map((e) => e.seq), [3, 4]);
   assert.deepEqual(s.listTrace("INC-0001", { limit: 2 }).map((e) => e.seq), [1, 2]);
-  // Conjunto de tipos em SQL (get_incident do MCP), combinável com last.
+  // Set of types in SQL (MCP get_incident), combinable with last.
   assert.deepEqual(s.listTrace("INC-0001", { types: ["handoff"], last: 1 }).map((e) => e.seq), [3]);
   assert.deepEqual(s.listTrace("INC-0001", { types: ["thought"] }).map((e) => e.seq), [2, 4]);
   assert.deepEqual(s.listTrace("INC-0001", { types: ["handoff", "thought"] }).map((e) => e.seq), [1, 2, 3, 4]);
@@ -116,4 +116,12 @@ test("llm calls and runs are persisted", () => {
   s.recordRun({ id: "RUN-0001", incidentId: "INC-0001", startedAt: "2026-10-04T09:42:30.000Z", endedAt: null, outcome: null });
   s.recordRun({ id: "RUN-0001", incidentId: "INC-0001", startedAt: "2026-10-04T09:42:30.000Z", endedAt: "2026-10-04T09:46:00.000Z", outcome: "awaiting_approval" });
   assert.deepEqual(s.listRuns("INC-0001"), [{ id: "RUN-0001", incidentId: "INC-0001", startedAt: "2026-10-04T09:42:30.000Z", endedAt: "2026-10-04T09:46:00.000Z", outcome: "awaiting_approval" }]);
+});
+
+test("llm_calls stores attempts, fallback and estimated usage (defaults 1, false, false)", () => {
+  const s = mk();
+  const base = { incidentId: "INC-0001", runId: "RUN-0001", promptVersion: "p.v1", model: "m", promptTokens: 1, completionTokens: 1, costUsd: 0, latencyMs: 1, success: true, errorKind: null, ts: "2026-10-04T09:00:00.000Z" };
+  s.recordLlmCall(base);
+  s.recordLlmCall({ ...base, attempts: 3, usedFallback: true, usageEstimated: true });
+  assert.deepEqual(s.listLlmCalls("INC-0001").map((c) => [c.attempts, c.usedFallback, c.usageEstimated]), [[1, false, false], [3, true, true]]);
 });

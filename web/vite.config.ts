@@ -1,5 +1,5 @@
-// War Room (spec 4.8 e 10.2): base do Pages por VITE_BASE, aliases para contracts e domain do backend (código puro,
-// seguro para navegador), uma só cópia do zod e a configuração do Vitest (jsdom).
+// War Room (spec 4.8 and 10.2): Pages base set by VITE_BASE, aliases for the backend's contracts and domain (pure code,
+// browser-safe), a single copy of zod, and the Vitest (jsdom) configuration.
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";

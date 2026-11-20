@@ -1,4 +1,4 @@
-// Contexto de execução dos nós: o grafo passa `signal` e `configurable.requestId` no segundo argumento do nó.
+// Run context for the nodes: the graph passes `signal` and `configurable.requestId` in the node's second argument.
 import type { AgentId, Blackboard } from "../contracts/index.ts";
 import type { RunContext } from "../llm/provider.ts";
 
@@ -15,7 +15,7 @@ export function runContextOf(state: Blackboard, config?: NodeConfig): RunContext
   };
 }
 
-/** Brief da última entrada do histórico do supervisor dirigida a `agent`; "" se não houver. */
+/** Brief of the last supervisor history entry directed at `agent`; "" if none. */
 export function lastBriefFor(state: Blackboard, agent: AgentId): string {
   for (let i = state.supervisor.history.length - 1; i >= 0; i--) {
     const h = state.supervisor.history[i]!;

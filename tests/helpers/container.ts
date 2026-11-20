@@ -1,4 +1,4 @@
-// Container de teste (spec 8.1): :memory:, relógio simulado, ids sequenciais, fake explícito e logs capturados.
+// Test container (spec 8.1): :memory:, simulated clock, sequential ids, explicit fake and captured logs.
 import { loadConfig } from "../../src/config.ts";
 import { createContainer } from "../../src/app/container.ts";
 import type { Container } from "../../src/app/container.ts";
@@ -25,13 +25,13 @@ export type TestContainerOptions = {
   dbPath?: string;
   nodes?: Partial<GraphNodes>;
   guards?: Partial<ExecutionGuards>;
-  /** Variáveis extras para o loadConfig (ex.: OPENROUTER_API_KEY falsa); LLM_PROVIDER continua fake e as opções acima vencem. */
+  /** Extra variables for loadConfig (e.g. fake OPENROUTER_API_KEY); LLM_PROVIDER stays fake and the options above win. */
   env?: Record<string, string>;
 };
 
 export type TestContainer = Container & { fake: FakeLlmProvider; logs: string[] };
 
-/** A fixture dada (objeto ou caminho a partir da raiz) substitui a do mesmo scenarioId em fixtures/llm. */
+/** The given fixture (object or path from the root) replaces the one with the same scenarioId in fixtures/llm. */
 export function createTestContainer(o: TestContainerOptions = {}): TestContainer {
   const env: Record<string, string | undefined> = {
     ...o.env,
@@ -62,7 +62,7 @@ export function createTestContainer(o: TestContainerOptions = {}): TestContainer
   return { ...c, fake: c.fake, logs };
 }
 
-/** Incidente gravado (linha, blackboard e auditoria) e blackboard inicial com runId próprio, para testar nós isolados. */
+/** Saved incident (row, blackboard and audit) and initial blackboard with its own runId, for testing isolated nodes. */
 export function initialBlackboard(c: Container, scenarioId: string): Blackboard {
   const { blackboard } = openIncidentRecord(
     { store: c.store, scenarios: c.scenarios, clock: c.clock, ids: c.ids, initialWorld: (s) => c.infra.initialWorld(s) },
@@ -82,7 +82,7 @@ export function countByType(events: TraceEvent[]): Partial<Record<TraceType, num
   return out;
 }
 
-/** Id do incidente mais recente do container (cada container de teste tem banco próprio). */
+/** Id of the container's most recent incident (each test container has its own database). */
 export function incidentIdOf(c: Container): string {
   const first = c.store.listIncidents({ limit: 1 })[0];
   if (!first) throw new Error("no incident in the container");
@@ -97,9 +97,9 @@ class StopAtGate extends Error {
 }
 
 /**
- * Roda a equipe até o portão com c.incidents.open, num container cujo nó gate só guarda o estado recebido e para a
- * execução. Devolve o container e esse estado (o blackboard que o portão receberia), com um passo extra opcional
- * anexado ao fim do plano.
+ * Runs the team up to the gate with c.incidents.open, in a container whose gate node only stores the received state and stops the
+ * execution. Returns the container and that state (the blackboard the gate would receive), with an optional extra step
+ * appended to the end of the plan.
  */
 export async function stateAtGate(
   scenarioId: string,

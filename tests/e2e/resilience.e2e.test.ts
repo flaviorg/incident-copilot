@@ -1,4 +1,4 @@
-// LLM indisponível e timeout de execução pela API (spec 6.1 e 6.2; AC-29 e AC-30).
+// LLM unavailable and execution timeout via the API (spec 6.1 and 6.2; AC-29 and AC-30).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildServer } from "../../src/http/server.ts";
@@ -39,7 +39,7 @@ test("LLM_TIMEOUT_MS turns a slow call into a failed attempt", async () => {
   const c = createTestContainer({ fixture: fx, llmTimeoutMs: 20 });
   const r = await post(buildServer(c), "/incidents", { scenarioId: "deploy-5xx-rollback" });
   assert.deepEqual([r.statusCode, r.json().error.code], [503, "llm_unavailable"]);
-  // Uma chamada lógica registrada (as 2 tentativas ficam dentro dela), que falhou por timeout; os 2 turnos lentos foram usados.
+  // One logical call recorded (the 2 attempts are inside it), which failed by timeout; the 2 slow turns were used.
   const calls = c.store.listLlmCalls("INC-0001");
   assert.deepEqual(calls.map((x) => [x.promptVersion, x.success, x.errorKind]), [["supervisor.v1", false, "timeout"]]);
   assert.deepEqual(c.fake.consumedIds(), ["sup-1-slow", "sup-1"]);
@@ -47,7 +47,7 @@ test("LLM_TIMEOUT_MS turns a slow call into a failed attempt", async () => {
 });
 
 test("RUN_TIMEOUT_MS is a ceiling even when the run never yields to the event loop (fake without delay)", async () => {
-  // Sem delayMs, o fake responde em microtarefas e o timer de AbortSignal.timeout nunca roda; o prazo é conferido pelo relógio.
+  // Without delayMs, the fake responds in microtasks and the AbortSignal.timeout timer never runs; the deadline is checked by the clock.
   const c = createTestContainer({ runTimeoutMs: 1 });
   const r = await post(buildServer(c), "/incidents", { scenarioId: "deploy-5xx-rollback" });
   assert.deepEqual([r.statusCode, r.json().error.code], [504, "run_timeout"]);

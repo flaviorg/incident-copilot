@@ -1,5 +1,5 @@
-// Nenhum segredo nas 7 superfícies de saída (spec 6.6; AC-17): HTTP, MCP, trace, auditoria, logs, relatórios e gravações.
-// O token também é colado no comentário da decisão e a chave do OpenRouter é usada como token errado.
+// No secret in the 7 output surfaces (spec 6.6; AC-17): HTTP, MCP, trace, audit, logs, reports and recordings.
+// The token is also pasted into the decision comment and the OpenRouter key is used as a wrong token.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
@@ -48,9 +48,9 @@ test("no secret value appears in any output surface", async () => {
   ].map((x) => JSON.stringify(x));
   await m.close();
 
-  // O gravador cria containers próprios, com token aleatório e sem herdar process.env. Para a 7ª superfície não passar
-  // por construção: a chave fica em process.env durante a gravação e os tokens efetivamente usados nas decisões entram
-  // na varredura.
+  // The recorder creates its own containers, with a random token and without inheriting process.env. For the 7th surface not to pass
+  // by construction: the key stays in process.env during recording and the tokens actually used in the decisions are included
+  // in the scan.
   const previousKey = process.env.OPENROUTER_API_KEY;
   process.env.OPENROUTER_API_KEY = KEY;
   let recorded: Awaited<ReturnType<typeof recordScenarioWithTokens>>;

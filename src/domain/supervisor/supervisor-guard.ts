@@ -1,19 +1,19 @@
-// Guarda do supervisor (spec 6.3): o LLM escolhe, o código valida as pré-condições. Puro.
-// Escolha inválida vira critique e segue a rota canônica: o primeiro artefato faltante na ordem
-// diagnóstico, runbooks, plano auditado, portão, relatório.
+// Supervisor guard (spec 6.3): the LLM chooses, the code validates the preconditions. Pure.
+// An invalid choice becomes a critique and follows the canonical route: the first missing artifact in the order
+// diagnosis, runbooks, audited plan, gate, report.
 import type { Blackboard, EscalationReason, Limits, SupervisorDecision } from "../../contracts/index.ts";
 
 export type SupervisorTarget = "telemetry_analyst" | "runbook_retriever" | "remediation_planner" | "gate" | "reporter";
 
 const confident = (bb: Blackboard) => bb.diagnosis !== null && (bb.diagnosis.confidence === "medium" || bb.diagnosis.confidence === "high");
 
-/** Sem diagnóstico, ou diagnóstico fraco sem teto do ReAct e com rodadas sobrando. */
+/** No diagnosis, or a weak diagnosis with no ReAct cap and with rounds left. */
 const needsTelemetry = (bb: Blackboard, limits: Limits) =>
   bb.diagnosis === null || (bb.diagnosis.confidence === "low" && !bb.diagnosis.capReached && bb.telemetryRuns < limits.maxTelemetryRuns);
 
 /**
- * Chamado com `supervisor.iterations` já incrementado, antes do LLM. Ordem do spec 6.3:
- * teto de equipe, teto do ReAct, diagnóstico fraco depois das rodadas permitidas.
+ * Called with `supervisor.iterations` already incremented, before the LLM. Order from spec 6.3:
+ * team cap, ReAct cap, weak diagnosis after the allowed rounds.
  */
 export function preEscalation(bb: Blackboard, limits: Limits): { reason: EscalationReason; detail: string } | null {
   if (bb.supervisor.iterations > limits.teamMaxIterations) {
@@ -28,7 +28,7 @@ export function preEscalation(bb: Blackboard, limits: Limits): { reason: Escalat
   return null;
 }
 
-/** Motivo da recusa, ou null se a pré-condição vale (tabela do spec 6.3). */
+/** Reason for the refusal, or null if the precondition holds (table from spec 6.3). */
 function violation(target: SupervisorTarget, bb: Blackboard, limits: Limits): string | null {
   switch (target) {
     case "telemetry_analyst":
@@ -64,7 +64,7 @@ export function canonicalNext(bb: Blackboard, limits: Limits): SupervisorTarget 
   return "reporter";
 }
 
-/** `done` vira `reporter` e é validado como tal. */
+/** `done` becomes `reporter` and is validated as such. */
 export function guardChoice(choice: SupervisorDecision["next"], bb: Blackboard, limits: Limits): { next: SupervisorTarget; coerced: boolean; reason: string } {
   const target: SupervisorTarget = choice === "done" ? "reporter" : choice;
   const why = violation(target, bb, limits);

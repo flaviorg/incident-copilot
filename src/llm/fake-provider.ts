@@ -1,5 +1,5 @@
-// Provedor fake roteirizado (spec 7.1 e 7.2): prova a mecânica, não a qualidade do modelo.
-// Cada resposta está numa fixture por cenário; chamada sem turno correspondente lança, para o teste quebrar.
+// Scripted fake provider (spec 7.1 and 7.2): proves the mechanics, not the model's quality.
+// Each reply lives in a per-scenario fixture; a call with no matching turn throws, so the test breaks.
 import { canonicalJson } from "../domain/canonical-json.ts";
 import { FixturePromptDriftError, UnscriptedLlmCallError } from "../domain/errors.ts";
 import { sha256Hex } from "../infra/crypto.ts";
@@ -14,10 +14,10 @@ export const FAKE_MODEL = "fake/scripted";
 export type FakeCall = { prompt: string; matchKeys: Record<string, unknown>; user: string; turnId: string | null };
 
 const turnKey = (scenarioId: string, turnId: string) => `${scenarioId}\u0000${turnId}`;
-/** Consumo para a correspondência: por incidente, para cada incidente tocar o roteiro do começo (API e MCP de longa duração). */
+/** Consumption for matching: per incident, so each incident plays the script from the start (long-lived API and MCP). */
 const incidentTurnKey = (incidentId: string, scenarioId: string, turnId: string) => `${incidentId}\u0000${scenarioId}\u0000${turnId}`;
 
-/** Espera `ms` ou até o sinal abortar; devolve false se abortou. */
+/** Waits `ms` or until the signal aborts; returns false if it aborted. */
 function sleep(ms: number, signal: AbortSignal): Promise<boolean> {
   if (signal.aborted) return Promise.resolve(false);
   return new Promise((resolve) => {
@@ -36,9 +36,9 @@ function sleep(ms: number, signal: AbortSignal): Promise<boolean> {
 export class FakeLlmProvider implements LlmProvider {
   readonly name = "fake" as const;
   private readonly files = new Map<string, FixtureFile>();
-  /** Turnos consumidos por algum incidente (modo estrito). */
+  /** Turns consumed by any incident (strict mode). */
   private readonly consumed = new Set<string>();
-  /** Turnos consumidos por incidente (correspondência, regra 2). */
+  /** Turns consumed per incident (matching, rule 2). */
   private readonly consumedByIncident = new Set<string>();
   private readonly consumedOrder: string[] = [];
   private readonly log: FakeCall[] = [];
@@ -57,7 +57,7 @@ export class FakeLlmProvider implements LlmProvider {
     const file = this.files.get(ctx.scenarioId);
     const ofPrompt = file ? file.turns.filter((t) => t.prompt === prompt.version) : [];
 
-    // Regra 1: hash do prompt antes de responder.
+    // Rule 1: prompt hash before answering.
     const actual = promptHash(prompt);
     if (file) {
       const expected = file.promptHashes[prompt.version] ?? null;
@@ -69,15 +69,15 @@ export class FakeLlmProvider implements LlmProvider {
     const call: FakeCall = { prompt: prompt.version, matchKeys: { ...matchKeys }, user, turnId: null };
     this.log.push(call);
 
-    // Regra 2: primeiro turno ainda não consumido por este incidente, daquele prompt, cujo `when` é subconjunto das chaves.
-    // O consumo é por incidente: num processo de longa duração (API, MCP), o 2º incidente do mesmo cenário toca o
-    // roteiro desde o começo em vez de esbarrar nos turnos gastos pelo 1º.
+    // Rule 2: first turn not yet consumed by this incident, for that prompt, whose `when` is a subset of the keys.
+    // Consumption is per incident: in a long-lived process (API, MCP), the 2nd incident of the same scenario plays the
+    // script from the start instead of bumping into the turns spent by the 1st.
     const usedHere = (t: FixtureTurn) => this.consumedByIncident.has(incidentTurnKey(ctx.incidentId, ctx.scenarioId, t.id));
     const found = file
       ? ofPrompt.find((t) => !usedHere(t) && Object.entries(t.when).every(([k, v]) => matchKeys[k] === v))
       : undefined;
     if (!file || !found) {
-      // Regra 3: sem turno, erro com diagnóstico.
+      // Rule 3: no turn, error with a diagnosis.
       throw new UnscriptedLlmCallError({
         scenarioId: ctx.scenarioId,
         prompt: prompt.version,
@@ -93,7 +93,7 @@ export class FakeLlmProvider implements LlmProvider {
     this.consumedOrder.push(found.id);
     call.turnId = found.id;
 
-    // Regra 6: atraso abortável pelo sinal da chamada.
+    // Rule 6: delay abortable by the call's signal.
     if (found.delayMs !== undefined && found.delayMs > 0) {
       const finished = await sleep(found.delayMs, ctx.signal);
       if (!finished) return llmFailure("aborted", `call aborted during the simulated delay of turn ${found.id}`, FAKE_MODEL);
@@ -101,17 +101,17 @@ export class FakeLlmProvider implements LlmProvider {
       return llmFailure("aborted", `call aborted before the response of turn ${found.id}`, FAKE_MODEL);
     }
 
-    // Regra 5: falha simulada.
+    // Rule 5: simulated failure.
     if (found.error) return llmFailure(found.error.kind, `failure simulated by the fixture (turn ${found.id})`, FAKE_MODEL);
 
-    // Regra 4: a saída passa pelo schema como se viesse do modelo.
+    // Rule 4: the output goes through the schema as if it came from the model.
     const parsed = prompt.outputSchema.safeParse(found.output);
     if (!parsed.success) {
       const where = parsed.error.issues.map((i) => i.path.map(String).join(".") || "(root)").join(", ");
       return llmFailure("invalid_output", `output of turn ${found.id} does not match the ${prompt.version} schema at ${where}`, FAKE_MODEL);
     }
 
-    // Regra 7: uso do turno ou estimado; custo 0.
+    // Rule 7: the turn's usage or an estimate; cost 0.
     const usage = found.usage ?? {
       promptTokens: estimateTokens(`${prompt.system}\n${user}`),
       completionTokens: estimateTokens(JSON.stringify(found.output)),
@@ -120,8 +120,8 @@ export class FakeLlmProvider implements LlmProvider {
   }
 
   /**
-   * Modo estrito (regra 8): lança listando os turnos que nenhum incidente consumiu, exceto os de `except`.
-   * Com `scenarioId`, confere só o roteiro daquele cenário (o container carrega as fixtures de todos os cenários).
+   * Strict mode (rule 8): throws listing the turns no incident consumed, except those in `except`.
+   * With `scenarioId`, checks only that scenario's script (the container loads the fixtures of all scenarios).
    */
   assertAllConsumed(o: { except?: string[]; scenarioId?: string } = {}): void {
     const except = new Set(o.except ?? []);
@@ -133,7 +133,7 @@ export class FakeLlmProvider implements LlmProvider {
     if (left.length > 0) throw new Error(`fixture turns not consumed: ${left.join(", ")}`);
   }
 
-  /** Registro de entradas (regra 9, só teste). */
+  /** Input log (rule 9, test only). */
   calls(): FakeCall[] {
     return this.log.map((c) => ({ ...c, matchKeys: { ...c.matchKeys } }));
   }
@@ -142,7 +142,7 @@ export class FakeLlmProvider implements LlmProvider {
     return [...this.consumedOrder];
   }
 
-  /** Turnos do cenário (útil para derivar fixtures em código). */
+  /** Scenario turns (useful for deriving fixtures in code). */
   turnsOf(scenarioId: string): FixtureTurn[] {
     return [...(this.files.get(scenarioId)?.turns ?? [])];
   }

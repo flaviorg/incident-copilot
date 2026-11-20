@@ -1,5 +1,5 @@
-// Auditor de plano (spec 4.7; Reflection da 221513 com piso em código): regras determinísticas primeiro, depois auditor.v1.
-// O LLM pode endurecer o veredito, nunca afrouxar; LLM indisponível não escala, valem as regras.
+// Plan auditor (spec 4.7; lesson 221513 Reflection with a floor in code): deterministic rules first, then auditor.v1.
+// The LLM may harden the verdict, never loosen it; LLM unavailable does not escalate, the rules apply.
 import type { Limits } from "../../contracts/index.ts";
 import type { ScenarioRepository } from "../../infra/scenarios/scenario-loader.ts";
 import type { LlmProvider } from "../../llm/provider.ts";
@@ -11,7 +11,7 @@ import type { TraceSink } from "../../app/trace-sink.ts";
 import { runContextOf } from "../run-context.ts";
 import type { NodeFn } from "../run-context.ts";
 
-/** `limits` só decide para quem vai o handoff, para o trace dizer o mesmo que a aresta afterAuditor. */
+/** `limits` only decides who the handoff goes to, so the trace says the same as the afterAuditor edge. */
 export function createAuditorNode(d: { llm: LlmProvider; trace: TraceSink; scenarios: ScenarioRepository; limits: Limits }): NodeFn {
   return async (state, config) => {
     const ctx = runContextOf(state, config);

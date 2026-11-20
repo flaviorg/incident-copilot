@@ -18,12 +18,12 @@ export const AuditEventSchema = z.enum([
   "canary_rollback", "circuit_opened", "incident_escalated", "incident_resolved",
 ]);
 
-// Linha da trilha de auditoria (spec 6.8): encadeada por hash.
+// Audit trail row (spec 6.8): hash-chained.
 export const AuditEntrySchema = z.object({
   id: z.string(),
   ts: z.string(),
   incidentId: z.string(),
-  actor: z.string(), // agent:<id>, human:<nome>, system:<componente>, mcp_client:<nome>
+  actor: z.string(), // agent:<id>, human:<name>, system:<component>, mcp_client:<name>
   event: AuditEventSchema,
   tier: TierSchema.nullable(),
   details: z.record(z.string(), z.unknown()),

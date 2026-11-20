@@ -1,6 +1,6 @@
-// check:tokens (spec 4.8): falha se houver cor literal (#rgb, #rrggbb, #rrggbbaa, rgb(, rgba(, hsl(, hsla() em
-// web/src/**/*.{css,ts,tsx} fora de web/src/styles/tokens.css. Os testes da web (web/src/test) ficam de fora porque
-// precisam de cores literais para conferir o cálculo de contraste.
+// check:tokens (spec 4.8): fails if there is a literal color (#rgb, #rrggbb, #rrggbbaa, rgb(, rgba(, hsl(, hsla() in
+// web/src/**/*.{css,ts,tsx} outside web/src/styles/tokens.css. The web tests (web/src/test) are excluded because
+// they need literal colors to check the contrast calculation.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { extname, join, relative } from "node:path";
 import { PROJECT_ROOT, projectPath } from "../src/infra/paths.ts";

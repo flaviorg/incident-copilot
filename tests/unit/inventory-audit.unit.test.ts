@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { auditInventory, roundUsd } from "../../src/domain/finops/inventory-audit.ts";
 import type { Inventory } from "../../src/contracts/index.ts";
 
-// Inventário e preços de teste escritos à mão, com valores esperados literais (calculados à mão).
+// Hand-written test inventory and prices, with literal expected values (computed by hand).
 const prices = { version: "t", note: "t", hoursPerMonth: 730, volumeGbMonthUsd: { gp3: 0.08 }, publicIpv4HourUsd: 0.005, instanceHourUsd: { "r6i.large": 0.126, "r6i.xlarge": 0.252 } };
 const inv: Inventory = { account: "acme", region: "us-east-1",
   volumes: [{ id: "vol-1", type: "gp3", sizeGb: 100, attachedTo: null, unattachedDays: 9 }, { id: "vol-2", type: "gp3", sizeGb: 40, attachedTo: "i-2", unattachedDays: 0 }],

@@ -1,5 +1,5 @@
-// Ferramentas de leitura (faixa 1) com parâmetros Zod e saída curta (spec 4.3). Nunca escrevem estado.
-// `run` nunca lança: ferramenta desconhecida, argumento inválido ou falha viram observação com ok: false.
+// Read tools (tier 1) with Zod parameters and short output (spec 4.3). They never write state.
+// `run` never throws: an unknown tool, invalid argument or failure becomes an observation with ok: false.
 import * as z from "zod";
 import type { ReadToolName, WorldState } from "../contracts/index.ts";
 import type { LoadedScenario } from "../infra/scenarios/scenario-loader.ts";
@@ -15,14 +15,14 @@ export type ToolResult = { ok: boolean; summary: string; evidenceRef: string | n
 
 export interface Tool<P> {
   name: ReadToolName;
-  description: string; // descrição orientada a uso
+  description: string; // usage-oriented description
   paramsSchema: z.ZodType<P>;
   run(params: P, ctx: ToolContext): ToolResult;
 }
 
 export interface ToolRegistry {
   names(): ReadToolName[];
-  /** Nome, descrição orientada a uso e JSON Schema dos parâmetros. */
+  /** Name, usage-oriented description and JSON Schema of the parameters. */
   describeForPrompt(): string;
   run(name: string, args: unknown, ctx: ToolContext): ToolResult;
 }
@@ -35,7 +35,7 @@ export function truncateSummary(text: string, max = MAX_OBSERVATION_CHARS): stri
   return text.slice(0, max - TRUNCATED_SUFFIX.length) + TRUNCATED_SUFFIX;
 }
 
-/** Escopo do cenário: o serviço do alerta ou, sem serviço, a conta. */
+/** Scenario scope: the alert's service or, without a service, the account. */
 export function scenarioScope(s: LoadedScenario): string | null {
   return s.file.service ?? s.file.account;
 }

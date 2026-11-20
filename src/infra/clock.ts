@@ -1,10 +1,10 @@
-// Relógio injetado (spec 4.3 e 7.5). SimulatedClock deixa demo e testes reprodutíveis byte a byte.
+// Injected clock (spec 4.3 and 7.5). SimulatedClock makes demo and tests reproducible byte for byte.
 
 export interface Clock {
   now(): Date;
-  /** Durações simuladas (LLM, ferramenta, dry run, execução); no-op no SystemClock. */
+  /** Simulated durations (LLM, tool, dry run, execution); no-op on SystemClock. */
   tick(seconds: number): void;
-  /** SimulatedClock vai para o detectedAt do cenário e o devolve; SystemClock devolve agora. */
+  /** SimulatedClock goes to the scenario's detectedAt and returns it; SystemClock returns now. */
   alignTo(scenarioDetectedAt: Date): Date;
 }
 

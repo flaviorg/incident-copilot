@@ -31,7 +31,7 @@ scenario deploy-5xx-rollback · service orders-api · sev1
 09:45:19  remediation planner: plan revision 0 with 3 steps: Roll orders-api back to v3.7.2, record the reason in the incident and block the 3.8.0 image so it is not promoted again.
 09:45:19  remediation planner → auditor: plan revision 0 with 3 steps
 09:45:39  auditor: approved (Plan consistent with the diagnosis: rollback to the version before the deploy, a note in the incident and the tag block only after the rollback.)
-09:45:39  auditor → supervisor: plan revision 0 approved (5 of 5 rules ok)
+09:45:39  auditor → supervisor: plan revision 0 approved (6 of 6 rules ok)
 09:45:59  supervisor → remediation gate: Assess the risk of each step of the audited plan
 09:46:05    act   add_incident_note(incident/orders-api, orders-api rollback from v3.8.0 to v3.7.2: TypeError in PriceFormatter.format after the deploy.) · tier 2
 09:46:05    obs   add_incident_note tier 2: dry run ok (incident/orders-api: note recorded) → ready, runs after the decisions
@@ -60,7 +60,7 @@ MTTR                    11.2 min        measured (simulated timeline, 09:40:30 �
 MTTD                    2.0 min         measured
 Minutes saved           33.8 to 83.8    illustrative (synthetic baseline of 45 to 95 min)
 ROI                     18.9x to 48.2x  illustrative (assumptions in data/business-assumptions.json)
-LLM cost                US$ 0.00        measured (12 calls, 13956 tokens)
+LLM cost                US$ 0.00        measured (12 calls, 13984 tokens)
 
 trace 41 events (thought 4 · action 10 · observation 10 · plan 1 · critique 2 · answer 2 · handoff 12)
 post-mortem: reports/INC-0001-postmortem.md
@@ -98,7 +98,7 @@ scenario cost-anomaly · account data-platform · sev3
 08:03:06  remediation planner: plan revision 1 with 6 steps: Cut the idle cost of the data-platform account with a snapshot of the volume before deletion, release of the idle IPv4, resize of the underused instance and cl…
 08:03:06  remediation planner → auditor: plan revision 1 with 6 steps
 08:03:26  auditor: approved (The snapshot comes before the deletion and the other steps follow the inventory findings.)
-08:03:26  auditor → supervisor: plan revision 1 approved (5 of 5 rules ok)
+08:03:26  auditor → supervisor: plan revision 1 approved (6 of 6 rules ok)
 08:03:46  supervisor → remediation gate: Assess the risk of each step of the revised plan
 08:03:56    act   tag_resource_for_review(volume/data-platform/vol-0c41d2, gp3 volume unattached for 23 days) · tier 2
 08:03:56    obs   tag_resource_for_review tier 2: dry run ok (volume/data-platform/vol-0c41d2: tagged for review (gp3 volume unattached for 23 days)) → ready, runs after the decisions

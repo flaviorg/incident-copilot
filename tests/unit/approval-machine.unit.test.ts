@@ -22,7 +22,7 @@ test("approve before expiry", () => {
   const r = transition(a, approve("ana"), plusMin(t0, 5)) as Approval;
   assert.deepEqual([r.status, r.approver, r.decisionSource, r.version], ["approved", "ana", "structured", 1]);
   assert.equal(r.decidedAt, plusMin(t0, 5).toISOString());
-  assert.equal(a.status, "pending"); // a entrada não muda
+  assert.equal(a.status, "pending"); // the input is not mutated
 });
 
 test("reject from text keeps the comment and the source", () => {
@@ -43,7 +43,7 @@ test("any event on a decided approval is not_pending", () => {
   for (const status of ["approved", "rejected", "expired"] as const) {
     assert.deepEqual(transition({ ...a, status }, { type: "expire" }, plusMin(t0, 40)), new ApprovalTransitionError("not_pending"), status);
   }
-  // Decidir duas vezes não muda nada: a segunda transição falha sobre o resultado da primeira.
+  // Deciding twice changes nothing: the second transition fails on the result of the first.
   const once = transition(a, approve("ana"), plusMin(t0, 1)) as Approval;
   assert.deepEqual(transition(once, { type: "reject", approver: "bia", comment: null, source: "structured" }, plusMin(t0, 2)), new ApprovalTransitionError("not_pending"));
 });

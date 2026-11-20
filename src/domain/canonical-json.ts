@@ -1,6 +1,6 @@
-// JSON canônico (spec 6.8): base do hash encadeado da auditoria.
-// Chaves ordenadas por unidade UTF-16, sem espaços, escape do JSON.stringify, -0 vira 0,
-// NaN e Infinity lançam, undefined é omitido em objeto e lança em array.
+// Canonical JSON (spec 6.8): basis of the audit hash chain.
+// Keys sorted by UTF-16 unit, no whitespace, JSON.stringify escaping, -0 becomes 0,
+// NaN and Infinity throw, undefined is omitted in an object and throws in an array.
 
 export function canonicalJson(value: unknown): string {
   return encode(value, "$");

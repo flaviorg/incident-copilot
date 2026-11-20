@@ -11,7 +11,7 @@ const assumptions: BusinessAssumptions = {
   revenuePerMinuteUsd: { "orders-api": 150 }, baselineMttrMin: { bad_deploy: { low: 45, high: 95 }, cost_anomaly: { low: 45, high: 95 } },
 };
 
-// Série de teste: 0,004 até 09:40:00 e 0,1 constante desde 09:40:30, a cada 30 s, até 10:10.
+// Test series: 0.004 until 09:40:00 and constant 0.1 from 09:40:30, every 30 s, until 10:10.
 function testSeries(): SeriesPoint[] {
   const out: SeriesPoint[] = [];
   const start = Date.parse("2026-10-04T09:30:00.000Z");

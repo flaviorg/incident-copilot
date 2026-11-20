@@ -1,8 +1,8 @@
-// Gravações da War Room (spec 4.2, 5.2, 7.6 e 10.2; AC-39). Cada cenário roda duas vezes, em containers novos com
-// banco :memory:, relógio simulado, provedor fake forçado e token aleatório: uma execução aprova todas as aprovações e
-// a outra rejeita todas. O prefixo comum (até o portão) sai da 1ª execução e é conferido contra a 2ª; cada ramo leva
-// o restante do trace e da auditoria e o estado final. Cenário sem aprovação: tudo no prefixo comum e branches null.
-// Tudo passa por redactSecrets e pelo DemoRecordingSchema antes de sair.
+// Recordings for the War Room (spec 4.2, 5.2, 7.6 and 10.2; AC-39). Each scenario runs twice, in fresh containers with
+// an :memory: database, simulated clock, forced fake provider and a random token: one run approves all approvals and
+// the other rejects all. The common prefix (up to the gate) comes from the 1st run and is checked against the 2nd; each branch carries
+// the rest of the trace and audit, plus the final state. A scenario with no approval: everything in the common prefix and null branches.
+// Everything goes through redactSecrets and DemoRecordingSchema before leaving.
 import { randomBytes } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -25,13 +25,13 @@ type Branch = "approved" | "rejected";
 
 function demoContainer(o: RecordOptions): { c: Container; token: string } {
   const token = randomBytes(24).toString("base64url");
-  // Ambiente próprio, sem herdar process.env: nenhuma chave real entra na gravação, e o fake é forçado.
+  // Own environment, without inheriting process.env: no real key enters the recording, and the fake is forced.
   const config = loadConfig({ DB_PATH: ":memory:", LLM_PROVIDER: "fake", CLOCK: "simulated", LOG_LEVEL: "warn", APPROVAL_TOKEN: token }, { forceFake: true });
   const c = createContainer(config, o.fixturesDir ? { fixtures: loadFixtures(o.fixturesDir) } : {});
   return { c, token };
 }
 
-/** Estado do incidente no ponto atual; `events` e `audit` são só o que veio depois de `fromSeq` e `fromAudit`. */
+/** Incident state at the current point; `events` and `audit` are only what came after `fromSeq` and `fromAudit`. */
 function snapshot(c: Container, incidentId: string, fromSeq: number, fromAudit: number): RecordingBranch {
   const incident = c.incidents.get(incidentId);
   const { blackboard } = c.store.loadBlackboard(incidentId);
@@ -69,7 +69,7 @@ export async function recordScenario(scenarioId: string, o: RecordOptions = {}):
   return (await recordScenarioWithTokens(scenarioId, o)).recording;
 }
 
-/** A gravação e os tokens efêmeros usados nas decisões de cada ramo, para a varredura de segredos (AC-17) conferir que não vazam. */
+/** The recording and the ephemeral tokens used in each branch's decisions, so the secrets sweep (AC-17) can confirm they do not leak. */
 export async function recordScenarioWithTokens(scenarioId: string, o: RecordOptions = {}): Promise<{ recording: DemoRecording; approvalTokens: string[] }> {
   const approved = await runBranch(scenarioId, "approved", o);
   const secrets = [approved.token];
@@ -94,7 +94,7 @@ export async function recordScenarioWithTokens(scenarioId: string, o: RecordOpti
   return { recording: DemoRecordingSchema.parse(redactSecrets(recording, secrets)), approvalTokens: secrets };
 }
 
-/** Grava index.json (ScenarioSummary[]) e <id>.json de cada cenário em `outDir`; devolve arquivo e tamanho. */
+/** Writes index.json (ScenarioSummary[]) and <id>.json for each scenario into `outDir`; returns file and size. */
 export async function recordAll(outDir: string, o: RecordOptions = {}): Promise<{ file: string; bytes: number }[]> {
   const scenarios = ScenarioSummarySchema.array().parse(new ScenarioRepository({ rootDir: projectPath("fixtures", "scenarios") }).list());
   mkdirSync(outDir, { recursive: true });

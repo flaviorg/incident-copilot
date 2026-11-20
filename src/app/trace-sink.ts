@@ -1,4 +1,4 @@
-// Valida, redige e persiste eventos de trace com numeração sequencial por incidente (spec 4.2). Não decide fluxo.
+// Validates, redacts and persists trace events with sequential numbering per incident (spec 4.2). Does not decide flow.
 import { TraceEventSchema } from "../contracts/index.ts";
 import type { AgentId, TraceEvent } from "../contracts/index.ts";
 import type { SqliteIncidentStore } from "../infra/db/incident-store.ts";
@@ -10,15 +10,15 @@ import type { LlmResult, PromptDef, RunContext } from "../llm/provider.ts";
 export type TraceInput = { [K in TraceEvent["type"]]: { type: K; payload: Extract<TraceEvent, { type: K }>["payload"] } }[TraceEvent["type"]];
 export type TraceLlmInfo = NonNullable<TraceEvent["llm"]>;
 
-/** Teto de cada texto dentro de `args` de um evento action (o maior parâmetro do catálogo, a nota, tem 500). */
+/** Cap on each text inside `args` of an action event (the largest catalog parameter, the note, has 500). */
 export const TRACE_ARG_MAX_CHARS = 500;
 
-/** Corta no máximo do schema com reticências. */
+/** Cuts to the schema maximum with an ellipsis. */
 export function clip(text: string, max: number): string {
   return text.length <= max ? text : text.slice(0, max - 1) + "…";
 }
 
-/** Uso do LLM que acompanha o evento produzido a partir de uma resposta bem-sucedida. */
+/** LLM usage that accompanies the event produced from a successful response. */
 export function llmInfoOf<I, O>(prompt: PromptDef<I, O>, r: LlmResult<O>): TraceLlmInfo | null {
   if (!r.success) return null;
   return {
@@ -31,7 +31,7 @@ export function llmInfoOf<I, O>(prompt: PromptDef<I, O>, r: LlmResult<O>): Trace
   };
 }
 
-/** Corta cada texto dentro de `args`, em qualquer nível, sem mudar a forma (números, booleanos e null ficam). */
+/** Cuts each text inside `args`, at any level, without changing the shape (numbers, booleans and null stay). */
 function clipArgs(v: unknown): unknown {
   if (typeof v === "string") return clip(v, TRACE_ARG_MAX_CHARS);
   if (Array.isArray(v)) return v.map(clipArgs);
@@ -71,7 +71,7 @@ export class TraceSink {
     this.secrets = d.secrets;
   }
 
-  /** Redige antes de cortar (o marcador pode ser maior que o segredo), valida com Zod e grava com seq = nextTraceSeq. */
+  /** Redacts before cutting (the marker may be longer than the secret), validates with Zod and writes with seq = nextTraceSeq. */
   emit(ctx: RunContext, agent: AgentId, input: TraceInput, llm: TraceLlmInfo | null = null): TraceEvent {
     const payload = clipPayload(redactSecrets(input, this.secrets));
     const seq = this.store.nextTraceSeq(ctx.incidentId);

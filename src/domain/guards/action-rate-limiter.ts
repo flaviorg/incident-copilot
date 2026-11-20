@@ -1,5 +1,5 @@
-// Limite de execuções (spec 6.7): janela deslizante de 1 minuto no total e no máximo 1 execução da mesma ação no mesmo
-// alvo a cada `repeatWindowMin` (contra loops de reparo). Puro, relógio injetado. Tentativa negada não conta.
+// Execution limit (spec 6.7): 1-minute sliding window in total and at most 1 execution of the same action on the same
+// target every `repeatWindowMin` (against repair loops). Pure, injected clock. A denied attempt does not count.
 
 export class ActionRateLimiter {
   private readonly perMinute: number;

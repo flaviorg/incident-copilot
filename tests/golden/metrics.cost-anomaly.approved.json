@@ -31,7 +31,7 @@
     "high": 17.8313
   },
   "llmCalls": 13,
-  "promptTokens": 13899,
+  "promptTokens": 13956,
   "completionTokens": 1632,
   "assumptionsVersion": "2026-10-04",
   "sources": {

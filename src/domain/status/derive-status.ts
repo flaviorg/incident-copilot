@@ -1,5 +1,5 @@
-// Status do incidente derivado do blackboard e das aprovações (spec 4.5.2). Puro.
-// Recebe os status efetivos já projetados com effectiveStatus (aprovação vencida conta como expired).
+// Incident status derived from the blackboard and the approvals (spec 4.5.2). Pure.
+// Takes the effective statuses already projected with effectiveStatus (an overdue approval counts as expired).
 import type { ApprovalStatus, Blackboard, IncidentStatus } from "../../contracts/index.ts";
 
 const MITIGATING_PHASES: readonly Blackboard["phase"][] = ["executing", "verifying", "resume"];

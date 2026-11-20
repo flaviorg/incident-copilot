@@ -1,6 +1,6 @@
-// Verificador (spec 4.6 e 6.7; AC-20). Sem LLM: espera a janela do canário, compara as séries pós-ação com as
-// checagens do cenário e, reprovado, reverte as ações reversíveis executadas em ordem inversa, registra falha no
-// breaker e escala com remediation_ineffective. Saudável, zera as falhas do breaker e devolve ao supervisor.
+// Verifier (spec 4.6 and 6.7; AC-20). No LLM: waits for the canary window, compares the post-action series with the
+// scenario's checks and, if it fails, reverts the executed reversible actions in reverse order, records a failure in the
+// breaker and escalates with remediation_ineffective. If healthy, resets the breaker's failures and returns to the supervisor.
 import type { CanaryCheckResult, GatedAction } from "../../contracts/index.ts";
 import { EXECUTABLE_ACTIONS, isExecutable } from "../../domain/autonomy/catalog.ts";
 import { analyzeCanary } from "../../domain/canary/canary-analyzer.ts";
@@ -10,7 +10,7 @@ import type { NodeFn } from "../run-context.ts";
 import { actionArgs } from "./gate-node.ts";
 import type { ExecutionDeps } from "./executor-node.ts";
 
-/** Janela de observação do canário (spec 7.5). */
+/** Canary observation window (spec 7.5). */
 const CANARY_WINDOW_SEC = 60;
 
 const pt = (x: number, digits: number) => x.toLocaleString("en-US", { maximumFractionDigits: digits, useGrouping: false });
@@ -59,6 +59,7 @@ export function createVerifierNode(d: ExecutionDeps): NodeFn {
       .filter((a) => a.status === "succeeded" && isReversible(a))
       .sort((a, b) => (b.executedAt ?? "").localeCompare(a.executedAt ?? "") || b.order - a.order);
     const reverted: string[] = [];
+    const revertFailed: { id: string; actionType: string; summary: string }[] = [];
     for (const a of toRevert) {
       const tool = `revert:${a.actionType}`;
       d.trace.emit(ctx, "verifier", { type: "action", payload: { tool, args: actionArgs(a), tier: a.tier } });
@@ -70,6 +71,12 @@ export function createVerifierNode(d: ExecutionDeps): NodeFn {
         a.resultSummary = res.result.summary;
         reverted.push(a.id);
         d.persist.action(a);
+      } else {
+        // Review 2026-11: the change is still in the world. Keep status succeeded (that is the truth) but say so in the
+        // action, the audit and the escalation, so the on-call human does not read "rolled back".
+        a.resultSummary = clip(`${a.resultSummary ?? "executed"}; revert FAILED: ${res.result.summary}`, 300);
+        revertFailed.push({ id: a.id, actionType: a.actionType, summary: res.result.summary });
+        d.persist.action(a);
       }
       d.trace.emit(ctx, "verifier", { type: "observation", payload: { tool, ok: res.result.ok, summary: res.result.summary, evidenceRef: null } });
     }
@@ -78,7 +85,10 @@ export function createVerifierNode(d: ExecutionDeps): NodeFn {
       actor: "system:canary",
       event: "canary_rollback",
       tier: null,
-      details: { failedChecks: r.checks.filter((c) => !c.passed).map(describeCheck), revertedActionIds: reverted, requestId: ctx.requestId },
+      details: {
+        failedChecks: r.checks.filter((c) => !c.passed).map(describeCheck), revertedActionIds: reverted,
+        revertFailedActionIds: revertFailed.map((f) => f.id), requestId: ctx.requestId,
+      },
     });
     if (d.guards.breaker.recordFailure(d.clock.now())) {
       d.persist.audit({
@@ -93,7 +103,14 @@ export function createVerifierNode(d: ExecutionDeps): NodeFn {
       world,
       escalation: {
         reason: "remediation_ineffective",
-        detail: clip(`failed canary (${checks}); ${revertedTypes.length > 0 ? `reverted in reverse order: ${revertedTypes.join(", ")}` : "nothing to revert"}`, 400),
+        detail: clip(
+          [
+            revertFailed.map((f) => `revert of ${f.actionType} FAILED: ${f.summary}`).join("; "),
+            `failed canary (${checks})`,
+            revertedTypes.length > 0 ? `reverted in reverse order: ${revertedTypes.join(", ")}` : revertFailed.length > 0 ? "" : "nothing to revert",
+          ].filter((s) => s !== "").join("; "),
+          400,
+        ),
       },
       phase: "verifying",
     };

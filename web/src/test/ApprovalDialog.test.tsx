@@ -1,4 +1,4 @@
-// Diálogo de aprovação (spec 10.2; AC-39): foco entra, fica preso, ESC fecha e devolve o foco a quem abriu.
+// Approval dialog (spec 10.2; AC-39): focus enters, stays trapped, ESC closes and returns focus to the opener.
 import { describe, expect, it, vi } from "vitest";
 import { useRef, useState } from "react";
 import { render, screen } from "@testing-library/react";

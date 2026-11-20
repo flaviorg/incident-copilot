@@ -1,4 +1,4 @@
-// Replay das gravações (spec 8.2; AC-39): ordem dos eventos, pausa no portão, escolha do ramo e fim.
+// Recording replay (spec 8.2; AC-39): event order, pause at the gate, branch choice and end.
 import { describe, expect, it } from "vitest";
 import { choose, createReplay, currentSnapshot, step, visibleEvents } from "../replay/replay-engine.ts";
 import type { ReplayState } from "../replay/replay-engine.ts";

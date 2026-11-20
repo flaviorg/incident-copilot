@@ -1,5 +1,5 @@
-// `npm run fixtures:rehash`: atualiza os promptHashes das fixtures do fake quando um `system` muda (spec 7.2 e 7.6).
-// Sem prompt interativo: o diff do Git é a revisão. Imprime "arquivo prompt antigo -> novo".
+// `npm run fixtures:rehash`: updates the fake fixtures' promptHashes when a `system` changes (spec 7.2 and 7.6).
+// No interactive prompt: the Git diff is the review. Prints "file old prompt -> new".
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { promptHash } from "../src/llm/prompt-hash.ts";
@@ -9,7 +9,7 @@ import { PROJECT_ROOT } from "../src/infra/paths.ts";
 
 export type HashChange = { file: string; prompt: string; old: string | null; next: string };
 
-/** Grava os hashes de todos os prompts dados e devolve as mudanças; uma segunda execução devolve []. */
+/** Writes the hashes of all given prompts and returns the changes; a second run returns []. */
 export function rehashFixtures(files: string[], prompts: PromptDef<any, any>[]): HashChange[] {
   const changes: HashChange[] = [];
   for (const file of files) {

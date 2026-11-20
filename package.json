@@ -1,7 +1,7 @@
 {
   "name": "incident-copilot",
-  "version": "0.2.0",
-  "description": "Copiloto de incidentes multiagente: o modelo propõe; o código e o humano decidem",
+  "version": "0.3.0",
+  "description": "Multi-agent incident copilot: the model proposes; code and humans decide",
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node --import ./tests/setup/no-network.ts --test \"tests/unit/**/*.test.ts\" \"tests/e2e/**/*.test.ts\"",
@@ -15,18 +15,19 @@
     "start": "node --env-file-if-exists=.env src/index.ts",
     "dev": "node --env-file-if-exists=.env --watch --inspect src/index.ts",
     "mcp": "node --env-file-if-exists=.env src/mcp/server.ts",
-    "mcp:inspect": "npx @modelcontextprotocol/inspector node src/mcp/server.ts",
+    "mcp:inspect": "npx -y @modelcontextprotocol/inspector@2.13.0 node src/mcp/server.ts",
     "demo:record": "node src/cli.ts record-demo --out web/public/demo",
     "typecheck:web": "npm --prefix web run typecheck",
     "web:install": "npm --prefix web ci",
     "web:demo": "npm run demo:record && npm --prefix web run dev",
     "web:build": "npm run demo:record && npm --prefix web run build",
     "web:test": "npm run demo:record && npm --prefix web run test",
+    "web:verify": "npm run demo:record && npm --prefix web run test && npm --prefix web run build",
     "check:tokens": "node scripts/check-tokens.ts",
     "check:secrets": "node scripts/check-secrets.ts",
     "setup:hooks": "git config core.hooksPath .githooks",
     "test:live": "node --env-file-if-exists=.env --test \"tests/live/**/*.live.ts\"",
-    "verify": "npm run typecheck && npm run typecheck:web && npm test && npm run web:test && npm run web:build && npm run check:tokens && npm run check:secrets"
+    "verify": "npm run typecheck && npm run typecheck:web && npm test && npm run web:verify && npm run check:tokens && npm run check:secrets"
   },
   "license": "MIT",
   "type": "module",

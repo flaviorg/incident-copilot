@@ -36,14 +36,14 @@ test("offset shifts every timestamp", () => {
   assert.equal(s.deploys.at(-1)!.at, "2026-10-04T10:40:00.000Z");
   assert.equal(firstViolation(s.series.http_5xx_rate!, 0.05), "2026-10-04T10:40:30.000Z");
   assert.equal(s.offsetSec, 3600);
-  // o cache não mistura deslocamentos
+  // the cache does not mix offsets
   assert.equal(repo.get("deploy-5xx-rollback").alert.detectedAt, "2026-10-04T09:42:30.000Z");
 });
 
 test("unknown scenario", () => {
   assert.throws(() => repo.get("nope"), (e) => e instanceof NotFoundError && e.code === "scenario_not_found");
   assert.throws(() => repo.get("../fixtures"), (e) => e instanceof NotFoundError && e.code === "scenario_not_found");
-  // A mensagem só repete um id bem formado; o resto (caminho, aspas, texto enorme) não volta para quem chamou.
+  // The message only repeats a well-formed id; the rest (path, quotes, huge text) is not echoed back to the caller.
   assert.throws(() => repo.get("nope"), { message: "scenario not found: nope" });
   assert.throws(() => repo.get("../fixtures"), { message: "scenario not found (id out of format)" });
   assert.throws(() => repo.get("x".repeat(65)), { message: "scenario not found (id out of format)" });

@@ -2,13 +2,20 @@
 
 `npm start` brings up the Fastify API at `127.0.0.1:3000`. Error body: `{ "error": { "code", "message", "requestId", "issues"? } }`, with no stack trace. Every response carries `X-Request-Id`. Summary in the [README](../README.md#http-api).
 
+Every route also answers:
+
+- **401 `invalid_api_token`** when `API_TOKEN` is set and the request has no `Authorization: Bearer <API_TOKEN>` header (every route except `GET /health`, which stays open for probes). `API_TOKEN` is optional on loopback and required when `HOST` is not a loopback address: `npm start` refuses to start without it. The approval route still needs `X-Approval-Token` on top.
+- **421 `host_not_allowed`** when the `Host` header is not a loopback name (`localhost`, `127.0.0.1`, `[::1]`), `HOST`, or one of `ALLOWED_HOSTS`. This stops DNS rebinding: a page that rebinds its own domain to `127.0.0.1` still sends its domain in `Host`.
+- **403 `cross_origin_write`** on a write (`POST`) whose `Origin` header is not one of those hosts. CLI and `curl` send no `Origin` and are unaffected.
+
 ## Routes
 
 | Route | What it does | Errors |
 |---|---|---|
 | `GET /health` | provider and version | none |
 | `GET /scenarios` | available scenarios | none |
-| `POST /incidents` | opens an incident and runs the team until `awaiting_approval`, `resolved` or `escalated` (201) | 400; 404 `scenario_not_found`; 503 `llm_unavailable`; 504 `run_timeout` |
+| `POST /incidents` | opens an incident and runs the team until `awaiting_approval`, `resolved` or `escalated` (201) | 400; 404 `scenario_not_found`; 429 `too_many_runs` (more than `MAX_CONCURRENT_RUNS`, default 2); 503 `llm_unavailable`; 504 `run_timeout` |
+| `POST /incidents/:id/resume` | retries a resume whose run failed after every approval was decided (phase still `resume`); no token, since it only runs what humans already approved | 404; 409 `incident_not_accepting`; 429 `too_many_runs` |
 | `GET /incidents` | list with SQL filtering (`status`, `service`, `limit`) | 400 |
 | `GET /incidents/:id` | full view: diagnosis, plan, actions, approvals, metrics | 404 |
 | `GET /incidents/:id/trace` | events in `seq` order (`type`, `agent`, `limit`) | 404 |

@@ -1,4 +1,4 @@
-// Blackboards e peças mínimas para testes de funções puras (guarda, status, roteamento).
+// Blackboards and minimal pieces for testing pure functions (guard, status, routing).
 import type {
   Approval, AuditReview, Blackboard, Diagnosis, Escalation, GatedAction, IncidentMetrics, PostmortemDoc, RemediationPlan, Verification,
 } from "../../src/contracts/index.ts";
