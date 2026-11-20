@@ -16,7 +16,7 @@ export function createQueryMetricsTool(): Tool<z.infer<typeof Params>> {
     name: "query_metrics",
     description: "Use to measure the size and onset of a signal (5xx, P99 latency, throughput, cost) in a window ending now.",
     paramsSchema: Params,
-    run({ service, metric, window }, { scenario, now }) {
+    async run({ service, metric, window }, { scenario, now }) {
       if (service !== scenarioScope(scenario)) return { ok: false, summary: `${NO_DATA}: ${service}`, evidenceRef: null };
       const series = scenario.series[metric];
       if (!series) return { ok: false, summary: `no data for metric ${metric} in this scenario`, evidenceRef: null };

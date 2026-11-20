@@ -1,0 +1,30 @@
+[
+  {
+    "version": "checkout-web@2026.10.04-1",
+    "dateCreated": "2026-10-04T09:30:00.000Z",
+    "dateReleased": "2026-10-04T09:35:00.000Z",
+    "lastDeploy": { "id": "331", "environment": "production", "dateStarted": "2026-10-04T09:36:00.000Z", "dateFinished": "2026-10-04T09:38:00.000Z" },
+    "projects": [{ "id": "6502112", "name": "Checkout Web", "slug": "checkout-web" }]
+  },
+  {
+    "version": "checkout-web@2026.10.03-2",
+    "dateCreated": "2026-10-03T14:00:00.000Z",
+    "dateReleased": "2026-10-03T14:10:00.000Z",
+    "lastDeploy": null,
+    "projects": [{ "id": "6502112", "name": "Checkout Web", "slug": "checkout-web" }]
+  },
+  {
+    "version": "billing-api@7.4.0",
+    "dateCreated": "2026-10-04T09:00:00.000Z",
+    "dateReleased": null,
+    "lastDeploy": { "id": "330", "environment": "production", "dateFinished": "2026-10-04T09:05:00.000Z" },
+    "projects": [{ "id": "6502999", "name": "Billing API", "slug": "billing-api" }]
+  },
+  {
+    "version": "checkout-web@2026.09.01-0",
+    "dateCreated": "2026-09-01T10:00:00.000Z",
+    "dateReleased": "2026-09-01T10:05:00.000Z",
+    "lastDeploy": null,
+    "projects": [{ "id": "6502112", "name": "Checkout Web", "slug": "checkout-web" }, { "id": "6502999", "name": "Billing API", "slug": "billing-api" }]
+  }
+]

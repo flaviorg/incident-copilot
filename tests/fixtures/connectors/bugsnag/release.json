@@ -1,0 +1,12 @@
+{
+  "account": { "id": "5f1c2a3b4d5e6f7a8b9c0d1e", "name": "Example Shop", "url": "https://app.bugsnag.com/example-shop" },
+  "project": { "id": "5f1c2a3b4d5e6f7a8b9c0d2f", "name": "checkout-api", "url": "https://app.bugsnag.com/example-shop/checkout-api" },
+  "trigger": { "type": "release", "message": "Release 2026.10.4-1 deployed to production" },
+  "release": {
+    "id": "7b1c2d3e4f5a6b7c8d9e0f12",
+    "version": "2026.10.4-1",
+    "releaseStage": "production",
+    "createdAt": "2026-10-04T09:30:00.000Z",
+    "url": "https://app.bugsnag.com/example-shop/checkout-api/releases/2026.10.4-1"
+  }
+}

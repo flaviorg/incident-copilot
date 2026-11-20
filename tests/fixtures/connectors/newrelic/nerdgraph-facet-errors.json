@@ -1,0 +1,15 @@
+{
+  "data": {
+    "actor": {
+      "account": {
+        "nrql": {
+          "results": [
+            { "count": 412, "facet": ["java.net.SocketTimeoutException", "Read timed out calling payments-api"] },
+            { "count": 37, "facet": ["java.lang.NullPointerException", "cart.items is null"] },
+            { "count": 5, "error.class": "IllegalStateException", "error.message": "ledger locked" }
+          ]
+        }
+      }
+    }
+  }
+}

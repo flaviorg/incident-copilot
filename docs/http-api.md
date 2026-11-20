@@ -4,7 +4,7 @@
 
 Every route also answers:
 
-- **401 `invalid_api_token`** when `API_TOKEN` is set and the request has no `Authorization: Bearer <API_TOKEN>` header (every route except `GET /health`, which stays open for probes). `API_TOKEN` is optional on loopback and required when `HOST` is not a loopback address: `npm start` refuses to start without it. The approval route still needs `X-Approval-Token` on top.
+- **401 `invalid_api_token`** when `API_TOKEN` is set and the request has no `Authorization: Bearer <API_TOKEN>` header (every route except `GET /health`, which stays open for probes, and the webhooks `POST /ingest/*`, which authenticate with each connector's own scheme). `API_TOKEN` is optional on loopback and required when `HOST` is not a loopback address: `npm start` refuses to start without it. The approval route still needs `X-Approval-Token` on top.
 - **421 `host_not_allowed`** when the `Host` header is not a loopback name (`localhost`, `127.0.0.1`, `[::1]`), `HOST`, or one of `ALLOWED_HOSTS`. This stops DNS rebinding: a page that rebinds its own domain to `127.0.0.1` still sends its domain in `Host`.
 - **403 `cross_origin_write`** on a write (`POST`) whose `Origin` header is not one of those hosts. CLI and `curl` send no `Origin` and are unaffected.
 
@@ -24,6 +24,16 @@ Every route also answers:
 | `GET /approvals` | approvals with their effective status (an expired one shows as `expired`, without writing) | 400 |
 | `POST /approvals/:id/decision` | decides with `X-Approval-Token`; resumes when nothing is left pending | 400; 401; 404; 409; 422; 429; 503 |
 | `GET /stats` | counts, MTTR P50 and P95, tiers, guards and LLM usage, all in SQL (`since=1h\|24h\|7d`) | 400 |
+| `POST /ingest/:connectorId` and `POST /ingest/:connectorId/:token` | live mode (spec 008): a provider webhook. Verified with the connector's scheme on the raw bytes, parsed, recorded and queued; answers **202** `{ accepted, duplicates, ignored, alertIds, requestId }` without running the graph. Any content type is read as raw bytes. Not behind `API_TOKEN` | 400 `invalid_payload` (body never echoed); 401 `invalid_webhook_credentials`; 404 `connector_not_found`; 413 `payload_too_large` (over `ingest.maxBodyBytes`, default 1 MiB); 415 for a malformed `Content-Type` header; 429 `ingest_rate_limited` with `Retry-After`; 503 `ingest_queue_full` with `Retry-After` |
+| `GET /connectors` | configured, enabled connectors: `{ connectors: [{ id, type, capabilities, ingestPath }] }` | none |
+| `GET /ingest/alerts` | recently ingested alerts, newest first: `{ alerts: IngestedAlertRecord[] }` (`limit` 1 to 200, default 50) | 400 |
+
+A rejected webhook records nothing. `accepted` counts new alerts, `duplicates` counts alerts already recorded for the same
+`(connectorId, externalId)`, and `alertIds` lists the new ones. Each alert then becomes, on the queue, `opened` (a new live
+incident, run in shadow mode until `advised`), `deduplicated` (an open live incident of the same fingerprint),
+`resolved`, `ignored` or `failed`; `GET /ingest/alerts` shows the outcome. Setup per provider: [docs/connectors/](connectors/).
+
+The other routes keep a 64 KB body cap.
 
 ## Real `curl` sequence
 

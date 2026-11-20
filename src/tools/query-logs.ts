@@ -18,7 +18,7 @@ export function createQueryLogsTool(): Tool<z.infer<typeof Params>> {
     name: "query_logs",
     description: "Use to see a service's most frequent error or warning messages, grouped, with counts and versions.",
     paramsSchema: Params,
-    run({ service, level, window, limit = 3 }, { scenario, now }) {
+    async run({ service, level, window, limit = 3 }, { scenario, now }) {
       const ofService = scenario.logs.filter((l) => l.service === service);
       if (ofService.length === 0) return { ok: false, summary: `${NO_DATA}: ${service}`, evidenceRef: null };
       const toMs = now.getTime();

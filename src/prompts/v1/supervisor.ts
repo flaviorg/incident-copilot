@@ -3,10 +3,12 @@ import * as z from "zod";
 import { AgentIdSchema, AlertSchema, SupervisorDecisionSchema } from "../../contracts/index.ts";
 import type { SupervisorDecision } from "../../contracts/index.ts";
 import type { PromptDef } from "../../llm/provider.ts";
-import { jsonOf } from "./shared.ts";
+import { alertSection, jsonOf } from "./shared.ts";
 
 export const SupervisorInputSchema = z.object({
   alert: AlertSchema,
+  /** Live incident: the alert comes from an external system and is shown as untrusted data. Absent in scenarios. */
+  externalAlert: z.boolean().optional(),
   flags: z.object({
     hasDiagnosis: z.boolean(),
     runbookSearchDone: z.boolean(),
@@ -41,7 +43,13 @@ export const supervisorPrompt: PromptDef<SupervisorInput, SupervisorDecision> = 
   id: "supervisor",
   version: "supervisor.v1",
   system: SYSTEM,
-  buildUser: (i) => `Incident state (JSON). Choose the next specialist.\n${jsonOf(SupervisorInputSchema, i)}`,
+  buildUser: (input) => {
+    const i = SupervisorInputSchema.parse(input);
+    // A scenario keeps the former rendering (the whole state as one JSON); a live alert is split out and delimited.
+    if (!i.externalAlert) return `Incident state (JSON). Choose the next specialist.\n${jsonOf(SupervisorInputSchema, i)}`;
+    const { alert, externalAlert: _flag, ...state } = i;
+    return `Incident state (JSON). Choose the next specialist.\n${alertSection(AlertSchema, alert, true)}\n\nState (JSON):\n${JSON.stringify(state, null, 2)}`;
+  },
   matchKeys: (i) => ({ ...i.flags }),
   inputSchema: SupervisorInputSchema,
   outputSchema: SupervisorDecisionSchema,

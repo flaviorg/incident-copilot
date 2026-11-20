@@ -12,7 +12,10 @@ import type { LoadedScenario, ScenarioRepository } from "../infra/scenarios/scen
 import type { Clock } from "../infra/clock.ts";
 import type { Ids } from "../infra/ids.ts";
 import type { Logger } from "../infra/logger.ts";
-import { ConflictError, LlmUnavailableError, NotFoundError, RunTimeoutError, UnprocessableError, ValidationError } from "../domain/errors.ts";
+import { ConflictError, LlmUnavailableError, NotFoundError, RunTimeoutError, UnprocessableError, UnscriptedLlmCallError, ValidationError } from "../domain/errors.ts";
+import { decideAlertAction } from "../domain/ingest/dedupe.ts";
+import { redactThenClip } from "../infra/redact.ts";
+import type { NotificationKind } from "../notifiers/types.ts";
 import { classifyAction, runbookRefsOf, EXECUTABLE_ACTIONS, isExecutable } from "../domain/autonomy/catalog.ts";
 import { parseWithIssues } from "../domain/validation.ts";
 import { effectiveStatus, isExpired, transition } from "../domain/approval/approval-machine.ts";
@@ -26,6 +29,7 @@ import { actionArgs, DRY_RUN_SEC } from "../graph/nodes/gate-node.ts";
 import type { ValidatedStep } from "../infra/simulated-infra.ts";
 import type { TraceSink } from "./trace-sink.ts";
 import { openIncidentRecord } from "./incident-setup.ts";
+import { openLiveIncidentRecord } from "./live-setup.ts";
 import { toAuditEntryView, toIncidentView } from "./views.ts";
 
 export type IncidentServiceDeps = {
@@ -43,6 +47,15 @@ export type IncidentServiceDeps = {
   /** Trace of external proposals (mcp_client agent). */
   trace: TraceSink;
   approvalTtlMin: number;
+  /** Live mode (spec 008): absent without a copilot config. */
+  live?: LiveIncidentDeps | null;
+};
+
+export type LiveIncidentDeps = {
+  dedupeWindowMin: number;
+  /** Never throws (NotificationService). */
+  notify(kind: NotificationKind, incidentId: string): Promise<void>;
+  secrets: readonly string[];
 };
 
 export type RunCtx = { requestId: string | null };
@@ -79,6 +92,103 @@ export class IncidentService {
     if (final.escalation?.reason === "llm_unavailable") throw new LlmUnavailableError(`model unavailable for incident ${incident.id}: ${final.escalation.detail}`);
     if (final.escalation?.reason === "timeout") throw new RunTimeoutError(`the run of incident ${incident.id} exceeded ${this.d.runTimeoutMs} ms`);
     return view;
+  }
+
+  /**
+   * The alert queue's job (spec 008, decision 8; AC-46, AC-47, AC-55 and AC-56). Opens a live incident and runs it,
+   * deduplicates into the open one, resolves it, or ignores a resolved alert without one; writes the outcome back to
+   * the ingested_alerts row. Never throws: a failure becomes outcome failed with a short redacted detail.
+   *
+   * Notifications are not sent in the run's path: incident_opened goes out while the investigation runs, and the
+   * rest is returned as a follow-up that the queue runs after it frees the run slot, so a slow notifier delays
+   * neither the diagnosis nor the next run (decision 14, AC-56). A run that fails closes its live_incidents row, so the
+   * next firing alert of that fingerprint opens a fresh incident instead of being deduplicated into a dead one.
+   */
+  async handleAlertJob(alertId: string): Promise<void | (() => Promise<void>)> {
+    const { store, clock } = this.d;
+    const live = this.d.live;
+    const rec = store.getIngestedAlert(alertId);
+    if (!rec || rec.outcome !== "queued") return; // recovered twice, or already handled
+    const log = this.d.logger.child({ requestId: rec.requestId, alertId, connectorId: rec.connectorId });
+    const fail = (e: unknown, incidentId: string | null) => {
+      const detail = e instanceof UnscriptedLlmCallError ? "llm_unscripted" : redactThenClip(`${(e as Error)?.name ?? "Error"}: ${(e as Error)?.message ?? ""}`, 200, live?.secrets ?? []);
+      try {
+        store.updateIngestedAlert(alertId, { outcome: "failed", detail, ...(incidentId ? { incidentId } : {}) });
+      } catch {
+        // The row may be gone with the database; the log line below still records the failure.
+      }
+      log.error("alert job failed", { event: "alert_failed", incidentId, error: (e as Error)?.name ?? "Error" });
+    };
+    if (!live) return fail(new Error("live alert without connector configuration"), null);
+
+    let opened: string | null = null;
+    try {
+      const a = rec.alert;
+      const open = store.findOpenLiveIncident(rec.connectorId, a.fingerprint);
+      const action = decideAlertAction({ status: a.status, open, now: clock.now(), dedupeWindowMin: live.dedupeWindowMin });
+      const ctx: RunCtx = { requestId: rec.requestId };
+      if (action === "open") {
+        if (open) store.closeLiveIncident(open.incidentId, clock.now().toISOString()); // stale: older than the dedupe window
+        const { incident } = openLiveIncidentRecord({ store, clock, ids: this.d.ids }, rec, ctx);
+        opened = incident.id;
+        log.info("live incident opened", { event: "incident_opened", incidentId: incident.id, scenarioId: incident.scenarioId });
+        const incidentId = incident.id;
+        const closeLive = () => {
+          try {
+            store.closeLiveIncident(incidentId, clock.now().toISOString());
+          } catch {
+            // The log line of the failure already records it; the row is closed again by the next alert's stale check.
+          }
+        };
+        const opening = live.notify("incident_opened", incidentId).catch(() => {}); // never throws; concurrent with the run
+        let final: Blackboard;
+        try {
+          final = await this.run(incidentId, ctx);
+        } catch (e) {
+          fail(e, incidentId);
+          closeLive();
+          return async () => {
+            await opening;
+            await live.notify("run_failed", incidentId);
+          };
+        }
+        const failed = final.escalation?.reason === "llm_unavailable" || final.escalation?.reason === "timeout";
+        if (failed) closeLive();
+        return async () => {
+          await opening;
+          await live.notify(failed ? "run_failed" : "analysis_ready", incidentId);
+        };
+      }
+      if (action === "deduplicate") {
+        const incidentId = open!.incidentId;
+        store.transaction(() => {
+          store.appendAudit({
+            incidentId, actor: "system:ingest", event: "alert_ingested", tier: null,
+            details: { alertId, externalId: a.externalId, deduplicated: true, requestId: rec.requestId },
+          });
+          store.updateIngestedAlert(alertId, { outcome: "deduplicated", incidentId });
+        });
+        log.info("alert deduplicated into the open incident", { event: "alert_deduplicated", incidentId });
+        return;
+      }
+      if (action === "resolve") {
+        const incidentId = open!.incidentId;
+        store.transaction(() => {
+          store.appendAudit({
+            incidentId, actor: "system:ingest", event: "alert_resolved", tier: null,
+            details: { alertId, externalId: a.externalId, resolvedAt: a.startedAt, requestId: rec.requestId },
+          });
+          store.closeLiveIncident(incidentId, clock.now().toISOString());
+          store.setIncidentResolved(incidentId, a.startedAt);
+          store.updateIngestedAlert(alertId, { outcome: "resolved", incidentId });
+        });
+        log.info("live incident resolved by the provider", { event: "alert_resolved", incidentId });
+        return () => live.notify("incident_resolved", incidentId);
+      }
+      store.updateIngestedAlert(alertId, { outcome: "ignored", detail: "resolved alert without an open incident" });
+    } catch (e) {
+      fail(e, opened);
+    }
   }
 
   /**

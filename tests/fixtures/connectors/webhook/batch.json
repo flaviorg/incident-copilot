@@ -1,0 +1,31 @@
+{
+  "batch_id": "batch-77",
+  "alerts": [
+    {
+      "id": "b-1",
+      "name": "disk usage",
+      "host": "db-1",
+      "app": "orders",
+      "sev": "critical",
+      "status": "firing",
+      "at": 1791106890000
+    },
+    {
+      "name": "queue depth",
+      "host": "worker-3",
+      "app": "orders",
+      "sev": "warning",
+      "status": "firing",
+      "at": 1791106900000
+    },
+    {
+      "id": "b-3",
+      "name": "error rate",
+      "host": "api-2",
+      "app": "checkout",
+      "sev": "notice",
+      "status": "Resolved",
+      "at": "2026-10-04T09:45:00Z"
+    }
+  ]
+}

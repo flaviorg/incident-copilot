@@ -2,7 +2,7 @@ import * as z from "zod";
 import { ConfidenceSchema, RootCauseCategorySchema } from "./enums.ts";
 
 export const EvidenceSchema = z.object({
-  source: z.enum(["metrics", "logs", "deploys", "inventory"]),
+  source: z.enum(["metrics", "logs", "deploys", "inventory", "errors", "external"]),
   ref: z.string().describe("Stable reference to the signal, e.g. metrics:orders-api:http_5xx_rate@09:40-09:55"),
   summary: z.string().max(300),
 });

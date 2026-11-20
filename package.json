@@ -1,6 +1,6 @@
 {
   "name": "incident-copilot",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Multi-agent incident copilot: the model proposes; code and humans decide",
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -41,6 +41,7 @@
     "@langchain/openai": "1.6.2",
     "@modelcontextprotocol/sdk": "1.32.0",
     "fastify": "5.12.5",
+    "yaml": "2.8.1",
     "zod": "4.6.5"
   },
   "devDependencies": {

@@ -1,0 +1,129 @@
+# incident-copilot 0.4 configuration example (spec 008; guides in docs/connectors/<type>.md).
+#
+# Copy it to copilot.yaml, keep only the connectors and notifiers you use, set the variables it references
+# (see the commented block at the end of .env.example), then validate it:
+#
+#   npm run cli -- config check --file copilot.yaml
+#
+# Rules the loader enforces:
+# - every secret is a whole "${VAR}" reference to a variable that is set (at least 16 characters unless a guide says
+#   otherwise); a literal secret is refused;
+# - "${VAR}" is also interpolated in non-secret strings;
+# - URLs must be https (http only for loopback hosts);
+# - problems are reported as { path, rule }, never with a value.
+
+version: 1
+
+# The only operating mode for live incidents in 0.4: the team diagnoses, plans and classifies tiers; nothing executes.
+# Tier 2 and tier 3 steps are recorded as recommendations, tier 4 stays forbidden.
+mode: shadow
+
+# Base URL of this copilot, used for links in notifications. Remove it (or set null) if there is none.
+publicUrl: https://copilot.example.com
+
+# Inbound webhook limits. These are the defaults.
+ingest:
+  maxBodyBytes: 1048576     # body cap per request (1 MiB); larger bodies get 413
+  rateLimitPerMin: 60       # token bucket per connector; beyond it, 429 with Retry-After
+  maxQueued: 100            # queue size at which new requests get 503 so the provider retries later
+  dedupeWindowMin: 1440     # a firing alert joins an open incident of the same fingerprint younger than this
+  trustProxy: false         # behind a proxy you control: its hop count (1) or its addresses ["10.0.0.0/8"]; never true
+
+# Canonical service names, and the name each connector uses for them (keys are connector ids below).
+services:
+  - name: checkout-api
+    aliases:
+      prom: [checkout]
+      nr: ["Checkout API (prod)"]
+      sentry-prod: [checkout-web]
+      bugsnag-prod: ["Checkout Web"]
+      generic: [checkout]
+  - name: payments-api
+    aliases:
+      prom: [payments]
+      nr: ["Payments API (prod)"]
+
+connectors:
+  # Prometheus Alertmanager: webhook_config receiver (docs/connectors/alertmanager.md). Ingest path /ingest/prom.
+  - id: prom
+    type: alertmanager
+    ingest:
+      auth: { type: bearer, token: "${ALERTMANAGER_WEBHOOK_TOKEN}" }
+
+  # New Relic: Workflows webhook destination in, NerdGraph NRQL out (docs/connectors/newrelic.md). Ingest path /ingest/nr.
+  - id: nr
+    type: newrelic
+    ingest:
+      auth: { type: bearer, token: "${NEW_RELIC_WEBHOOK_TOKEN}" }
+    query:
+      region: us              # us or eu
+      accountId: 1234567
+      apiKey: "${NEW_RELIC_API_KEY}"
+
+  # Sentry: signed Integration Platform webhooks in, REST issues and releases out (docs/connectors/sentry.md).
+  # Ingest path /ingest/sentry-prod.
+  - id: sentry-prod
+    type: sentry
+    ingest:
+      clientSecret: "${SENTRY_CLIENT_SECRET}"     # HMAC-SHA256 key of Sentry-Hook-Signature
+      resources: [event_alert, metric_alert, issue]
+    query:
+      baseUrl: https://sentry.io
+      organization: my-org
+      token: "${SENTRY_AUTH_TOKEN}"
+
+  # Bugsnag: Data Forwarding webhook in, Data Access API out (docs/connectors/bugsnag.md).
+  # Bugsnag does not sign its webhook, so the secret goes in the URL: /ingest/bugsnag-prod/<token>.
+  - id: bugsnag-prod
+    type: bugsnag
+    ingest:
+      token: "${BUGSNAG_WEBHOOK_TOKEN}"           # 24 to 128 characters of A-Z, a-z, 0-9, _ and -
+    query:
+      token: "${BUGSNAG_AUTH_TOKEN}"
+      projects:
+        "Checkout Web": "0123456789abcdef01234567"   # Bugsnag project name (the alias above) to project id
+
+  # Any JSON sender, mapped field by field (docs/connectors/webhook.md). Ingest path /ingest/generic.
+  - id: generic
+    type: webhook
+    ingest:
+      auth: { type: hmac, header: x-signature, secret: "${GENERIC_WEBHOOK_SECRET}", prefix: "sha256=" }
+      mapping:
+        externalId: id
+        fingerprint: problemId
+        service: service
+        title: { template: "{service}: {summary}" }
+        severity: { path: level, map: { critical: sev1, high: sev2 }, default: sev3 }
+        status: { path: state, resolvedValues: [resolved, ok] }
+        startedAt: startedAt
+        url: link
+
+  # Any MCP server, through an explicit read-only tool allowlist (docs/connectors/mcp.md). Query only.
+  # Example: New Relic's hosted MCP server. Whether it accepts a key from a generic client is not verified.
+  - id: newrelic-mcp
+    type: mcp
+    transport: http
+    url: https://mcp.newrelic.com/mcp/
+    secretHeaders:
+      api-key: "${NEW_RELIC_API_KEY}"
+    tools:
+      - name: execute_nrql_query
+        description: "Runs the configured NRQL for a service and a window and returns rows. Read only."
+        # The model only fills {service} and {window}; it never writes the query (docs/connectors/mcp.md, "Tool arguments").
+        arguments:
+          query: "SELECT count(*) FROM TransactionError WHERE appName = '{service}' FACET error.class SINCE {window} ago LIMIT 10"
+
+notifiers:
+  # Slack incoming webhook (docs/connectors/slack.md). The webhook URL is itself a secret.
+  - id: incidents-channel
+    type: slack
+    webhookUrl: "${SLACK_WEBHOOK_URL}"
+    events: [incident_opened, analysis_ready, run_failed, incident_resolved]
+
+  # Generic outbound JSON webhook, HMAC-signed (docs/connectors/outbound-webhook.md).
+  - id: pager-bridge
+    type: outbound-webhook
+    url: https://hooks.example.com/incident-copilot
+    signingSecret: "${OUTBOUND_WEBHOOK_SIGNING_SECRET}"
+    bearerToken: "${OUTBOUND_WEBHOOK_TOKEN}"
+    events: [analysis_ready, incident_resolved]

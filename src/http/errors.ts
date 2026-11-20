@@ -48,7 +48,7 @@ export function toHttpError(e: unknown, requestId: string): HttpError {
 
   const f = fastifyError(e);
   if (f) {
-    if (f.code === "FST_ERR_CTP_BODY_TOO_LARGE") return known(413, "payload_too_large", "request body larger than 64 KB");
+    if (f.code === "FST_ERR_CTP_BODY_TOO_LARGE") return known(413, "payload_too_large", "request body larger than the limit of this route");
     if (f.code === "FST_ERR_CTP_INVALID_JSON_BODY" || f.code === "FST_ERR_CTP_EMPTY_JSON_BODY") return known(400, "invalid_json", "invalid JSON body");
     if (f.code === "FST_ERR_CTP_INVALID_MEDIA_TYPE") return known(415, "unsupported_media_type", "unsupported content-type; use application/json");
     if (f.statusCode >= 400 && f.statusCode < 500) return known(f.statusCode, "bad_request", "bad request");

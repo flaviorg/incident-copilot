@@ -7,6 +7,8 @@ export interface Ids {
   approval(): string;
   action(): string;
   run(): string;
+  /** Ingested alert (live path only, so scenario runs never consume this sequence). */
+  alert(): string;
   event(incidentId: string, seq: number): string;
 }
 
@@ -21,5 +23,6 @@ export class DbIds implements Ids {
   approval(): string { return padId("APR", this.store.nextSequence("approval")); }
   action(): string { return padId("ACT", this.store.nextSequence("action")); }
   run(): string { return padId("RUN", this.store.nextSequence("run")); }
+  alert(): string { return padId("ALR", this.store.nextSequence("alert")); }
   event(incidentId: string, seq: number): string { return `${incidentId}:${seq}`; }
 }

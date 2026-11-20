@@ -1,0 +1,18 @@
+{
+  "account": { "id": "5f1c2a3b4d5e6f7a8b9c0d1e", "name": "Example Shop", "url": "https://app.bugsnag.com/example-shop" },
+  "project": { "id": "5f1c2a3b4d5e6f7a8b9c0d2f", "name": "checkout-api", "url": "https://app.bugsnag.com/example-shop/checkout-api" },
+  "trigger": { "type": "errorStateManualChange", "message": "Error marked as fixed by a teammate", "stateChange": "fixed" },
+  "error": {
+    "id": "6a0b1c2d3e4f5a6b7c8d9e01",
+    "errorId": "6a0b1c2d3e4f5a6b7c8d9e00",
+    "exceptionClass": "PaymentGatewayTimeout",
+    "message": "Upstream payment gateway did not answer within 5000 ms",
+    "context": "POST /api/checkout",
+    "firstReceived": "2026-10-04T09:41:12.000Z",
+    "receivedAt": "2026-10-04T10:05:00.000Z",
+    "url": "https://app.bugsnag.com/example-shop/checkout-api/errors/6a0b1c2d3e4f5a6b7c8d9e00",
+    "severity": "error",
+    "status": "fixed",
+    "app": { "releaseStage": "production", "version": "2026.10.4-1" }
+  }
+}

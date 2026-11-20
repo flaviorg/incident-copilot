@@ -17,6 +17,7 @@ export function createPlannerNode(d: { llm: LlmProvider; trace: TraceSink; catal
       plannerPrompt,
       {
         alert: state.alert,
+        ...(state.origin ? { externalAlert: true } : {}),
         diagnosis: state.diagnosis,
         runbookExcerpts: state.runbookMatches.map((m) => ({ ref: `${m.runbookId}#${m.section}`, excerpt: m.excerpt })),
         catalogText: d.catalogText(),

@@ -1,0 +1,40 @@
+{
+  "text": "[SEV2] Analysis ready: High error rate in checkout &lt;script&gt;&amp; (checkout-api)",
+  "blocks": [
+    {
+      "type": "section",
+      "text": { "type": "mrkdwn", "text": "*High error rate in checkout &lt;script&gt;&amp;*\nINC-0001 - advised" }
+    },
+    {
+      "type": "section",
+      "fields": [
+        { "type": "mrkdwn", "text": "*Severity*\nSEV2" },
+        { "type": "mrkdwn", "text": "*Service*\ncheckout-api" },
+        { "type": "mrkdwn", "text": "*Source*\nprom (alertmanager)" },
+        { "type": "mrkdwn", "text": "*Status*\nadvised" }
+      ]
+    },
+    {
+      "type": "section",
+      "text": { "type": "mrkdwn", "text": "*Diagnosis*\nCategory: bad_deploy | Confidence: high\nThe v2.4.0 deploy introduced a TypeError in PriceFormatter" }
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Recommendations*\nTier 3 - rollback_deployment on deployment/checkout-api - recommended, not executed (would require human approval)\nTier 2 - add_incident_note on incident/checkout-api - recommended, not executed (shadow mode)\nTier 4 - run_arbitrary_command on host/checkout-api - blocked (forbidden by construction)"
+      }
+    },
+    {
+      "type": "context",
+      "elements": [{ "type": "mrkdwn", "text": "Shadow mode: nothing was executed." }]
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "<https://copilot.example.com/incidents/INC-0001|Open incident> | <https://prometheus.example.com/graph?g0.expr=up|Source alert (prom)>"
+      }
+    }
+  ]
+}

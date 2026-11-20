@@ -360,7 +360,7 @@ test("a resume that failed can be retried through IncidentService.resume once th
   });
   const { createExecutorNode } = await import("../../src/graph/nodes/executor-node.ts");
   realExecutor = createExecutorNode({
-    infra: c.infra, scenarios: c.scenarios, guards: c.guards, trace: c.trace, clock: c.clock,
+    infra: c.infra, context: c.context, guards: c.guards, trace: c.trace, clock: c.clock,
     persist: { action: (a) => c.store.upsertAction(a), approval: (a) => c.store.createApproval(a), audit: (e) => c.store.appendAudit(e) },
   });
   const v = await c.incidents.open({ scenarioId: DEPLOY }, { requestId: null });
