@@ -264,3 +264,58 @@ test("a run whose final save fails still records its end", async () => {
 });
 
 const incidentIdOfStore = (c: TestContainer) => c.store.listIncidents({ limit: 1 })[0]!.id;
+
+test("a decision that resumes the incident also records overdue sibling approvals as expired", async () => {
+  // Review 2026-11: the gate approval (APR-0001) is overdue but unrecorded; an MCP proposal made later (APR-0002) is
+  // still valid. Approving APR-0002 resumed the batch while APR-0001 stayed "pending" in the store, its action stayed
+  // awaiting_approval and its dependents were never cancelled.
+  const { c, v } = await open();
+  c.clock.tick(20 * 60);
+  const p = c.incidents.proposeExternalAction(
+    { incidentId: v.incident.id, actionType: "rollback_deployment", target: "deployment/orders-api", params: { toVersion: "v3.7.2" }, rationale: "second opinion" },
+    "mcp_client:tests",
+  );
+  assert.equal(p.approvalId, "APR-0002");
+  c.clock.tick(15 * 60); // APR-0001 is now past its 30 min TTL; APR-0002 is not
+  await approveAs(c, "ana", "APR-0002");
+  const first = c.store.getApproval("APR-0001")!;
+  assert.deepEqual([first.status, first.decisionSource], ["expired", "expiry"]);
+  const audit = c.store.listAudit(v.incident.id);
+  assert.ok(audit.some((e) => e.event === "approval_expired" && e.details.approvalId === "APR-0001"));
+  const actions = c.store.listActions(v.incident.id);
+  const step2 = actions.find((a) => a.order === 2)!;
+  const step3 = actions.find((a) => a.order === 3)!;
+  assert.equal(step2.status, "expired");
+  assert.equal(step3.status, "cancelled");
+});
+
+test("a timeout escalation after the gate closes the pending approvals, and a late decision is refused", async () => {
+  // Review 2026-11: a run that timed out right after the gate left APR-0001 pending on an escalated incident; a human
+  // could then "approve" an action that would never run, and the audit said it was approved.
+  let realGate: NodeFn | null = null;
+  const c: TestContainer = createTestContainer({
+    runTimeoutMs: 40,
+    nodes: {
+      gate: async (s, cfg) => {
+        const out = await realGate!(s, cfg);
+        await new Promise((r) => setTimeout(r, 80));
+        return out;
+      },
+    },
+  });
+  realGate = createGateNode({
+    infra: c.infra, trace: c.trace, clock: c.clock, ids: c.ids, approvalTtlMin: c.config.approvalTtlMin,
+    persist: { action: (a) => c.store.upsertAction(a), approval: (a) => c.store.createApproval(a), audit: (e) => c.store.appendAudit(e) },
+  });
+  await assert.rejects(c.incidents.open({ scenarioId: DEPLOY }, { requestId: null }));
+  const id = "INC-0001";
+  assert.equal(c.incidents.get(id).incident.status, "escalated");
+  assert.equal(c.store.getApproval("APR-0001")!.status, "expired");
+  assert.deepEqual(c.approvals.list("pending"), []);
+  const closed = c.store.listAudit(id).find((e) => e.event === "approval_expired" && e.details.approvalId === "APR-0001");
+  assert.ok(closed, "approval closure is audited");
+  assert.match(String(closed!.details.cause), /escalat/);
+  assert.equal(c.store.listActions(id).find((a) => a.order === 2)!.status, "cancelled");
+  await assert.rejects(approveAs(c, "ana"), (e) => e instanceof ConflictError);
+  assert.ok(!c.store.listAudit(id).some((e) => e.event === "approval_approved"));
+});

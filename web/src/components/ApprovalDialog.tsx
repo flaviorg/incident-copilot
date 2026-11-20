@@ -1,5 +1,5 @@
-// Diálogo de confirmação da decisão (spec 10.2, item 4; AC-39): role dialog modal com nome e descrição, foco preso,
-// Escape fecha e devolve o foco, e o aviso de que nada real acontece.
+// Decision confirmation (spec 10.2, item 4; AC-39): modal dialog with a name and description, trapped focus, Escape
+// closes it and returns focus, and the reminder that nothing real happens.
 import { useId, useRef } from "react";
 import type { RefObject } from "react";
 import { useFocusTrap } from "../hooks/useFocusTrap.ts";
@@ -33,7 +33,7 @@ export function ApprovalDialog({ open, decision, approvalIds = [], onConfirm, on
         </p>
         <div className="dialog-actions">
           <button type="button" onClick={onClose}>Cancel</button>
-          <button type="button" className={decision === "approve" ? "button-primary" : "button-danger"} onClick={onConfirm}>Confirm</button>
+          <button type="button" className={decision === "approve" ? "button-approve" : "button-danger"} onClick={onConfirm}>Confirm</button>
         </div>
       </div>
     </div>

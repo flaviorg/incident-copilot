@@ -1,34 +1,57 @@
-/* Design tokens semânticos: única fonte de cores, espaçamento e tipografia da War Room (spec 4.8 e 10.2).
-   Nenhuma cor literal fora deste arquivo (npm run check:tokens). Pares de texto e fundo em contrast-pairs.json,
-   conferidos com pelo menos 4,5:1 nos dois temas (src/test/tokens-contrast.test.ts). */
+/* Semantic design tokens: the only source of colour, spacing and type for the War Room (spec 4.8 and 10.2).
+   No literal colour outside this file (npm run check:tokens). Text/background pairs live in contrast-pairs.json and
+   are checked at 4.5:1 or more in both themes (src/test/tokens-contrast.test.ts).
+   World: a flight-progress strip board. Strip holders say who acted: model (blue), code (green), human (amber). */
 :root {
   color-scheme: light dark;
 
-  --color-bg: #f6f7f9;
-  --color-surface: #ffffff;
-  --color-surface-muted: #eef1f5;
-  --color-border: #8c96a3;
-  --color-text: #1b1f24;
-  --color-text-muted: #4f5966;
-  --color-accent: #1d4ed8;
+  /* Board and strips */
+  --color-bg: #d3dae2;
+  --color-bay: #c2cbd5;
+  --color-surface: #fbfcfd;
+  --color-surface-muted: #edf1f5;
+  --color-border: #7d8896;
+  --color-rule: #dbe1e8;
+  --color-text: #141c26;
+  --color-text-muted: #47515e;
+  --color-accent: #17202b;
   --color-accent-text: #ffffff;
-  --color-link: #1d4ed8;
-  --color-focus: #1d4ed8;
-  --color-danger: #b42318;
-  --color-success: #1a7f37;
-  --color-banner-bg: #fff7e0;
-  --color-banner-text: #5c3d00;
+  --color-link: #1f4fb0;
+  --color-focus: #1f4fb0;
+  --color-danger: #a8301d;
+  --color-danger-text: #ffffff;
+  --color-success: #17643f;
+  --color-banner-bg: #141c26;
+  --color-banner-text: #f1f4f7;
+  --color-banner-tag: #ffd27a;
 
-  --color-tier-1-bg: #e7f0ff;
-  --color-tier-1-fg: #1e3a8a;
-  --color-tier-2-bg: #e6f4ea;
+  /* Authority: who acted */
+  --color-auth-model-bg: #2b5cbf;
+  --color-auth-code-bg: #1b6e49;
+  --color-auth-human-bg: #8f5306;
+  --color-auth-system-bg: #4f5a68;
+  --color-auth-on: #ffffff;
+
+  /* The held strip and its mark */
+  --color-held-ring: #8f5306;
+  --color-held-text: #7a4604;
+  --color-stamp-approved: #17643f;
+  --color-stamp-rejected: #a8301d;
+
+  --color-tier-1-bg: #e4ecfb;
+  --color-tier-1-fg: #1d3f86;
+  --color-tier-2-bg: #e1f1e8;
   --color-tier-2-fg: #14532d;
-  --color-tier-3-bg: #fff4e5;
-  --color-tier-3-fg: #7a3e00;
-  --color-tier-4-bg: #fde8e8;
-  --color-tier-4-fg: #8a1c1c;
+  --color-tier-3-bg: #fbecd6;
+  --color-tier-3-fg: #6e3f04;
+  --color-tier-4-bg: #f9e3df;
+  --color-tier-4-fg: #86231a;
 
-  --color-backdrop: #1b1f24b3;
+  --color-hatch: #9aa5b2;
+  --color-backdrop: #141c26b3;
+  --shadow-strip: 0 1px 2px #141c2633, 0 1px 1px #141c261a;
+  --shadow-raised: 0 8px 20px #141c2633, 0 2px 4px #141c261f;
+  --color-selection: #2b5cbf40;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -36,37 +59,59 @@
   --space-4: 16px;
   --space-5: 24px;
   --space-6: 32px;
+  --space-7: 48px;
 
   --radius: 8px;
+  --radius-strip: 4px;
   --border-width: 1px;
   --focus-width: 3px;
-  --content-max: 1100px;
+  --content-max: 1280px;
+  --holder-width: 9.5rem;
 
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-size-xs: 0.8125rem;
   --font-size-sm: 0.875rem;
   --font-size-md: 1rem;
   --font-size-lg: 1.25rem;
   --font-size-xl: 1.75rem;
   --line-height: 1.5;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-slide: 420ms;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-bg: #0f1216;
-    --color-surface: #171b21;
-    --color-surface-muted: #1f252d;
-    --color-border: #5d6878;
-    --color-text: #e8ecf1;
-    --color-text-muted: #a9b3bf;
-    --color-accent: #8ab4ff;
-    --color-accent-text: #0b1220;
-    --color-link: #8ab4ff;
-    --color-focus: #8ab4ff;
-    --color-danger: #ff8a80;
-    --color-success: #6fdc8c;
-    --color-banner-bg: #3a2f0b;
-    --color-banner-text: #ffe8a3;
+    --color-bg: #0e141b;
+    --color-bay: #161e28;
+    --color-surface: #1d2632;
+    --color-surface-muted: #24303d;
+    --color-border: #5f6c7c;
+    --color-rule: #2c3846;
+    --color-text: #e7edf3;
+    --color-text-muted: #a9b5c2;
+    --color-accent: #e7edf3;
+    --color-accent-text: #0e141b;
+    --color-link: #8fb3ff;
+    --color-focus: #8fb3ff;
+    --color-danger: #ff8f7e;
+    --color-danger-text: #1d0905;
+    --color-success: #71d39d;
+    --color-banner-bg: #05080c;
+    --color-banner-text: #e7edf3;
+    --color-banner-tag: #ffd27a;
+
+    --color-auth-model-bg: #2b5cbf;
+    --color-auth-code-bg: #1b6e49;
+    --color-auth-human-bg: #8f5306;
+    --color-auth-system-bg: #4f5a68;
+    --color-auth-on: #ffffff;
+
+    --color-held-ring: #f0a33a;
+    --color-held-text: #ffc978;
+    --color-stamp-approved: #71d39d;
+    --color-stamp-rejected: #ff8f7e;
 
     --color-tier-1-bg: #1b2a45;
     --color-tier-1-fg: #bcd4ff;
@@ -77,6 +122,10 @@
     --color-tier-4-bg: #431a1a;
     --color-tier-4-fg: #ffb4ab;
 
+    --color-hatch: #4a5767;
     --color-backdrop: #000000b3;
+    --shadow-strip: 0 1px 2px #00000066, 0 1px 1px #0000004d;
+    --shadow-raised: 0 10px 24px #00000080, 0 2px 6px #00000059;
+    --color-selection: #8fb3ff4d;
   }
 }

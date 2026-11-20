@@ -89,6 +89,55 @@ test("full limiter throttles and escalates throttled", async () => {
   assert.ok(events(c, bb.incidentId).includes("action_throttled"));
 });
 
+/** Breaker opened by a failure 301 s ago, with a 300 s cooldown: half-open now. */
+function halfOpen(c: Container): CircuitBreaker {
+  const b = new CircuitBreaker({ failureThreshold: 1, cooldownSec: 300 });
+  b.recordFailure(new Date(c.clock.now().getTime() - 301_000));
+  assert.equal(b.state(c.clock.now()), "half_open");
+  return b;
+}
+
+test("half-open breaker: the whole batch is the trial, so a non-mitigating first step does not block the rollback", async () => {
+  const { c, bb } = await decided({ 2: "approved" });
+  const g = guards({ breaker: halfOpen(c) });
+  const out = await createExecutorNode(ed(c, g))(bb);
+  assert.deepEqual(out.actions!.map((a) => a.status), ["succeeded", "succeeded", "succeeded"]);
+  assert.equal(out.escalation, undefined);
+  // The verifier owns the outcome of this trial: a healthy canary closes the breaker.
+  await createVerifierNode(ed(c, g))({ ...bb, actions: out.actions!, world: out.world! });
+  assert.equal(g.breaker.state(c.clock.now()), "closed");
+});
+
+test("half-open breaker: a throttled batch gives the trial back instead of blocking every later run", async () => {
+  const { c, bb } = await decided({ 2: "approved" });
+  const g = guards({ breaker: halfOpen(c) });
+  for (let i = 0; i < 5; i++) g.limiter.tryAcquire("add_incident_note", `incident/outro-${i}`, c.clock.now());
+  const out = await createExecutorNode(ed(c, g))(bb);
+  assert.deepEqual(out.actions!.map((a) => a.status), ["throttled", "throttled", "cancelled"]);
+  assert.equal(out.escalation!.reason, "throttled");
+  assert.equal(g.breaker.state(c.clock.now()), "half_open");
+  assert.equal(g.breaker.canExecute(c.clock.now()), true);
+});
+
+test("half-open breaker: a batch that mitigates nothing gives the trial back", async () => {
+  const { c, bb } = await decided({ 2: "rejected" });
+  const g = guards({ breaker: halfOpen(c) });
+  const out = await createExecutorNode(ed(c, g))(bb);
+  assert.deepEqual(out.actions!.map((a) => a.status), ["succeeded", "rejected", "cancelled"]);
+  assert.equal(out.escalation!.reason, "mitigation_rejected");
+  assert.equal(g.breaker.canExecute(c.clock.now()), true);
+});
+
+test("half-open breaker: a failure inside the trial batch reopens it and blocks the rest of the batch", async () => {
+  const faults = (s: LoadedScenario): LoadedScenario => ({ ...s, file: { ...s.file, faults: { "add_incident_note@incident/orders-api": "fail" } } });
+  const { c, bb } = await decided({ 2: "approved" }, { transformScenario: faults });
+  const g = guards({ breaker: halfOpen(c) });
+  const out = await createExecutorNode(ed(c, g))(bb);
+  assert.deepEqual(out.actions!.map((a) => a.status), ["failed", "blocked_circuit_open", "cancelled"]);
+  assert.equal(out.escalation!.reason, "circuit_open");
+  assert.equal(g.breaker.state(c.clock.now()), "open");
+});
+
 test("execution failure records a breaker failure", async () => {
   const faults = (s: LoadedScenario): LoadedScenario => ({ ...s, file: { ...s.file, faults: { "rollback_deployment@deployment/orders-api": "fail" } } });
   const { c, bb } = await decided({ 2: "approved" }, { transformScenario: faults });

@@ -1,0 +1,853 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-20T10:51:47.704522+00:00",
+  "title": "Design System: incident-copilot War Room",
+  "extensions": {
+    "colorMeta": {
+      "board": {
+        "role": "neutral",
+        "displayName": "Board Slate",
+        "canonical": "#d3dae2",
+        "cssVar": "--color-bg",
+        "dark": "#0e141b",
+        "tonalRamp": [
+          "oklch(15% 0.013 251.6)",
+          "oklch(25% 0.013 251.6)",
+          "oklch(35% 0.013 251.6)",
+          "oklch(48% 0.013 251.6)",
+          "oklch(60% 0.013 251.6)",
+          "oklch(72% 0.013 251.6)",
+          "oklch(85% 0.013 251.6)",
+          "oklch(95% 0.013 251.6)"
+        ]
+      },
+      "bay": {
+        "role": "neutral",
+        "displayName": "Bay Slate",
+        "canonical": "#c2cbd5",
+        "cssVar": "--color-bay",
+        "dark": "#161e28",
+        "tonalRamp": [
+          "oklch(15% 0.017 250.9)",
+          "oklch(25% 0.017 250.9)",
+          "oklch(35% 0.017 250.9)",
+          "oklch(48% 0.017 250.9)",
+          "oklch(60% 0.017 250.9)",
+          "oklch(72% 0.017 250.9)",
+          "oklch(85% 0.017 250.9)",
+          "oklch(95% 0.017 250.9)"
+        ]
+      },
+      "strip-white": {
+        "role": "neutral",
+        "displayName": "Strip White",
+        "canonical": "#fbfcfd",
+        "cssVar": "--color-surface",
+        "dark": "#1d2632",
+        "tonalRamp": [
+          "oklch(15% 0.002 247.8)",
+          "oklch(25% 0.002 247.8)",
+          "oklch(35% 0.002 247.8)",
+          "oklch(48% 0.002 247.8)",
+          "oklch(60% 0.002 247.8)",
+          "oklch(72% 0.002 247.8)",
+          "oklch(85% 0.002 247.8)",
+          "oklch(95% 0.002 247.8)"
+        ]
+      },
+      "strip-muted": {
+        "role": "neutral",
+        "displayName": "Strip Muted",
+        "canonical": "#edf1f5",
+        "cssVar": "--color-surface-muted",
+        "dark": "#24303d",
+        "tonalRamp": [
+          "oklch(15% 0.007 247.9)",
+          "oklch(25% 0.007 247.9)",
+          "oklch(35% 0.007 247.9)",
+          "oklch(48% 0.007 247.9)",
+          "oklch(60% 0.007 247.9)",
+          "oklch(72% 0.007 247.9)",
+          "oklch(85% 0.007 247.9)",
+          "oklch(95% 0.007 247.9)"
+        ]
+      },
+      "border-slate": {
+        "role": "neutral",
+        "displayName": "Border Slate",
+        "canonical": "#7d8896",
+        "cssVar": "--color-border",
+        "dark": "#5f6c7c",
+        "tonalRamp": [
+          "oklch(15% 0.025 254.5)",
+          "oklch(25% 0.025 254.5)",
+          "oklch(35% 0.025 254.5)",
+          "oklch(48% 0.025 254.5)",
+          "oklch(60% 0.025 254.5)",
+          "oklch(72% 0.025 254.5)",
+          "oklch(85% 0.025 254.5)",
+          "oklch(95% 0.025 254.5)"
+        ]
+      },
+      "rule-hairline": {
+        "role": "neutral",
+        "displayName": "Rule Hairline",
+        "canonical": "#dbe1e8",
+        "cssVar": "--color-rule",
+        "dark": "#2c3846",
+        "tonalRamp": [
+          "oklch(15% 0.012 252.1)",
+          "oklch(25% 0.012 252.1)",
+          "oklch(35% 0.012 252.1)",
+          "oklch(48% 0.012 252.1)",
+          "oklch(60% 0.012 252.1)",
+          "oklch(72% 0.012 252.1)",
+          "oklch(85% 0.012 252.1)",
+          "oklch(95% 0.012 252.1)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#141c26",
+        "cssVar": "--color-text",
+        "dark": "#e7edf3",
+        "tonalRamp": [
+          "oklch(15% 0.023 254.3)",
+          "oklch(25% 0.023 254.3)",
+          "oklch(35% 0.023 254.3)",
+          "oklch(48% 0.023 254.3)",
+          "oklch(60% 0.023 254.3)",
+          "oklch(72% 0.023 254.3)",
+          "oklch(85% 0.023 254.3)",
+          "oklch(95% 0.023 254.3)"
+        ]
+      },
+      "ink-muted": {
+        "role": "neutral",
+        "displayName": "Ink Muted",
+        "canonical": "#47515e",
+        "cssVar": "--color-text-muted",
+        "dark": "#a9b5c2",
+        "tonalRamp": [
+          "oklch(15% 0.025 255.1)",
+          "oklch(25% 0.025 255.1)",
+          "oklch(35% 0.025 255.1)",
+          "oklch(48% 0.025 255.1)",
+          "oklch(60% 0.025 255.1)",
+          "oklch(72% 0.025 255.1)",
+          "oklch(85% 0.025 255.1)",
+          "oklch(95% 0.025 255.1)"
+        ]
+      },
+      "accent-ink": {
+        "role": "neutral",
+        "displayName": "Accent Ink",
+        "canonical": "#17202b",
+        "cssVar": "--color-accent",
+        "dark": "#e7edf3",
+        "tonalRamp": [
+          "oklch(15% 0.025 253.8)",
+          "oklch(25% 0.025 253.8)",
+          "oklch(35% 0.025 253.8)",
+          "oklch(48% 0.025 253.8)",
+          "oklch(60% 0.025 253.8)",
+          "oklch(72% 0.025 253.8)",
+          "oklch(85% 0.025 253.8)",
+          "oklch(95% 0.025 253.8)"
+        ]
+      },
+      "accent-on": {
+        "role": "neutral",
+        "displayName": "Accent On",
+        "canonical": "#ffffff",
+        "cssVar": "--color-accent-text",
+        "dark": "#0e141b",
+        "tonalRamp": [
+          "oklch(15% 0.000 89.9)",
+          "oklch(25% 0.000 89.9)",
+          "oklch(35% 0.000 89.9)",
+          "oklch(48% 0.000 89.9)",
+          "oklch(60% 0.000 89.9)",
+          "oklch(72% 0.000 89.9)",
+          "oklch(85% 0.000 89.9)",
+          "oklch(95% 0.000 89.9)"
+        ]
+      },
+      "link-blue": {
+        "role": "neutral",
+        "displayName": "Link Blue",
+        "canonical": "#1f4fb0",
+        "cssVar": "--color-link",
+        "dark": "#8fb3ff",
+        "tonalRamp": [
+          "oklch(15% 0.164 262.2)",
+          "oklch(25% 0.164 262.2)",
+          "oklch(35% 0.164 262.2)",
+          "oklch(48% 0.164 262.2)",
+          "oklch(60% 0.164 262.2)",
+          "oklch(72% 0.164 262.2)",
+          "oklch(85% 0.164 262.2)",
+          "oklch(95% 0.160 262.2)"
+        ]
+      },
+      "focus-blue": {
+        "role": "neutral",
+        "displayName": "Focus Blue",
+        "canonical": "#1f4fb0",
+        "cssVar": "--color-focus",
+        "dark": "#8fb3ff",
+        "tonalRamp": [
+          "oklch(15% 0.164 262.2)",
+          "oklch(25% 0.164 262.2)",
+          "oklch(35% 0.164 262.2)",
+          "oklch(48% 0.164 262.2)",
+          "oklch(60% 0.164 262.2)",
+          "oklch(72% 0.164 262.2)",
+          "oklch(85% 0.164 262.2)",
+          "oklch(95% 0.160 262.2)"
+        ]
+      },
+      "danger-red": {
+        "role": "secondary",
+        "displayName": "Danger Red",
+        "canonical": "#a8301d",
+        "cssVar": "--color-danger",
+        "dark": "#ff8f7e",
+        "tonalRamp": [
+          "oklch(15% 0.159 31.8)",
+          "oklch(25% 0.159 31.8)",
+          "oklch(35% 0.159 31.8)",
+          "oklch(48% 0.159 31.8)",
+          "oklch(60% 0.159 31.8)",
+          "oklch(72% 0.159 31.8)",
+          "oklch(85% 0.159 31.8)",
+          "oklch(95% 0.159 31.8)"
+        ]
+      },
+      "danger-on": {
+        "role": "secondary",
+        "displayName": "Danger On",
+        "canonical": "#ffffff",
+        "cssVar": "--color-danger-text",
+        "dark": "#1d0905",
+        "tonalRamp": [
+          "oklch(15% 0.000 89.9)",
+          "oklch(25% 0.000 89.9)",
+          "oklch(35% 0.000 89.9)",
+          "oklch(48% 0.000 89.9)",
+          "oklch(60% 0.000 89.9)",
+          "oklch(72% 0.000 89.9)",
+          "oklch(85% 0.000 89.9)",
+          "oklch(95% 0.000 89.9)"
+        ]
+      },
+      "success-green": {
+        "role": "secondary",
+        "displayName": "Success Green",
+        "canonical": "#17643f",
+        "cssVar": "--color-success",
+        "dark": "#71d39d",
+        "tonalRamp": [
+          "oklch(15% 0.095 157.4)",
+          "oklch(25% 0.095 157.4)",
+          "oklch(35% 0.095 157.4)",
+          "oklch(48% 0.095 157.4)",
+          "oklch(60% 0.095 157.4)",
+          "oklch(72% 0.095 157.4)",
+          "oklch(85% 0.095 157.4)",
+          "oklch(95% 0.095 157.4)"
+        ]
+      },
+      "banner-night": {
+        "role": "neutral",
+        "displayName": "Banner Night",
+        "canonical": "#141c26",
+        "cssVar": "--color-banner-bg",
+        "dark": "#05080c",
+        "tonalRamp": [
+          "oklch(15% 0.023 254.3)",
+          "oklch(25% 0.023 254.3)",
+          "oklch(35% 0.023 254.3)",
+          "oklch(48% 0.023 254.3)",
+          "oklch(60% 0.023 254.3)",
+          "oklch(72% 0.023 254.3)",
+          "oklch(85% 0.023 254.3)",
+          "oklch(95% 0.023 254.3)"
+        ]
+      },
+      "banner-text": {
+        "role": "neutral",
+        "displayName": "Banner Text",
+        "canonical": "#f1f4f7",
+        "cssVar": "--color-banner-text",
+        "dark": "#e7edf3",
+        "tonalRamp": [
+          "oklch(15% 0.005 247.9)",
+          "oklch(25% 0.005 247.9)",
+          "oklch(35% 0.005 247.9)",
+          "oklch(48% 0.005 247.9)",
+          "oklch(60% 0.005 247.9)",
+          "oklch(72% 0.005 247.9)",
+          "oklch(85% 0.005 247.9)",
+          "oklch(95% 0.005 247.9)"
+        ]
+      },
+      "banner-tag": {
+        "role": "neutral",
+        "displayName": "Banner Tag Gold",
+        "canonical": "#ffd27a",
+        "cssVar": "--color-banner-tag",
+        "dark": "#ffd27a",
+        "tonalRamp": [
+          "oklch(15% 0.118 82.9)",
+          "oklch(25% 0.118 82.9)",
+          "oklch(35% 0.118 82.9)",
+          "oklch(48% 0.118 82.9)",
+          "oklch(60% 0.118 82.9)",
+          "oklch(72% 0.118 82.9)",
+          "oklch(85% 0.118 82.9)",
+          "oklch(95% 0.118 82.9)"
+        ]
+      },
+      "auth-model": {
+        "role": "primary",
+        "displayName": "Proposal Blue",
+        "canonical": "#2b5cbf",
+        "cssVar": "--color-auth-model-bg",
+        "dark": "#2b5cbf",
+        "tonalRamp": [
+          "oklch(15% 0.165 262.3)",
+          "oklch(25% 0.165 262.3)",
+          "oklch(35% 0.165 262.3)",
+          "oklch(48% 0.165 262.3)",
+          "oklch(60% 0.165 262.3)",
+          "oklch(72% 0.165 262.3)",
+          "oklch(85% 0.165 262.3)",
+          "oklch(95% 0.160 262.3)"
+        ]
+      },
+      "auth-code": {
+        "role": "primary",
+        "displayName": "Enforcement Green",
+        "canonical": "#1b6e49",
+        "cssVar": "--color-auth-code-bg",
+        "dark": "#1b6e49",
+        "tonalRamp": [
+          "oklch(15% 0.098 159.2)",
+          "oklch(25% 0.098 159.2)",
+          "oklch(35% 0.098 159.2)",
+          "oklch(48% 0.098 159.2)",
+          "oklch(60% 0.098 159.2)",
+          "oklch(72% 0.098 159.2)",
+          "oklch(85% 0.098 159.2)",
+          "oklch(95% 0.098 159.2)"
+        ]
+      },
+      "auth-human": {
+        "role": "primary",
+        "displayName": "Decision Amber",
+        "canonical": "#8f5306",
+        "cssVar": "--color-auth-human-bg",
+        "dark": "#8f5306",
+        "tonalRamp": [
+          "oklch(15% 0.112 63.3)",
+          "oklch(25% 0.112 63.3)",
+          "oklch(35% 0.112 63.3)",
+          "oklch(48% 0.112 63.3)",
+          "oklch(60% 0.112 63.3)",
+          "oklch(72% 0.112 63.3)",
+          "oklch(85% 0.112 63.3)",
+          "oklch(95% 0.112 63.3)"
+        ]
+      },
+      "auth-system": {
+        "role": "primary",
+        "displayName": "System Slate",
+        "canonical": "#4f5a68",
+        "cssVar": "--color-auth-system-bg",
+        "dark": "#4f5a68",
+        "tonalRamp": [
+          "oklch(15% 0.027 254.5)",
+          "oklch(25% 0.027 254.5)",
+          "oklch(35% 0.027 254.5)",
+          "oklch(48% 0.027 254.5)",
+          "oklch(60% 0.027 254.5)",
+          "oklch(72% 0.027 254.5)",
+          "oklch(85% 0.027 254.5)",
+          "oklch(95% 0.027 254.5)"
+        ]
+      },
+      "auth-on": {
+        "role": "primary",
+        "displayName": "Holder White",
+        "canonical": "#ffffff",
+        "cssVar": "--color-auth-on",
+        "dark": "#ffffff",
+        "tonalRamp": [
+          "oklch(15% 0.000 89.9)",
+          "oklch(25% 0.000 89.9)",
+          "oklch(35% 0.000 89.9)",
+          "oklch(48% 0.000 89.9)",
+          "oklch(60% 0.000 89.9)",
+          "oklch(72% 0.000 89.9)",
+          "oklch(85% 0.000 89.9)",
+          "oklch(95% 0.000 89.9)"
+        ]
+      },
+      "held-ring": {
+        "role": "secondary",
+        "displayName": "Hold Amber Ring",
+        "canonical": "#8f5306",
+        "cssVar": "--color-held-ring",
+        "dark": "#f0a33a",
+        "tonalRamp": [
+          "oklch(15% 0.112 63.3)",
+          "oklch(25% 0.112 63.3)",
+          "oklch(35% 0.112 63.3)",
+          "oklch(48% 0.112 63.3)",
+          "oklch(60% 0.112 63.3)",
+          "oklch(72% 0.112 63.3)",
+          "oklch(85% 0.112 63.3)",
+          "oklch(95% 0.112 63.3)"
+        ]
+      },
+      "held-text": {
+        "role": "secondary",
+        "displayName": "Hold Amber Text",
+        "canonical": "#7a4604",
+        "cssVar": "--color-held-text",
+        "dark": "#ffc978",
+        "tonalRamp": [
+          "oklch(15% 0.100 63.3)",
+          "oklch(25% 0.100 63.3)",
+          "oklch(35% 0.100 63.3)",
+          "oklch(48% 0.100 63.3)",
+          "oklch(60% 0.100 63.3)",
+          "oklch(72% 0.100 63.3)",
+          "oklch(85% 0.100 63.3)",
+          "oklch(95% 0.100 63.3)"
+        ]
+      },
+      "stamp-approved": {
+        "role": "secondary",
+        "displayName": "Stamp Green",
+        "canonical": "#17643f",
+        "cssVar": "--color-stamp-approved",
+        "dark": "#71d39d",
+        "tonalRamp": [
+          "oklch(15% 0.095 157.4)",
+          "oklch(25% 0.095 157.4)",
+          "oklch(35% 0.095 157.4)",
+          "oklch(48% 0.095 157.4)",
+          "oklch(60% 0.095 157.4)",
+          "oklch(72% 0.095 157.4)",
+          "oklch(85% 0.095 157.4)",
+          "oklch(95% 0.095 157.4)"
+        ]
+      },
+      "stamp-rejected": {
+        "role": "secondary",
+        "displayName": "Stamp Red",
+        "canonical": "#a8301d",
+        "cssVar": "--color-stamp-rejected",
+        "dark": "#ff8f7e",
+        "tonalRamp": [
+          "oklch(15% 0.159 31.8)",
+          "oklch(25% 0.159 31.8)",
+          "oklch(35% 0.159 31.8)",
+          "oklch(48% 0.159 31.8)",
+          "oklch(60% 0.159 31.8)",
+          "oklch(72% 0.159 31.8)",
+          "oklch(85% 0.159 31.8)",
+          "oklch(95% 0.159 31.8)"
+        ]
+      },
+      "tier-1-bg": {
+        "role": "tertiary",
+        "displayName": "Tier 1 Tint",
+        "canonical": "#e4ecfb",
+        "cssVar": "--color-tier-1-bg",
+        "dark": "#1b2a45",
+        "tonalRamp": [
+          "oklch(15% 0.022 263.2)",
+          "oklch(25% 0.022 263.2)",
+          "oklch(35% 0.022 263.2)",
+          "oklch(48% 0.022 263.2)",
+          "oklch(60% 0.022 263.2)",
+          "oklch(72% 0.022 263.2)",
+          "oklch(85% 0.022 263.2)",
+          "oklch(95% 0.022 263.2)"
+        ]
+      },
+      "tier-1-fg": {
+        "role": "tertiary",
+        "displayName": "Tier 1 Ink",
+        "canonical": "#1d3f86",
+        "cssVar": "--color-tier-1-fg",
+        "dark": "#bcd4ff",
+        "tonalRamp": [
+          "oklch(15% 0.126 262.7)",
+          "oklch(25% 0.126 262.7)",
+          "oklch(35% 0.126 262.7)",
+          "oklch(48% 0.126 262.7)",
+          "oklch(60% 0.126 262.7)",
+          "oklch(72% 0.126 262.7)",
+          "oklch(85% 0.126 262.7)",
+          "oklch(95% 0.126 262.7)"
+        ]
+      },
+      "tier-2-bg": {
+        "role": "tertiary",
+        "displayName": "Tier 2 Tint",
+        "canonical": "#e1f1e8",
+        "cssVar": "--color-tier-2-bg",
+        "dark": "#173222",
+        "tonalRamp": [
+          "oklch(15% 0.021 161.5)",
+          "oklch(25% 0.021 161.5)",
+          "oklch(35% 0.021 161.5)",
+          "oklch(48% 0.021 161.5)",
+          "oklch(60% 0.021 161.5)",
+          "oklch(72% 0.021 161.5)",
+          "oklch(85% 0.021 161.5)",
+          "oklch(95% 0.021 161.5)"
+        ]
+      },
+      "tier-2-fg": {
+        "role": "tertiary",
+        "displayName": "Tier 2 Ink",
+        "canonical": "#14532d",
+        "cssVar": "--color-tier-2-fg",
+        "dark": "#a7e8b8",
+        "tonalRamp": [
+          "oklch(15% 0.090 152.5)",
+          "oklch(25% 0.090 152.5)",
+          "oklch(35% 0.090 152.5)",
+          "oklch(48% 0.090 152.5)",
+          "oklch(60% 0.090 152.5)",
+          "oklch(72% 0.090 152.5)",
+          "oklch(85% 0.090 152.5)",
+          "oklch(95% 0.090 152.5)"
+        ]
+      },
+      "tier-3-bg": {
+        "role": "tertiary",
+        "displayName": "Tier 3 Tint",
+        "canonical": "#fbecd6",
+        "cssVar": "--color-tier-3-bg",
+        "dark": "#3a2a10",
+        "tonalRamp": [
+          "oklch(15% 0.033 77.6)",
+          "oklch(25% 0.033 77.6)",
+          "oklch(35% 0.033 77.6)",
+          "oklch(48% 0.033 77.6)",
+          "oklch(60% 0.033 77.6)",
+          "oklch(72% 0.033 77.6)",
+          "oklch(85% 0.033 77.6)",
+          "oklch(95% 0.033 77.6)"
+        ]
+      },
+      "tier-3-fg": {
+        "role": "tertiary",
+        "displayName": "Tier 3 Ink",
+        "canonical": "#6e3f04",
+        "cssVar": "--color-tier-3-fg",
+        "dark": "#ffd59a",
+        "tonalRamp": [
+          "oklch(15% 0.092 63.6)",
+          "oklch(25% 0.092 63.6)",
+          "oklch(35% 0.092 63.6)",
+          "oklch(48% 0.092 63.6)",
+          "oklch(60% 0.092 63.6)",
+          "oklch(72% 0.092 63.6)",
+          "oklch(85% 0.092 63.6)",
+          "oklch(95% 0.092 63.6)"
+        ]
+      },
+      "tier-4-bg": {
+        "role": "tertiary",
+        "displayName": "Tier 4 Tint",
+        "canonical": "#f9e3df",
+        "cssVar": "--color-tier-4-bg",
+        "dark": "#431a1a",
+        "tonalRamp": [
+          "oklch(15% 0.025 29.9)",
+          "oklch(25% 0.025 29.9)",
+          "oklch(35% 0.025 29.9)",
+          "oklch(48% 0.025 29.9)",
+          "oklch(60% 0.025 29.9)",
+          "oklch(72% 0.025 29.9)",
+          "oklch(85% 0.025 29.9)",
+          "oklch(95% 0.025 29.9)"
+        ]
+      },
+      "tier-4-fg": {
+        "role": "tertiary",
+        "displayName": "Tier 4 Ink",
+        "canonical": "#86231a",
+        "cssVar": "--color-tier-4-fg",
+        "dark": "#ffb4ab",
+        "tonalRamp": [
+          "oklch(15% 0.136 29.3)",
+          "oklch(25% 0.136 29.3)",
+          "oklch(35% 0.136 29.3)",
+          "oklch(48% 0.136 29.3)",
+          "oklch(60% 0.136 29.3)",
+          "oklch(72% 0.136 29.3)",
+          "oklch(85% 0.136 29.3)",
+          "oklch(95% 0.136 29.3)"
+        ]
+      },
+      "hatch": {
+        "role": "tertiary",
+        "displayName": "Hatch Slate",
+        "canonical": "#9aa5b2",
+        "cssVar": "--color-hatch",
+        "dark": "#4a5767",
+        "tonalRamp": [
+          "oklch(15% 0.023 252.6)",
+          "oklch(25% 0.023 252.6)",
+          "oklch(35% 0.023 252.6)",
+          "oklch(48% 0.023 252.6)",
+          "oklch(60% 0.023 252.6)",
+          "oklch(72% 0.023 252.6)",
+          "oklch(85% 0.023 252.6)",
+          "oklch(95% 0.023 252.6)"
+        ]
+      }
+    },
+    "themes": {
+      "light": "default :root",
+      "dark": "@media (prefers-color-scheme: dark) redefines the same custom properties; colorMeta.<token>.dark holds each dark value. Authority holder colours are identical in both themes."
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Incident title, picker headline, post-mortem title."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Masthead, dialog title, key metric values, scenario titles."
+      },
+      "card-title": {
+        "displayName": "Card title",
+        "purpose": "Bay and card heads, post-mortem section heads."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Prose; tabular figures always on. Post-mortem lines capped at 70ch."
+      },
+      "strip-text": {
+        "displayName": "Strip text",
+        "purpose": "Event lines, metadata rows, legend."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Tier badges, chips, stamps, times, sources, holder role lines."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Action identifiers, tool names, JSON args, dry-run output only."
+      },
+      "openDecision": "System font stack because the owner has not opted into a webfont; not a rule, may be replaced by a chosen face."
+    },
+    "shadows": [
+      {
+        "name": "strip",
+        "value": "0 1px 2px #141c2633, 0 1px 1px #141c261a",
+        "dark": "0 1px 2px #00000066, 0 1px 1px #0000004d",
+        "purpose": "Every strip, card, the playback bar; primary button hover."
+      },
+      {
+        "name": "raised",
+        "value": "0 8px 20px #141c2633, 0 2px 4px #141c261f",
+        "dark": "0 10px 24px #00000080, 0 2px 6px #00000059",
+        "purpose": "Only elements pulled out of the rack (held strip, held gate card, hovered scenario strip) or modal (dialog)."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "All transitions and keyframes."
+      },
+      {
+        "name": "dur-slide",
+        "value": "420ms",
+        "purpose": "Strip slide-in (from translateX(-16px)), held-strip offset and return, scenario strip hover."
+      },
+      {
+        "name": "control",
+        "value": "160ms",
+        "purpose": "Button border/background, summary caret rotation."
+      },
+      {
+        "name": "dialog",
+        "value": "180ms fade backdrop, 260ms rise-in (translateY(8px) scale(0.98))",
+        "purpose": "Confirmation dialog entry."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "prefers-reduced-motion: reduce -> animation and transition none, smooth scroll becomes instant",
+        "purpose": "Global accessibility override in base.css."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "600px",
+        "purpose": "Below: single column, strip holder becomes a header row, held offset 8px, 16px page padding."
+      },
+      {
+        "name": "lg",
+        "value": "960px",
+        "purpose": "From: bay and side column split (1.65fr / minmax(320px, 1fr)); held side column is sticky. Below while held: side column moves above the bay."
+      }
+    ],
+    "layout": {
+      "contentMax": "1280px",
+      "holderWidth": "9.5rem",
+      "timeColumn": "4.75rem",
+      "stripGap": "6px",
+      "focus": "3px solid focus-blue, 2px offset"
+    },
+    "contrast": "Every text/background pair in web/src/styles/contrast-pairs.json is verified at >= 4.5:1 in both themes by src/test/tokens-contrast.test.ts."
+  },
+  "components": [
+    {
+      "name": "Flight Strip",
+      "kind": "custom",
+      "refersTo": "strip",
+      "description": "One strip per agent turn: solid authority holder with agent name and role, then time-stamped event rows.",
+      "html": "<div class=\"ds-strip\"><div class=\"ds-holder ds-auth-model\"><b>Remediation planner</b><small>model · proposes</small></div><div class=\"ds-rows\"><div class=\"ds-row\"><time>09:45:19</time><span><b>plan</b> (revision 0, 3 steps)</span></div><div class=\"ds-row\"><time>09:45:19</time><span>Remediation planner to Plan auditor: plan revision 0 with 3 steps</span></div></div></div>",
+      "css": ".ds-strip { display: grid; grid-template-columns: 9.5rem minmax(0,1fr); background: var(--color-surface, #fbfcfd); color: var(--color-text, #141c26); border-radius: 4px; box-shadow: 0 1px 2px #141c2633, 0 1px 1px #141c261a; overflow: hidden; font: 0.875rem/1.5 system-ui, sans-serif; font-variant-numeric: tabular-nums; transition: transform 420ms cubic-bezier(0.16,1,0.3,1), box-shadow 420ms cubic-bezier(0.16,1,0.3,1); } .ds-strip:hover { box-shadow: 0 8px 20px #141c2633, 0 2px 4px #141c261f; } .ds-holder { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; line-height: 1.2; color: #fff; } .ds-holder b { font-weight: 750; } .ds-holder small { font-size: 0.8125rem; font-weight: 500; } .ds-auth-model { background: var(--color-auth-model-bg, #2b5cbf); } .ds-row { display: grid; grid-template-columns: 4.75rem minmax(0,1fr); } .ds-row + .ds-row { border-top: 1px solid var(--color-rule, #dbe1e8); } .ds-row time { padding: 11px 8px 8px; border-right: 1px solid var(--color-rule, #dbe1e8); color: var(--color-text-muted, #47515e); font-size: 0.8125rem; } .ds-row span { padding: 8px 12px; }"
+    },
+    {
+      "name": "Held Gate Strip",
+      "kind": "custom",
+      "refersTo": "strip-holder-code",
+      "description": "The gate strip pulled out of the bay while held: offset, raised, amber ring, HOLD stamp. Returns stamped APPROVED or REJECTED.",
+      "html": "<div class=\"ds-held\"><div class=\"ds-holder-code\"><b>Remediation gate</b><small>code · catalog tiers</small><span class=\"ds-stamp ds-stamp-hold\">HOLD</span></div><div class=\"ds-held-body\">Remediation gate to Human: awaiting approval of APR-0001</div></div><span class=\"ds-stamp ds-stamp-approved\">APPROVED</span> <span class=\"ds-stamp ds-stamp-rejected\">REJECTED</span>",
+      "css": ".ds-held { display: grid; grid-template-columns: 9.5rem minmax(0,1fr); background: var(--color-surface, #fbfcfd); border-radius: 4px; overflow: hidden; transform: translateX(16px); box-shadow: 0 8px 20px #141c2633, 0 2px 4px #141c261f; outline: 2px solid var(--color-held-ring, #8f5306); outline-offset: -2px; font: 0.875rem/1.5 system-ui, sans-serif; margin-bottom: 12px; } .ds-holder-code { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; background: var(--color-auth-code-bg, #1b6e49); color: #fff; line-height: 1.2; } .ds-holder-code b { font-weight: 750; } .ds-holder-code small { font-size: 0.8125rem; font-weight: 500; } .ds-held-body { padding: 8px 12px; color: var(--color-text, #141c26); } .ds-stamp { display: inline-block; align-self: flex-start; margin-top: 8px; padding: 0 8px; background: var(--color-surface, #fbfcfd); border: 2px solid currentColor; border-radius: 3px; font: 800 0.8125rem/1.5 system-ui, sans-serif; letter-spacing: 0.06em; transform: rotate(-3deg); white-space: nowrap; } .ds-stamp-hold { color: var(--color-held-text, #7a4604); } .ds-stamp-approved { color: var(--color-stamp-approved, #17643f); } .ds-stamp-rejected { color: var(--color-stamp-rejected, #a8301d); }"
+    },
+    {
+      "name": "Authority Chain",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Gate step chain: Proposed by / Tier set by / Decided by, each cell filled with the colour of who holds it.",
+      "html": "<dl class=\"ds-chain\"><div class=\"ds-c-model\"><dt>Proposed by</dt><dd>model</dd></div><div class=\"ds-c-code\"><dt>Tier set by</dt><dd>catalog</dd></div><div class=\"ds-c-human\"><dt>Decided by</dt><dd>a human</dd></div></dl>",
+      "css": ".ds-chain { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 4px; margin: 0; font-family: system-ui, sans-serif; } .ds-chain div { border-radius: 4px; padding: 4px 8px; color: #fff; } .ds-chain dt { font-size: 0.8125rem; } .ds-chain dd { margin: 0; font-weight: 700; font-size: 0.875rem; } .ds-c-model { background: var(--color-auth-model-bg, #2b5cbf); } .ds-c-code { background: var(--color-auth-code-bg, #1b6e49); } .ds-c-human { background: var(--color-auth-human-bg, #8f5306); }"
+    },
+    {
+      "name": "Tier Badge",
+      "kind": "chip",
+      "refersTo": "tier-badge-3",
+      "description": "Tier conveyed by text, icon and colour together; never colour alone.",
+      "html": "<span class=\"ds-tier ds-tier-2\"><svg viewBox=\"0 0 16 16\" width=\"13\" height=\"13\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 8.5l3 3 7-7\"/></svg>Tier 2</span> <span class=\"ds-tier ds-tier-3\"><svg viewBox=\"0 0 16 16\" width=\"13\" height=\"13\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M8 2l6.5 11.5h-13z\"/><path d=\"M8 6.5v3.2M8 11.8v.4\"/></svg>Tier 3</span> <span class=\"ds-tier ds-tier-4\"><svg viewBox=\"0 0 16 16\" width=\"13\" height=\"13\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"8\" cy=\"8\" r=\"6\"/><path d=\"M3.8 12.2l8.4-8.4\"/></svg>Tier 4</span>",
+      "css": ".ds-tier { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; font: 700 0.8125rem/1.5 system-ui, sans-serif; white-space: nowrap; } .ds-tier-2 { background: var(--color-tier-2-bg, #e1f1e8); color: var(--color-tier-2-fg, #14532d); } .ds-tier-3 { background: var(--color-tier-3-bg, #fbecd6); color: var(--color-tier-3-fg, #6e3f04); } .ds-tier-4 { background: var(--color-tier-4-bg, #f9e3df); color: var(--color-tier-4-fg, #86231a); }"
+    },
+    {
+      "name": "Forbidden Block",
+      "kind": "custom",
+      "refersTo": "tier-badge-4",
+      "description": "Tier-4 / blocked reason: dashed border with a 135deg hatch; text on a white backing.",
+      "html": "<p class=\"ds-blocked\"><span>reason: delete_namespace is forbidden by construction</span></p>",
+      "css": ".ds-blocked { margin: 0; padding: 8px 12px; border: 1px dashed var(--color-border, #7d8896); border-radius: 4px; background: repeating-linear-gradient(135deg, transparent 0 7px, var(--color-hatch, #9aa5b2) 7px 8px); color: var(--color-text, #141c26); font: 0.875rem/1.5 system-ui, sans-serif; } .ds-blocked span { background: var(--color-surface, #fbfcfd); padding: 0 2px; }"
+    },
+    {
+      "name": "Provenance Row",
+      "kind": "card",
+      "refersTo": "computed-by-chip",
+      "description": "Numbers card: 'computed by code' chip in the head, each value with its source line.",
+      "html": "<div class=\"ds-num\"><div class=\"ds-num-head\"><b>Incident numbers</b><span class=\"ds-chip\">computed by code</span></div><dl class=\"ds-row-m\"><dt>MTTR</dt><dd class=\"ds-key\">14 min</dd><dd class=\"ds-src\">source: measured</dd></dl><dl class=\"ds-row-m\"><dt>LLM cost</dt><dd>$0.02 across 9 calls</dd><dd class=\"ds-src\">source: derived</dd></dl></div>",
+      "css": ".ds-num { background: var(--color-surface, #fbfcfd); border-radius: 8px; box-shadow: 0 1px 2px #141c2633, 0 1px 1px #141c261a; overflow: hidden; font: 0.875rem/1.5 system-ui, sans-serif; font-variant-numeric: tabular-nums; color: var(--color-text, #141c26); } .ds-num-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--color-rule, #dbe1e8); font-size: 1rem; } .ds-chip { font-size: 0.8125rem; font-weight: 700; padding: 1px 8px; border-radius: 4px; background: var(--color-auth-code-bg, #1b6e49); color: #fff; } .ds-row-m { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 0 12px; align-items: baseline; margin: 0 16px; padding: 6px 0; border-top: 1px solid var(--color-rule, #dbe1e8); } .ds-row-m dt { color: var(--color-text-muted, #47515e); } .ds-row-m dd { margin: 0; font-weight: 650; text-align: right; } .ds-row-m .ds-key { font-size: 1.25rem; font-weight: 750; letter-spacing: -0.01em; } .ds-row-m .ds-src { grid-column: 1 / -1; text-align: left; font-weight: 400; font-size: 0.8125rem; color: var(--color-text-muted, #47515e); }"
+    },
+    {
+      "name": "Default Button",
+      "kind": "button",
+      "refersTo": "button",
+      "description": "Play, Pause, Try again: white with slate border.",
+      "html": "<button class=\"ds-btn\"><svg viewBox=\"0 0 16 16\" width=\"14\" height=\"14\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M4 2.5v11L13 8z\"/></svg>Play</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 16px; border-radius: 8px; border: 1px solid var(--color-border, #7d8896); background: var(--color-surface, #fbfcfd); color: var(--color-text, #141c26); font: 600 1rem system-ui, sans-serif; cursor: pointer; transition: border-color 160ms cubic-bezier(0.16,1,0.3,1), transform 120ms cubic-bezier(0.16,1,0.3,1); } .ds-btn:hover { border-color: var(--color-text, #141c26); } .ds-btn:active { transform: translateY(1px); } .ds-btn:focus-visible { outline: 3px solid var(--color-focus, #1f4fb0); outline-offset: 2px; }"
+    },
+    {
+      "name": "Primary Button (Step)",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one primary control: accent ink fill.",
+      "html": "<button class=\"ds-btn-primary\"><svg viewBox=\"0 0 16 16\" width=\"14\" height=\"14\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M3 2.5v11l7-5.5zM11 2.5h2v11h-2z\"/></svg>Step</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 16px; border-radius: 8px; border: 1px solid var(--color-accent, #17202b); background: var(--color-accent, #17202b); color: var(--color-accent-text, #fff); font: 600 1rem system-ui, sans-serif; cursor: pointer; transition: box-shadow 160ms cubic-bezier(0.16,1,0.3,1), transform 120ms cubic-bezier(0.16,1,0.3,1); } .ds-btn-primary:hover { box-shadow: 0 1px 2px #141c2633, 0 1px 1px #141c261a; } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:focus-visible { outline: 3px solid var(--color-focus, #1f4fb0); outline-offset: 2px; }"
+    },
+    {
+      "name": "Approve / Reject",
+      "kind": "button",
+      "refersTo": "button-approve",
+      "description": "Gate decision pair, set apart: solid code green Approve, outlined red Reject.",
+      "html": "<div class=\"ds-pair\"><button class=\"ds-approve\">Approve</button><button class=\"ds-reject\">Reject</button></div>",
+      "css": ".ds-pair { display: flex; justify-content: space-between; gap: 24px; } .ds-pair button { flex: 1; justify-content: center; display: inline-flex; align-items: center; min-height: 40px; padding: 8px 16px; border-radius: 8px; font: 600 1rem system-ui, sans-serif; cursor: pointer; transition: border-color 160ms cubic-bezier(0.16,1,0.3,1); } .ds-approve { background: var(--color-auth-code-bg, #1b6e49); color: #fff; border: 1px solid var(--color-auth-code-bg, #1b6e49); } .ds-reject { background: var(--color-surface, #fbfcfd); color: var(--color-danger, #a8301d); border: 1px solid var(--color-danger, #a8301d); } .ds-pair button:focus-visible { outline: 3px solid var(--color-focus, #1f4fb0); outline-offset: 2px; }"
+    },
+    {
+      "name": "Mode Banner",
+      "kind": "nav",
+      "refersTo": "mode-banner",
+      "description": "Replay label required on every screen.",
+      "html": "<div class=\"ds-banner\"><strong>Replay</strong><span>Replay of a recorded run with a scripted fake provider</span></div>",
+      "css": ".ds-banner { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; padding: 8px 24px; background: var(--color-banner-bg, #141c26); color: var(--color-banner-text, #f1f4f7); font: 0.875rem/1.5 system-ui, sans-serif; } .ds-banner strong { color: var(--color-banner-tag, #ffd27a); font-weight: 700; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Strip Board",
+    "overview": "The War Room is an air-traffic flight-progress strip board, moved onto an incident. Every agent turn is a white paper strip set into a slate bay, and the coloured holder on its left edge says who acted: the model proposes (blue), code computes and enforces (green), a human decides (amber), the system or an outside client is neutral slate. The board's job is to make authority legible at a glance, so colour is spent on authority and on nothing else; everything that is not a holder, a tier, or a decision mark stays slate and ink.\n\nThe density is operational, not editorial. Strips are tight (6px apart, 4px corners), times and numbers run in tabular figures, and folded details keep a long run scannable for an on-call engineer while the holder column alone tells an evaluator the story in two minutes. The one dramatic gesture is physical: when the replay stops at the approval gate, the gate strip is pulled out of the bay, ringed in amber and marked HOLD; after the human decides it slides back and carries an APPROVED or REJECTED stamp.\n\nThe system rejects the category default of a neutral timeline with grey status pills. It also refuses to let colour carry meaning alone: every holder names its role in text, every tier badge carries \"Tier N\" and an icon.",
+    "keyCharacteristics": [
+      "Slate board, white strips, solid authority-coloured holders with agent name and role line.",
+      "Colour means authority (model, code, human, system) or tier; never decoration.",
+      "One strip per agent turn; newest at the bottom.",
+      "The held strip slides out (transform offset) with a HOLD stamp, then returns stamped with the decision.",
+      "Numbers are provenance rows, each with its source, under a \"computed by code\" chip.",
+      "Light and dark themes from `prefers-color-scheme`; every text/background pair verified at 4.5:1 in both."
+    ],
+    "rules": [
+      {
+        "name": "The Holder Rule",
+        "body": "Authority colour belongs on a solid holder block (strip holder, authority cell, chip, held gate head) with white text that names the role. Never tint body text or borders with an authority colour to imply who acted.",
+        "section": "colors"
+      },
+      {
+        "name": "The Paired Contrast Rule",
+        "body": "A new text/background combination is added to `contrast-pairs.json` and passes 4.5:1 in both themes before it ships. No literal colour outside `tokens.css`.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Rule",
+        "body": "Body sets `font-variant-numeric: tabular-nums`; never switch it off for times, counts or money.",
+        "section": "typography"
+      },
+      {
+        "name": "The Mono Means Machine Rule",
+        "body": "Monospace is only for identifiers and outputs a machine produced (action types, tools, JSON args, dry runs).",
+        "section": "typography"
+      },
+      {
+        "name": "The Pulled Strip Rule",
+        "body": "Raised elevation means \"taken out of the rack\". It pairs with a transform offset (translateX) or a modal; it is not a generic card hover.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do give every agent turn one strip with a solid authority holder that names the agent and its role.",
+      "Do mark the held gate with transform offset, raised shadow, amber ring and a HOLD stamp, then restamp APPROVED or REJECTED.",
+      "Do convey tier with text, icon and colour together.",
+      "Do show every number with its source and under the \"computed by code\" chip.",
+      "Do take every colour, space and type value from `tokens.css` and register new text/background pairs in `contrast-pairs.json`.",
+      "Do disable animation and transition under `prefers-reduced-motion: reduce` (smooth scroll falls back to instant)."
+    ],
+    "donts": [
+      "Don't use grey status pills or a neutral timeline for agent events; who acted is the point.",
+      "Don't spend an authority colour on decoration, headings or borders that do not denote who acted.",
+      "Don't use raised elevation for anything not pulled out of the rack or modal.",
+      "Don't let colour be the only carrier of tier, authority or status.",
+      "Don't imply live execution: no screen without the replay banner."
+    ]
+  }
+}

@@ -1,12 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  catalogPromptText, classifyAction, EXECUTABLE_ACTIONS, FORBIDDEN_ACTIONS, isExecutable, isMitigating, targetInScope,
+  catalogPromptText, classifyAction, runbookRefsOf, EXECUTABLE_ACTIONS, FORBIDDEN_ACTIONS, isExecutable, isMitigating, targetInScope,
 } from "../../src/domain/autonomy/catalog.ts";
 import type { ExecutableActionType } from "../../src/domain/autonomy/catalog.ts";
 
-const ctx = { scope: { service: "orders-api", account: null, incidentId: "INC-0001" }, revisionsExhausted: false };
-const costCtx = { scope: { service: null, account: "data-platform", incidentId: "INC-0002" }, revisionsExhausted: false };
+const knownRunbookRefs = runbookRefsOf([
+  { runbookId: "orders-5xx-after-deploy", section: "Mitigation" },
+  { runbookId: "cloud-cost-anomaly", section: "mitigation" },
+]);
+const ctx = { scope: { service: "orders-api", account: null, incidentId: "INC-0001" }, revisionsExhausted: false, knownRunbookRefs };
+const costCtx = { scope: { service: null, account: "data-platform", incidentId: "INC-0002" }, revisionsExhausted: false, knownRunbookRefs };
 const s = (actionType: string, target = "deployment/orders-api", params: Record<string, unknown> = {}, runbookRef: string | null = "orders-5xx-after-deploy#mitigation") =>
   ({ actionType, target, params, runbookRef });
 
@@ -107,4 +111,17 @@ test("catalog prompt text lists every executable action and the forbidden ones",
   assert.match(text, /rollback_deployment: deployment\/<service>; parameters \{ toVersion: string \}; mitigates the incident/);
   for (const t of FORBIDDEN_ACTIONS) assert.ok(text.includes(t), t);
   assert.doesNotMatch(text, /\btier\b/i);
+});
+
+test("a runbookRef the retriever never returned raises the step to tier 3 (the ref is evidence, not free text)", () => {
+  // Review 2026-11: an injected or hallucinating planner, or an MCP client, could name any runbook and keep tier 2.
+  const invented = classifyAction(s("block_image_tag", "image/orders-api:3.8.0", {}, "anything#x"), ctx);
+  assert.equal(invented.tier, 3);
+  assert.ok(invented.reasons.includes("runbook reference not among the retrieved runbooks"));
+  // No retrieved runbooks at all: every ref is unknown.
+  const none = classifyAction(s("block_image_tag", "image/orders-api:3.8.0"), { ...ctx, knownRunbookRefs: runbookRefsOf([]) });
+  assert.equal(none.tier, 3);
+  // A retrieved ref keeps the catalog tier, case-insensitively, by section or by runbook id alone.
+  assert.equal(classifyAction(s("block_image_tag", "image/orders-api:3.8.0", {}, "orders-5xx-after-deploy#mitigation"), ctx).tier, 2);
+  assert.equal(classifyAction(s("block_image_tag", "image/orders-api:3.8.0", {}, "Orders-5xx-After-Deploy"), ctx).tier, 2);
 });

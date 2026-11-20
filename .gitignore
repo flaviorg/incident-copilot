@@ -7,3 +7,10 @@ web/node_modules/
 web/dist/
 web/public/demo/
 coverage/
+
+# Impeccable design-tool scratch (the surface brief and design.json are kept)
+.impeccable/review/
+.impeccable/questions/
+.impeccable/hook.cache.json
+.impeccable/direction-payload.json
+.impeccable/preview-*.html

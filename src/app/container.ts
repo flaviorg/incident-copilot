@@ -25,6 +25,7 @@ import { createLlmProvider } from "../llm/create-provider.ts";
 import type { FakeLlmProvider } from "../llm/fake-provider.ts";
 import type { LlmProvider } from "../llm/provider.ts";
 import type { ModelPrices } from "../llm/usage.ts";
+import { missingPrices } from "../llm/usage.ts";
 import { DEFAULT_LIMITS } from "../contracts/index.ts";
 import type { Limits } from "../contracts/index.ts";
 import { TraceSink } from "./trace-sink.ts";
@@ -122,6 +123,14 @@ export function createContainer(config: Config, o: ContainerOverrides = {}): Con
   const infra = new SimulatedInfra({ prices });
   const fixtures = o.fixtures ?? (config.llmProvider === "fake" ? loadFixtures(projectPath("fixtures", "llm")) : []);
   const { provider: llm, fake } = createLlmProvider(config, { fixtures, prices: modelPrices, store, clock });
+  if (config.llmProvider === "openrouter") {
+    const unpriced = missingPrices([config.openrouterModel, config.openrouterModelFallback], modelPrices);
+    if (unpriced.length > 0) {
+      logger.warn("LLM cost will read as $0.00: no price for the configured model(s) in data/model-prices.json", {
+        event: "llm_price_missing", models: unpriced,
+      });
+    }
+  }
   const limits: Limits = { ...DEFAULT_LIMITS, ...o.limits };
   const trace = new TraceSink({ store, ids, clock, secrets });
 

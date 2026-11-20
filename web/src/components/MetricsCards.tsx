@@ -1,6 +1,6 @@
-// Cartões de números (spec 5.7 e 10.2, item 5): MTTR e tempo aguardando aprovação em destaque; economia mensal só
-// quando houver; minutos economizados e ROI como faixa ilustrativa; cada valor com a origem (medido, premissa,
-// derivado). Nada é calculado aqui: os valores vêm da gravação.
+// Incident numbers (spec 5.7 and 10.2, item 5): MTTR and time waiting for approval up front; monthly savings only when
+// there are any; minutes saved and ROI as an illustrative range; every value with its source (measured, assumption,
+// derived). Nothing is computed here: the values come from the recording, computed by code in the backend.
 import type { IncidentMetrics } from "@contracts";
 import { SOURCE_LABELS, formatNumber, formatUsd } from "../labels.ts";
 
@@ -8,23 +8,27 @@ export function MetricsCards({ metrics }: { metrics: IncidentMetrics }) {
   const source = (key: string) => SOURCE_LABELS[metrics.sources[key] ?? "derived"];
   const range = (r: { low: number; high: number } | null, unit: string) => (r === null ? "no resolution" : `${formatNumber(r.low)} to ${formatNumber(r.high)}${unit}`);
   return (
-    <section className="panel" aria-labelledby="metrics-title">
-      <h2 id="metrics-title">Incident numbers</h2>
-      <dl className="metrics-highlight">
-        <div className="metric-card">
+    <section className="card" aria-labelledby="metrics-title">
+      <div className="card-head">
+        <h2 id="metrics-title" className="card-title">Incident numbers</h2>
+        <span className="computed-by auth-code">computed by code</span>
+      </div>
+      <div className="card-body">
+      <dl className="metrics-main">
+        <div className="metric-row is-key">
           <dt>MTTR</dt>
-          <dd className="metric-value">{metrics.mttrMin === null ? "not resolved" : `${formatNumber(metrics.mttrMin)} min`}</dd>
+          <dd>{metrics.mttrMin === null ? "not resolved" : `${formatNumber(metrics.mttrMin)} min`}</dd>
           <dd className="metric-source">{source("mttrMin")}</dd>
         </div>
-        <div className="metric-card">
+        <div className="metric-row is-key">
           <dt>Time waiting for approval</dt>
-          <dd className="metric-value">{`${formatNumber(metrics.timeAwaitingApprovalMin)} min`}</dd>
+          <dd>{`${formatNumber(metrics.timeAwaitingApprovalMin)} min`}</dd>
           <dd className="metric-source">{source("timeAwaitingApprovalMin")}</dd>
         </div>
         {metrics.monthlySavingsUsd > 0 ? (
-          <div className="metric-card">
+          <div className="metric-row is-key">
             <dt>Monthly savings</dt>
-            <dd className="metric-value">{formatUsd(metrics.monthlySavingsUsd)}</dd>
+            <dd>{formatUsd(metrics.monthlySavingsUsd)}</dd>
             <dd className="metric-source">{source("monthlySavingsUsd")}</dd>
           </div>
         ) : null}
@@ -61,6 +65,8 @@ export function MetricsCards({ metrics }: { metrics: IncidentMetrics }) {
           <dd className="metric-source">{source("llmCostUsd")}</dd>
         </div>
       </dl>
+      <p className="provenance">Computed by pure functions in the backend from the recorded run. The model writes none of these numbers.</p>
+      </div>
     </section>
   );
 }

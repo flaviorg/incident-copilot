@@ -85,6 +85,7 @@ export const REASONS = {
   unknown: "type not in catalog: deny by default",
   outOfScope: "target outside the incident scope",
   noRunbook: "step without a reference runbook",
+  unknownRunbook: "runbook reference not among the retrieved runbooks",
   revisionsExhausted: "plan revisions exhausted",
   catalogTier: (tier: Tier) => `catalog tier: ${tier}`,
 } as const;
@@ -113,7 +114,25 @@ export function catalogPromptText(): string {
   ].join("\n");
 }
 
-export type ClassificationContext = { scope: { service: string | null; account: string | null; incidentId: string }; revisionsExhausted: boolean };
+export type ClassificationContext = {
+  scope: { service: string | null; account: string | null; incidentId: string };
+  revisionsExhausted: boolean;
+  /** Refs the runbook retriever actually returned (see runbookRefsOf). A ref outside this set is not evidence. */
+  knownRunbookRefs: ReadonlySet<string>;
+};
+
+/**
+ * The refs a step may cite: `<runbookId>#<section>` and `<runbookId>` for every retrieved match, lowercased. The
+ * runbookRef comes from LLM or MCP text, so it only lowers the "no runbook" raise when it names retrieved evidence.
+ */
+export function runbookRefsOf(matches: readonly { runbookId: string; section: string }[]): ReadonlySet<string> {
+  const refs = new Set<string>();
+  for (const m of matches) {
+    refs.add(m.runbookId.toLowerCase());
+    refs.add(`${m.runbookId}#${m.section}`.toLowerCase());
+  }
+  return refs;
+}
 export type Classification = { tier: Tier; reasons: string[]; known: boolean; executable: boolean; paramsOk: boolean; params: Record<string, unknown> | null };
 
 /** incident/<id do incidente> sempre; senão o 2º segmento do alvo (antes de ":") precisa ser o serviço ou a conta. */
@@ -147,6 +166,9 @@ export function classifyAction(
   if (step.runbookRef === null) {
     tier = raise(tier, 3);
     reasons.push(REASONS.noRunbook);
+  } else if (!ctx.knownRunbookRefs.has(step.runbookRef.trim().toLowerCase())) {
+    tier = raise(tier, 3);
+    reasons.push(REASONS.unknownRunbook);
   }
   if (ctx.revisionsExhausted) {
     tier = raise(tier, 3);

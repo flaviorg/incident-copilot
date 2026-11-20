@@ -77,4 +77,70 @@ describe("App", () => {
     expect((await screen.findByRole("alert")).textContent).toMatch(/could not load \.\/demo\/index\.json/);
     expect(screen.getByRole("status").textContent).toContain("Replay of a recorded run");
   });
+
+  it("moves focus to Pause when playing and back to Step when paused", async () => {
+    const user = userEvent.setup();
+    render(<App fetchImpl={fakeFetchFor({ index: [rec.scenario], [rec.scenario.id]: rec })} />);
+    await user.click(await screen.findByRole("button", { name: new RegExp(rec.scenario.title) }));
+    await user.click(screen.getByRole("button", { name: "Play" }));
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Pause" }));
+    await user.click(screen.getByRole("button", { name: "Pause" }));
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Step" }));
+  });
+
+  it("returns focus to the picker heading after Change scenario", async () => {
+    const user = userEvent.setup();
+    render(<App fetchImpl={fakeFetchFor({ index: [rec.scenario], [rec.scenario.id]: rec })} />);
+    await user.click(await screen.findByRole("button", { name: new RegExp(rec.scenario.title) }));
+    await user.click(screen.getByRole("button", { name: "Change scenario" }));
+    expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Choose a scenario" }));
+  });
+
+  it("stamps the gate strip HOLD while held and APPROVED after the decision", async () => {
+    const user = userEvent.setup();
+    render(<App fetchImpl={fakeFetchFor({ index: [rec.scenario], [rec.scenario.id]: rec })} />);
+    await playToGate(user);
+    expect(screen.getByText("HOLD")).toBeTruthy();
+    expect(document.querySelector(".strip.is-held")).not.toBeNull();
+    await user.click(screen.getByRole("button", { name: "Approve" }));
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+    expect(screen.queryByText("HOLD")).toBeNull();
+    expect(screen.getByText("APPROVED")).toBeTruthy();
+  });
+
+  it("retries loading the index after a failure", async () => {
+    const user = userEvent.setup();
+    let calls = 0;
+    const flaky = (async (input: RequestInfo | URL) => {
+      calls++;
+      if (calls === 1) return new Response("nothing", { status: 503 });
+      return fakeFetchFor({ index: [rec.scenario] })(input);
+    }) as typeof fetch;
+    render(<App fetchImpl={flaky} />);
+    await user.click(await screen.findByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("button", { name: new RegExp(rec.scenario.title) })).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("disables the picker while a recording loads, so a second click cannot race the first", async () => {
+    const user = userEvent.setup();
+    const other = { ...rec.scenario, id: "cost-anomaly", title: "Other scenario" };
+    let releaseSlow: () => void = () => {};
+    const slowGate = new Promise<void>((r) => (releaseSlow = r));
+    const fetchImpl = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("index.json")) return new Response(JSON.stringify([rec.scenario, other]), { status: 200 });
+      if (url.includes(rec.scenario.id)) {
+        await slowGate;
+        return new Response(JSON.stringify(rec), { status: 200 });
+      }
+      return new Response("nothing", { status: 404 });
+    }) as typeof fetch;
+    render(<App fetchImpl={fetchImpl} />);
+    await user.click(await screen.findByRole("button", { name: new RegExp(rec.scenario.title) }));
+    expect(screen.getByRole("button", { name: /Other scenario/ }).hasAttribute("disabled")).toBe(true);
+    releaseSlow();
+    expect(await screen.findByRole("heading", { name: /Agent conversation/ })).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
 });

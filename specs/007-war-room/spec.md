@@ -34,7 +34,7 @@ It makes clear, on every screen, that it is a replay with a fake provider. Since
 - Live mode against the local API, `SettingsDialog` and token field (v2 backlog).
 - `Tabs`, `Sparkline`, filterable trace table and `prefers-reduced-motion` test (v2 backlog).
 - Real browser tests (Playwright or Cypress).
-- Internationalization: the interface is in pt-BR.
+- Internationalization: the interface is English only (en-US number formats), with no locale switching.
 - Computing metrics in the browser: the War Room only shows what the recording carries.
 
 ## Acceptance criteria (EARS)

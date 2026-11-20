@@ -6,6 +6,8 @@ import { OpenRouterProvider } from "../../src/llm/openrouter-provider.ts";
 import type { StructuredChat } from "../../src/llm/openrouter-provider.ts";
 import { withCallRecording } from "../../src/llm/recording-provider.ts";
 import { createLlmProvider } from "../../src/llm/create-provider.ts";
+import { missingPrices } from "../../src/llm/usage.ts";
+import { createContainer } from "../../src/app/container.ts";
 import { llmFailure } from "../../src/llm/provider.ts";
 import type { LlmErrorKind, LlmProvider, LlmResult, PromptDef, RunContext } from "../../src/llm/provider.ts";
 import type { ModelPrices } from "../../src/llm/usage.ts";
@@ -136,4 +138,28 @@ test("withCallRecording stores successes and failures and ticks 20 s", async () 
     ["probe.v1", "primary-model", false, "server_error", "2026-10-04T09:43:10.000Z"],
   ]);
   assert.deepEqual([rows[0]!.promptTokens, rows[0]!.completionTokens, rows[0]!.incidentId, rows[0]!.runId], [3, 2, "INC-0001", "RUN-0001"]);
+});
+
+test("missingPrices lists the configured real models without a price, so cost is never a silent 0", () => {
+  // Review 2026-11: data/model-prices.json ships empty, so every OpenRouter call was recorded as $0.00 with no signal.
+  const table = { version: "x", note: "x", models: { "known/model": { inputPerMTokUsd: 1, outputPerMTokUsd: 2 } } };
+  assert.deepEqual(missingPrices(["known/model", "typo/model", null], table), ["typo/model"]);
+  assert.deepEqual(missingPrices(["known/model"], table), []);
+});
+
+test("an OpenRouter container with an unpriced model logs a loud llm_price_missing warning at startup", () => {
+  const lines: string[] = [];
+  const c = createContainer(
+    loadConfig({ LLM_PROVIDER: "openrouter", OPENROUTER_API_KEY: "sk-or-v1-" + "z".repeat(40), OPENROUTER_MODEL: "vendor/unpriced-model", DB_PATH: ":memory:", CLOCK: "simulated" }),
+    { fixtures: [], logWrite: (l) => void lines.push(l) },
+  );
+  try {
+    const warn = lines.map((l) => JSON.parse(l)).find((l) => l.event === "llm_price_missing");
+    assert.ok(warn, "warning logged");
+    assert.equal(warn.level, "warn");
+    assert.deepEqual(warn.models, ["vendor/unpriced-model"]);
+    assert.ok(!lines.join("\n").includes("z".repeat(40)), "the key is never logged");
+  } finally {
+    c.close();
+  }
 });

@@ -75,6 +75,17 @@ export function createExecutorNode(d: ExecutionDeps): NodeFn {
     const observe = (a: GatedAction, ok: boolean, summary: string) =>
       d.trace.emit(ctx, "executor", { type: "observation", payload: { tool: a.actionType, ok, summary: `${a.actionType}: ${summary}`, evidenceRef: null } });
 
+    // Half-open, the whole batch is the trial: once this batch holds it, its remaining steps run, a failure reopens the
+    // breaker, and the verifier records the outcome. A batch that ends without one hands the trial back (see below).
+    let holdsTrial = false;
+    const breakerAllows = (now: Date): boolean => {
+      if (holdsTrial) return true;
+      const halfOpen = d.guards.breaker.state(now) === "half_open";
+      const ok = d.guards.breaker.canExecute(now);
+      if (ok && halfOpen) holdsTrial = true;
+      return ok;
+    };
+
     for (const a of [...actions].sort((x, y) => x.order - y.order)) {
       if (!RUNNABLE.includes(a.status)) continue;
       const now = d.clock.now();
@@ -88,7 +99,7 @@ export function createExecutorNode(d: ExecutionDeps): NodeFn {
         audit(a, "action_cancelled", { dependsOn: a.dependsOn });
         continue;
       }
-      if (!d.guards.breaker.canExecute(now)) {
+      if (!breakerAllows(now)) {
         a.status = "blocked_circuit_open";
         a.resultSummary = "not executed: circuit breaker open";
         observe(a, false, a.resultSummary);
@@ -123,7 +134,9 @@ export function createExecutorNode(d: ExecutionDeps): NodeFn {
         observe(a, false, `falhou (${r.result.summary})`);
         d.persist.action(a);
         audit(a, "action_failed", { summary: r.result.summary });
-        if (d.guards.breaker.recordFailure(d.clock.now())) {
+        const opened = d.guards.breaker.recordFailure(d.clock.now());
+        if (opened) {
+          holdsTrial = false; // the trial failed: the breaker reopened and blocks the rest of the batch
           d.persist.audit({
             incidentId: state.incidentId, actor: "system:circuit-breaker", event: "circuit_opened", tier: null,
             details: { cause: `execution failure of ${a.actionType} on ${a.target}`, requestId: ctx.requestId },
@@ -134,6 +147,8 @@ export function createExecutorNode(d: ExecutionDeps): NodeFn {
 
     const mitigated = actions.some((a) => a.status === "succeeded" && isMitigating(a.actionType));
     if (!mitigated) {
+      // The verifier only runs after a mitigation; without one, this trial has no outcome and must not stay taken.
+      if (holdsTrial) d.guards.breaker.releaseTrial();
       return { actions, world, phase: "executing", escalation: { reason: executorEscalationReason(actions), detail: escalationDetail(actions) } };
     }
     return { actions, world, phase: "executing" };

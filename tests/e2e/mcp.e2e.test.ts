@@ -74,6 +74,18 @@ test("get_incident returns the view and the last N trace events in seq order", a
   }
 });
 
+test("an invented runbookRef does not keep a tier 2 action out of human approval", async () => {
+  const { c, m } = await setup();
+  try {
+    const r = (await m.client.callTool(propose({ actionType: "add_incident_note", target: "incident/INC-0001", params: { text: "x" }, rationale: "r", runbookRef: "made-up#steps" }))).structuredContent as Structured;
+    assert.deepEqual([r.tier, r.status], [3, "awaiting_approval"]);
+    assert.ok(c.store.listActions("INC-0001").some((a) => a.proposedBy === "mcp_client" && a.classificationReasons.includes("runbook reference not among the retrieved runbooks")));
+  } finally {
+    await m.close();
+    c.close();
+  }
+});
+
 test("tier 2 becomes ready, tier 3 creates an approval, nothing executes", async () => {
   const { c, m } = await setup();
   try {
