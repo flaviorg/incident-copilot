@@ -46,6 +46,21 @@ test("half-open failure reopens", () => {
   assert.equal(c.state(t(300)), "half_open");
 });
 
+test("releasing a half-open trial that ended without an outcome lets the next trial through", () => {
+  const b = new CircuitBreaker({ failureThreshold: 1, cooldownSec: 300 });
+  b.recordFailure(t(0));
+  assert.equal(b.canExecute(t(301)), true);
+  assert.equal(b.canExecute(t(302)), false);
+  b.releaseTrial();
+  assert.equal(b.state(t(303)), "half_open");
+  assert.equal(b.canExecute(t(303)), true);
+  // Closed breaker: releasing is a no-op.
+  const c = new CircuitBreaker({ failureThreshold: 3, cooldownSec: 300 });
+  c.releaseTrial();
+  assert.equal(c.state(t(0)), "closed");
+  assert.equal(c.canExecute(t(0)), true);
+});
+
 test("rate limiter: 5 per minute globally and 1 per action and target in 10 min", () => {
   const l = new ActionRateLimiter({ perMinute: 5, repeatWindowMin: 10 });
   for (let i = 0; i < 5; i++) assert.equal(l.tryAcquire("a", `t${i}`, t(i)).ok, true);

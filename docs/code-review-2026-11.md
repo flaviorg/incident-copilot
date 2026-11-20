@@ -8,17 +8,17 @@ Status: **fixed in 0.2.0** means the change is on this branch; **open** means it
 
 | Severity | Confirmed | Fixed in 0.2.0 |
 |---|---|---|
-| high | 1 | 0 |
+| high | 1 | 1 |
 | medium | 6 | 2 |
 | low | 24 | 6 |
 
-The most important open item is the half-open circuit breaker that can stay blocked until the process restarts (high). It is the first thing to fix in the backend.
+The only high-severity finding, the half-open circuit breaker that could stay blocked until the process restarts, is fixed in 0.2.0. The most important open items are now the medium-severity approval-lifecycle findings in `src/app/incident-service.ts` and the unvalidated `runbookRef`.
 
 ## Correctness
 
 ### A half-open circuit breaker can stay blocked until the process restarts
 
-- **Severity:** high · **Status:** open · **Where:** [`src/domain/guards/circuit-breaker.ts:26`](../src/domain/guards/circuit-breaker.ts#L26)
+- **Severity:** high · **Status:** fixed in 0.2.0 (the whole batch is the half-open trial; `CircuitBreaker.releaseTrial()` hands back a trial that ended without an outcome; 5 regression tests in `guards.unit.test.ts` and `nodes-execution.unit.test.ts`) · **Where:** [`src/domain/guards/circuit-breaker.ts:26`](../src/domain/guards/circuit-breaker.ts#L26)
 - **Scenario:** canExecute() sets trialTaken=true. After that, only recordSuccess() (called only by the verifier) or recordFailure() can reset it. In executor-node.ts:91-107 the breaker is checked before the rate limiter. Case (a): the breaker is half_open, action 1 takes the trial, then limiter.tryAcquire rejects it as 'repeat' or 'global', so the action becomes 'throttled' and no outcome is recorded. Case (b): the breaker is half_open and the plan follows the pattern the auditor requires: create_volume_snapshot (tier 2, does not mitigate) as step 1, then delete_volume depending on it. The snapshot takes the trial and succeeds, and delete_volume gets blocked_circuit_open. No mitigating action succeeded, so afterExecutor escalates with circuit_open and the verifier never runs. In both cases openedAtMs stays set and trialTaken stays true, so state() returns half_open forever and canExecute() returns false forever. Every later execution in the process, for every incident, ends as blocked_circuit_open until a restart.
 - **Suggested fix:** Check the rate limiter before breaker.canExecute(), or add breaker.releaseTrial() for trials that end without an outcome. Treat the whole batch as the half-open trial: call recordSuccess or recordFailure at the end of the executor when the verifier will not run. Alternatively, reopen the breaker with a fresh cooldown when a trial ends without an outcome so it can expire. Add a unit test where a half-open trial is followed by a throttle, and one where the trial runs a step that does not mitigate.
 

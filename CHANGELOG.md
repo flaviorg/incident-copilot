@@ -16,6 +16,10 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Narrow screens.** Below 960 px, the gate card moves above the strip bay while the replay is held, so Approve is reachable without scrolling past the whole conversation.
 - Version bumped to 0.2.0 in both packages (`/health` and the MCP server read it from `package.json`).
 
+### Fixed (backend, from the November 2026 review)
+
+- **Circuit breaker could stay blocked until a restart (high severity).** Half-open, the breaker lets one trial through. If that trial ended without an outcome (the action was throttled, or it was a non-mitigating step such as `add_incident_note` followed by a blocked rollback), the breaker stayed half-open with its trial taken, and every later execution in the process, for every incident, ended as `blocked_circuit_open`. Now the whole execution batch is the trial: its remaining steps run, a failure reopens the breaker, the verifier records the outcome, and a batch with no outcome hands the trial back through the new `CircuitBreaker.releaseTrial()`. Five regression tests cover it (345 backend tests).
+
 ### Fixed (War Room, from the November 2026 review)
 
 - Pressing Play no longer drops keyboard focus to `<body>`: focus moves to Pause, and pausing returns it to Step.

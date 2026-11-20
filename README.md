@@ -8,7 +8,7 @@
 [![MIT License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Node 24.21](https://img.shields.io/badge/node-24.21-brightgreen?logo=nodedotjs&logoColor=white)](.nvmrc)
 [![TypeScript 7](https://img.shields.io/badge/TypeScript-7.0-3178c6?logo=typescript&logoColor=white)](tsconfig.json)
-[![Tests](https://img.shields.io/badge/tests-340%20backend%20%2B%2037%20web-brightgreen)](#tests-and-quality)
+[![Tests](https://img.shields.io/badge/tests-345%20backend%20%2B%2037%20web-brightgreen)](#tests-and-quality)
 [![Version 0.2.0](https://img.shields.io/badge/version-0.2.0-blue)](CHANGELOG.md)
 
 [**Live War Room demo**](https://flaviorg.github.io/incident-copilot/) · [Quick start](#quick-start) · [Architecture](docs/architecture.md) · [Threat model](docs/threat-model.md) · [Changelog](CHANGELOG.md)
@@ -54,7 +54,7 @@ LLM agents can already investigate an incident and propose a fix. The problem is
 - **Four entry points, one core:** CLI, HTTP API (Fastify), MCP server (stdio) and War Room (React 19, published on GitHub Pages).
 - **Insert-only audit** with a hash chain over canonical JSON, verifiable by the client.
 - **Runs offline**, with no Docker, no key and no network after `npm install`, using a scripted fake LLM; OpenRouter plugs in with two environment variables.
-- **340 backend tests and 37 War Room tests, none using the network**, plus SDD specs with 41 acceptance criteria in EARS.
+- **345 backend tests and 37 War Room tests, none using the network**, plus SDD specs with 41 acceptance criteria in EARS.
 
 ## Architecture
 
@@ -385,7 +385,7 @@ npm run web:test     # War Room
 npm run verify       # what CI runs: typecheck, tests, web tests and build, check:tokens, check:secrets
 ```
 
-Current count: **340 backend tests**, all passing (262 unit tests in 40 files and 78 end-to-end tests in 11 files), and **37 in the War Room**, in 6 files. The live test is skipped without a key.
+Current count: **345 backend tests**, all passing (267 unit tests in 40 files and 78 end-to-end tests in 11 files), and **37 in the War Room**, in 6 files. The live test is skipped without a key.
 
 - **No network.** `fetch` is replaced by a function that throws, in the test process and in child processes (CLI and MCP); one test starts a child through the same helpers and checks that the block holds inside it.
 - **Strict fake.** Scenario tests assert that every turn of the script was consumed and that the metrics match the golden files.
@@ -558,8 +558,8 @@ The most important point first: **the fake provider proves the mechanics, not th
 - **Simulated world.** No action touches real infrastructure.
 - **Simulated clock in the demo.** The demo MTTR is the simulated timeline, not a measured time.
 - **Scripted narrative.** With the system clock, the numbers in the fake's narrative do not match and the post-mortem comes out through the template (the numeric guard working, but without a narrative).
-- **Open findings from the November 2026 review.** A full review with verification lives in [`docs/code-review-2026-11.md`](docs/code-review-2026-11.md): 31 confirmed findings, of which 8 (War Room and docs) are fixed in 0.2.0. The most important open one is in the backend: a half-open circuit breaker whose trial ends without an outcome (throttled, or a non-mitigating step) stays blocked until the process restarts. Other open items include overdue sibling approvals not being recorded as expired on resume, pending approvals left live after a timeout escalation, an unvalidated `runbookRef` that can lower a step's tier, and real-provider cost reported as 0 when the model is missing from `data/model-prices.json`.
-- **In-memory protections.** The circuit breaker, the execution rate limiter and the token-attempt lock are per process; restarting the API resets all three.
+- **Open findings from the November 2026 review.** A full review with verification lives in [`docs/code-review-2026-11.md`](docs/code-review-2026-11.md): 31 confirmed findings, of which 9 are fixed in 0.2.0, including the only high-severity one (a half-open circuit breaker that could stay blocked until a restart). Open items include overdue sibling approvals not being recorded as expired on resume, pending approvals left live after a timeout escalation, an unvalidated `runbookRef` that can lower a step's tier, and real-provider cost reported as 0 when the model is missing from `data/model-prices.json`.
+- **In-memory protections.** The circuit breaker, the execution rate limiter and the token-attempt lock are per process; restarting the API resets all three. Half-open, the breaker treats a whole execution batch as its single trial: the verifier records the outcome, a failure reopens it, and a batch with no outcome (throttled, or nothing mitigated) hands the trial back.
 - **Global token lock.** The 5 wrong attempts (or attempts without a token) count for the whole process, not per client: whoever gets it wrong 5 times in 10 min blocks decisions for everyone, including the operator with the right token, for 10 min. The API only listens on `127.0.0.1`; the risk is accepted in the [threat model](docs/threat-model.md).
 - **Single token.** There are no users or roles.
 - **Numbers spelled out.** The numeric guard only extracts digits; "three minutes" in a narrative passes without being checked.

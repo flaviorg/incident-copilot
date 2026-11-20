@@ -1,6 +1,7 @@
-// Circuit breaker (spec 6.7). Puro, relógio injetado em cada chamada. Conta falhas consecutivas de execução e de
-// verificação; com `failureThreshold`, abre por `cooldownSec`; em meia-abertura deixa passar 1 tentativa; sucesso
-// fecha e falha reabre. Estado em memória, global por processo (reiniciar zera; limitação documentada).
+// Circuit breaker (spec 6.7). Pure, with the clock passed into each call. Counts consecutive execution and
+// verification failures; at `failureThreshold` it opens for `cooldownSec`; half-open, it lets 1 trial through; success
+// closes it and failure reopens it. A trial that ends with no outcome must be released, or the breaker would stay
+// half-open and blocked until the process restarts. In-memory state, global per process (a restart resets it).
 
 export type BreakerState = "closed" | "open" | "half_open";
 
@@ -29,6 +30,14 @@ export class CircuitBreaker {
     if (s === "open" || this.trialTaken) return false;
     this.trialTaken = true;
     return true;
+  }
+
+  /**
+   * Gives back a half-open trial that ended without an outcome (throttled, or a batch the verifier will not judge),
+   * so the next attempt can be the trial. No effect when no trial is in flight.
+   */
+  releaseTrial(): void {
+    this.trialTaken = false;
   }
 
   recordSuccess(_now: Date): void {
