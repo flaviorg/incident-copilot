@@ -12,8 +12,12 @@ The War Room (`web/`) is a static page that replays recordings. This document se
 | Tier conveyed by text and icon, not by color alone | `TierBadge` writes "Tier N", with the tier label in `title`; the SVG icon is `aria-hidden` | `components.test.tsx` ("TierBadge communicates the tier by text") |
 | Literal demo mode label on every screen | `ModeBanner` with `role="status"`, always mounted by `App` | `components.test.tsx` ("ModeBanner shows the literal label"); `App.test.tsx` |
 | Keyboard focus follows the action | On load or branch choice, focus goes to Step; at the gate, to the gate heading; at the end, to the post-mortem heading | `web/src/test/App.test.tsx` ("keeps keyboard focus where the action is: step button, gate and postmortem") |
+| Play and Pause never drop focus to `body` | Play disables itself, so focus moves to Pause; pausing returns it to Step | `App.test.tsx` ("moves focus to Pause when playing and back to Step when paused") |
+| Leaving a replay keeps focus | Change scenario focuses the "Choose a scenario" heading | `App.test.tsx` ("returns focus to the picker heading after Change scenario") |
+| The held gate is announced in text, not only by motion | The gate strip carries a `HOLD` stamp while held and `APPROVED` or `REJECTED` after | `App.test.tsx` ("stamps the gate strip HOLD while held and APPROVED after the decision") |
+| Authority is not conveyed by color alone | Every strip holder names the agent and its role ("model · proposes", "code · catalog tiers"); the gate chain spells out "Proposed by", "Tier set by", "Decided by" | `components.test.tsx` (axe), visual check in 0.2.0 |
 | Playback does not start on its own | No autoplay; the user steps through or presses Play | `replay-engine.test.ts` ("starts empty, without autoplay"); `components.test.tsx` |
-| Contrast of at least 4.5:1 on the declared pairs, in light and dark themes | Relative luminance calculation (WCAG 2.x) over the `tokens.css` values, for the 17 pairs in `web/src/styles/contrast-pairs.json` | `web/src/test/tokens-contrast.test.ts` ("every declared pair reaches 4.5:1 in light and dark themes") |
+| Contrast of at least 4.5:1 on the declared pairs, in light and dark themes | Relative luminance calculation (WCAG 2.x) over the `tokens.css` values, for the 28 pairs in `web/src/styles/contrast-pairs.json` (text, strip holders, stamps, tiers and banner) | `web/src/test/tokens-contrast.test.ts` ("every declared pair reaches 4.5:1 in light and dark themes") |
 | No literal colors outside `tokens.css` | Scan of the War Room sources | `npm run check:tokens`; `tests/unit/check-tokens.unit.test.ts` |
 
 ### Why contrast is proven by its own test
@@ -80,6 +84,18 @@ The checked items in the checklist above held on all four paths:
 `vite preview` needs the same `VITE_BASE` as the build. Without it, the server returns `index.html` in place of the assets and the console shows 404s.
 
 The three unchecked items remain pending.
+
+### 0.2.0 redesign check
+
+**Date:** 2026-11-20. **Environment:** Vite dev server (`npm run web:demo`) in the development browser pane, and headless Chromium at 1440 × 900, 1280 × 900 and 390 × 844, light and dark themes, reduced motion.
+
+- [x] **390 px with no horizontal scroll.** `scrollWidth` equal to `innerWidth` (390) with the replay held at the gate.
+- [x] **Gate on narrow screens.** Below 960 px the gate card is placed above the strip bay while held, so Approve is reachable without scrolling past the conversation.
+- [x] **Held strip and gate share the viewport** at 1440 px in both scenarios: the side column is sticky only while held, and the numbers flow normally once the replay ends.
+- [x] **Dark theme by eye.** Checked at the gate and at the end in both scenarios; every text pair is in `contrast-pairs.json`.
+- [x] **Focus at the gate.** The gate heading is focused without a page jump, and the held strip is scrolled into view.
+- [x] **Live region.** Announces "Playing", "Paused", "Held at the approval gate: your decision" and "Replay finished" only; the event counter is outside it.
+- [ ] **Screen reader**, **200% zoom** and an automated **reduced-motion** test remain pending, as before.
 
 ## How to repeat the check
 
