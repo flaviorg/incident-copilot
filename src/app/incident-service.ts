@@ -13,7 +13,7 @@ import type { Clock } from "../infra/clock.ts";
 import type { Ids } from "../infra/ids.ts";
 import type { Logger } from "../infra/logger.ts";
 import { ConflictError, LlmUnavailableError, NotFoundError, RunTimeoutError, UnprocessableError, ValidationError } from "../domain/errors.ts";
-import { classifyAction, EXECUTABLE_ACTIONS, isExecutable } from "../domain/autonomy/catalog.ts";
+import { classifyAction, runbookRefsOf, EXECUTABLE_ACTIONS, isExecutable } from "../domain/autonomy/catalog.ts";
 import { parseWithIssues } from "../domain/validation.ts";
 import { effectiveStatus, isExpired, transition } from "../domain/approval/approval-machine.ts";
 import { ApprovalTransitionError } from "../domain/errors.ts";
@@ -97,27 +97,12 @@ export class IncidentService {
     return store.transaction(() => {
       this.requireIncident(incidentId);
       this.requireNoRunInProgress(incidentId);
-      const due = store.listApprovals({ incidentId, status: "pending" }).filter((a) => isExpired(a, now));
-      if (due.length === 0) return { expired: [], pendingLeft: this.pendingCount(incidentId, now) };
+      if (!store.listApprovals({ incidentId, status: "pending" }).some((a) => isExpired(a, now))) {
+        return { expired: [], pendingLeft: this.pendingCount(incidentId, now) };
+      }
       const { blackboard, version } = store.loadBlackboard(incidentId);
       const actions = blackboard.actions.map((a) => ({ ...a }));
-      const expired: Approval[] = [];
-      for (const ap of due) {
-        const current = store.getApproval(ap.id)!;
-        if (current.status !== "pending") continue; // já fechada em cascata nesta mesma transação
-        const next = this.closeApproval(current, { type: "expire" }, now);
-        expired.push(next);
-        store.appendAudit({
-          incidentId, actor: "system:approval-expiry", event: "approval_expired", tier: 3,
-          details: { approvalId: next.id, actionId: next.actionId, expiresAt: next.expiresAt, requestId: ctx.requestId },
-        });
-        const action = actions.find((a) => a.id === next.actionId);
-        if (action) {
-          action.status = "expired";
-          store.upsertAction(action);
-          this.cancelDependents(actions, action, "expired", now, ctx, { type: "expire" });
-        }
-      }
+      const expired = this.expireOverdue(incidentId, actions, now, ctx);
       const pendingLeft = this.pendingCount(incidentId, now);
       const phase = pendingLeft === 0 && blackboard.phase === "awaiting_approval" ? "resume" : blackboard.phase;
       this.persist(incidentId, { ...blackboard, actions, phase }, version, ctx);
@@ -136,8 +121,11 @@ export class IncidentService {
     if (decided !== "approved" && decided !== "rejected") throw new TypeError(`applyDecision expects approved or rejected, got ${decided}`);
     return store.transaction(() => {
       const incidentId = approval.incidentId;
-      this.requireIncident(incidentId);
+      const incident = this.requireIncident(incidentId);
       this.requireNoRunInProgress(incidentId);
+      if (incident.status === "escalated" || incident.status === "resolved") {
+        throw new ConflictError("incident_not_accepting", `incident ${incidentId} is ${incident.status}; it no longer accepts decisions`);
+      }
       store.transitionApproval(approval.id, next, approval.version);
       const { blackboard, version } = store.loadBlackboard(incidentId);
       const actions = blackboard.actions.map((a) => ({ ...a }));
@@ -160,6 +148,9 @@ export class IncidentService {
           this.cancelDependents(actions, action, "rejected", now, ctx, { type: "reject", approver: next.approver ?? "unknown", source: next.decisionSource === "text" ? "text" : "structured" });
         }
       }
+      // Overdue siblings must be recorded before counting: effectiveStatus already treats them as expired, so without
+      // this the batch would resume while their rows, actions and dependents still said pending.
+      this.expireOverdue(incidentId, actions, now, ctx);
       const pendingLeft = this.pendingCount(incidentId, now);
       const phase = pendingLeft === 0 && blackboard.phase === "awaiting_approval" ? "resume" : blackboard.phase;
       this.persist(incidentId, { ...blackboard, actions, phase }, version, ctx);
@@ -177,6 +168,63 @@ export class IncidentService {
     if (this.d.store.listRuns(incidentId).some((r) => r.endedAt === null)) {
       throw new ConflictError("incident_not_accepting", `incident ${incidentId} has a run in progress; try again when it finishes`);
     }
+  }
+
+  /**
+   * Records every overdue pending approval of the incident as expired (spec 6.5): approval expired with decisionSource
+   * expiry, action expired, dependents cancelled and an approval_expired audit entry. Mutates `actions` in place; the
+   * caller saves the blackboard. Must run inside the caller's transaction.
+   */
+  private expireOverdue(incidentId: string, actions: GatedAction[], now: Date, ctx: RunCtx): Approval[] {
+    const { store } = this.d;
+    const expired: Approval[] = [];
+    for (const ap of store.listApprovals({ incidentId, status: "pending" }).filter((a) => isExpired(a, now))) {
+      const current = store.getApproval(ap.id)!;
+      if (current.status !== "pending") continue; // already closed in cascade in this same transaction
+      const next = this.closeApproval(current, { type: "expire" }, now);
+      expired.push(next);
+      store.appendAudit({
+        incidentId, actor: "system:approval-expiry", event: "approval_expired", tier: 3,
+        details: { approvalId: next.id, actionId: next.actionId, expiresAt: next.expiresAt, requestId: ctx.requestId },
+      });
+      const action = actions.find((a) => a.id === next.actionId);
+      if (action) {
+        action.status = "expired";
+        store.upsertAction(action);
+        this.cancelDependents(actions, action, "expired", now, ctx, { type: "expire" });
+      }
+    }
+    return expired;
+  }
+
+  /**
+   * A run stopped outside the graph (timeout or recursion limit) is escalated, so nothing will ever execute its batch.
+   * Every still-pending approval is closed (expired, with the cause in the audit) and its action cancelled, so no human
+   * can "approve" an action that will never run.
+   */
+  private closePendingOnStop(incidentId: string, bb: Blackboard, stop: Escalation, ctx: RunCtx): Blackboard {
+    const { store, clock } = this.d;
+    return store.transaction(() => {
+      const now = clock.now();
+      const actions = bb.actions.map((a) => ({ ...a }));
+      const cause = `incident escalated before a decision (${stop.reason})`;
+      for (const ap of store.listApprovals({ incidentId, status: "pending" })) {
+        const next = this.closeApproval(ap, { type: "expire" }, now);
+        store.appendAudit({
+          incidentId, actor: "system:incident-service", event: "approval_expired", tier: 3,
+          details: { approvalId: next.id, actionId: next.actionId, cause, requestId: ctx.requestId },
+        });
+        // The abort can land mid-superstep, after the gate wrote its rows but before its state reached `bb`: fall back
+        // to the stored action so it is cancelled either way.
+        const action = actions.find((a) => a.id === next.actionId) ?? store.listActions(incidentId).find((a) => a.id === next.actionId);
+        if (action && CANCELLABLE.includes(action.status)) {
+          action.status = "cancelled";
+          action.resultSummary = `cancelled: ${cause}`;
+          store.upsertAction(action);
+        }
+      }
+      return { ...bb, actions };
+    });
   }
 
   /** Aprovações do incidente com status efetivo pending. */
@@ -251,7 +299,11 @@ export class IncidentService {
 
     const cls = classifyAction(
       { actionType: i.actionType, target: i.target, params: i.params, runbookRef: i.runbookRef ?? null },
-      { scope: { service: blackboard.alert.service, account: blackboard.alert.account, incidentId: i.incidentId }, revisionsExhausted: false },
+      {
+        scope: { service: blackboard.alert.service, account: blackboard.alert.account, incidentId: i.incidentId },
+        revisionsExhausted: false,
+        knownRunbookRefs: runbookRefsOf(blackboard.runbookMatches),
+      },
     );
     const head = `${i.actionType} tier ${cls.tier}`;
     let status: GatedAction["status"];
@@ -433,7 +485,7 @@ export class IncidentService {
     }
     if (stop) {
       log.warn("run escalated outside the graph", { event: "run_escalated", reason: stop.reason });
-      last = { ...last, escalation: stop };
+      last = this.closePendingOnStop(incidentId, { ...last, escalation: stop }, stop, ctx);
       last = { ...last, ...(await this.d.direct.escalation(last, config)) };
       last = { ...last, ...(await this.d.direct.reporter(last, config)) };
     }

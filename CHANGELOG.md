@@ -18,7 +18,12 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed (backend, from the November 2026 review)
 
-- **Circuit breaker could stay blocked until a restart (high severity).** Half-open, the breaker lets one trial through. If that trial ended without an outcome (the action was throttled, or it was a non-mitigating step such as `add_incident_note` followed by a blocked rollback), the breaker stayed half-open with its trial taken, and every later execution in the process, for every incident, ended as `blocked_circuit_open`. Now the whole execution batch is the trial: its remaining steps run, a failure reopens the breaker, the verifier records the outcome, and a batch with no outcome hands the trial back through the new `CircuitBreaker.releaseTrial()`. Five regression tests cover it (345 backend tests).
+- **Circuit breaker could stay blocked until a restart (high severity).** Half-open, the breaker lets one trial through. If that trial ended without an outcome (the action was throttled, or it was a non-mitigating step such as `add_incident_note` followed by a blocked rollback), the breaker stayed half-open with its trial taken, and every later execution in the process, for every incident, ended as `blocked_circuit_open`. Now the whole execution batch is the trial: its remaining steps run, a failure reopens the breaker, the verifier records the outcome, and a batch with no outcome hands the trial back through the new `CircuitBreaker.releaseTrial()`. Five regression tests cover it.
+
+- **Overdue sibling approvals are recorded when another decision resumes the batch.** Approving a later MCP proposal no longer resumes while an overdue gate approval stays `pending` in the store: it is recorded as expired (audit `approval_expired`), its action is `expired` and its dependents are cancelled.
+- **A timeout or recursion-limit escalation closes the pending approvals.** They are expired with the cause in the audit, their actions are cancelled, and a decision on an escalated or resolved incident is refused with `incident_not_accepting`, so no audit entry can say a human approved an action that never ran.
+- **`runbookRef` is now checked against the runbooks actually retrieved.** A planner or MCP client naming a runbook the retriever never returned no longer keeps a step at tier 2: it is raised to tier 3 with the reason "runbook reference not among the retrieved runbooks".
+- **Unpriced real models are no longer silent.** With OpenRouter, a primary or fallback model missing from `data/model-prices.json` logs a startup warning (`llm_price_missing`); the README explains how to add prices.
 
 ### Fixed (War Room, from the November 2026 review)
 
@@ -33,6 +38,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - `docs/code-review-2026-11.md`: the full review of the codebase, with 31 verified findings (1 high, 6 medium, 24 low), their status and suggested fixes, plus the 14 findings that verification rejected.
 - `PRODUCT.md` (product context for design work) and `DESIGN.md` (the War Room design system).
+- Eleven backend regression tests for the review fixes (351 backend tests: 270 unit, 81 end to end).
 - Five War Room tests (37 in total): focus on Play and Pause, focus after Change scenario, the `HOLD` and `APPROVED` stamps, retry after an index failure, and the picker locked while loading.
 - New README media: `docs/media/demo.gif`, `war-room.png`, `war-room-dark.png` and `war-room-mobile.png`.
 

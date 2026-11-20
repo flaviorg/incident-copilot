@@ -1,4 +1,5 @@
-// Uso de tokens e custo estimado (spec 5.7 e 7.2, regra 7). O fake custa 0; modelo sem preço também custa 0.
+// Token usage and estimated cost (spec 5.7 and 7.2, rule 7). The fake costs 0. A real model without a price in
+// data/model-prices.json also records 0, so the container warns at startup (missingPrices) instead of staying silent.
 
 /** Cerca de 4 caracteres por token (221522). */
 export function estimateTokens(text: string): number {
@@ -10,6 +11,11 @@ export type ModelPrices = {
   note: string;
   models: Record<string, { inputPerMTokUsd: number; outputPerMTokUsd: number }>;
 };
+
+/** Configured real models (primary, fallback) that have no entry in the price table: their cost would read as 0. */
+export function missingPrices(models: readonly (string | null | undefined)[], prices: ModelPrices): string[] {
+  return models.filter((m): m is string => typeof m === "string" && m !== "" && !(m in prices.models));
+}
 
 export function estimateCostUsd(model: string, u: { promptTokens: number; completionTokens: number }, prices: ModelPrices): number {
   const p = prices.models[model];

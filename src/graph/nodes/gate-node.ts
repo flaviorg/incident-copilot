@@ -8,7 +8,7 @@ import type { NewAuditEntry } from "../../infra/db/incident-store.ts";
 import type { SimulatedInfra } from "../../infra/simulated-infra.ts";
 import type { Clock } from "../../infra/clock.ts";
 import type { Ids } from "../../infra/ids.ts";
-import { classifyAction, EXECUTABLE_ACTIONS, isExecutable } from "../../domain/autonomy/catalog.ts";
+import { classifyAction, EXECUTABLE_ACTIONS, isExecutable, runbookRefsOf } from "../../domain/autonomy/catalog.ts";
 import { ACTION_STATUS_LABELS } from "../../domain/report/postmortem-template.ts";
 import type { TraceSink } from "../../app/trace-sink.ts";
 import { runContextOf } from "../run-context.ts";
@@ -38,13 +38,14 @@ export function createGateNode(d: GateDeps): NodeFn {
     if (state.plan === null || state.audit === null) throw new Error("gate invoked without an audited plan (the supervisor guard should prevent this)");
     const revisionsExhausted = state.audit.verdict === "revise";
     const scope = { service: state.alert.service, account: state.alert.account, incidentId: state.incidentId };
+    const knownRunbookRefs = runbookRefsOf(state.runbookMatches);
     const steps: PlanStep[] = [...state.plan.steps].sort((a, b) => a.order - b.order);
 
     // 1. Avalia o lote em ordem, com o mundo hipotético acumulando o efeito dos passos aceitos.
     let world = state.world;
     const evaluated: Evaluated[] = [];
     for (const step of steps) {
-      const cls = classifyAction(step, { scope, revisionsExhausted });
+      const cls = classifyAction(step, { scope, revisionsExhausted, knownRunbookRefs });
       const action: GatedAction = {
         id: d.ids.action(), incidentId: state.incidentId, planRevision: state.planRevision, order: step.order,
         actionType: step.actionType, target: step.target, params: step.params, dependsOn: step.dependsOn,

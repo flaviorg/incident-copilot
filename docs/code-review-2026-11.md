@@ -9,10 +9,10 @@ Status: **fixed in 0.2.0** means the change is on this branch; **open** means it
 | Severity | Confirmed | Fixed in 0.2.0 |
 |---|---|---|
 | high | 1 | 1 |
-| medium | 6 | 2 |
+| medium | 6 | 6 |
 | low | 24 | 6 |
 
-The only high-severity finding, the half-open circuit breaker that could stay blocked until the process restarts, is fixed in 0.2.0. The most important open items are now the medium-severity approval-lifecycle findings in `src/app/incident-service.ts` and the unvalidated `runbookRef`.
+The only high-severity finding, the half-open circuit breaker that could stay blocked until the process restarts, is fixed in 0.2.0. All six medium findings are fixed too. The 18 open items are low severity.
 
 ## Correctness
 
@@ -24,13 +24,13 @@ The only high-severity finding, the half-open circuit breaker that could stay bl
 
 ### applyDecision resumes without recording overdue sibling approvals as expired
 
-- **Severity:** medium · **Status:** open · **Where:** [`src/app/incident-service.ts:163`](../src/app/incident-service.ts#L163)
+- **Severity:** medium · **Status:** fixed in 0.2.0 (`applyDecision` runs the shared `expireOverdue` helper in the same transaction before counting pending approvals; e2e test in `gate.e2e.test.ts`) · **Where:** [`src/app/incident-service.ts:163`](../src/app/incident-service.ts#L163)
 - **Scenario:** The gate creates approvals A1 and A2 for steps that both mitigate. A2's TTL passes and nobody records that. The human then approves A1 before its own TTL ends. pendingCount uses effectiveStatus, so A2 counts as expired and pendingLeft is 0. The phase becomes 'resume' and the executor runs. A2 is never actually expired: its row stays status='pending' with no decidedAt or decisionSource, there is no approval_expired audit entry, and its action stays 'awaiting_approval' instead of 'expired'. Its dependents are not cancelled in the cascade. If A1's action then fails or gets throttled, executorEscalationReason looks for status 'expired', does not find it, and reports no_executable_actions instead of mitigation_rejected. The post-mortem timeline also shows A2 as never decided.
 - **Suggested fix:** In applyDecision, inside the same transaction and before pendingCount, record every overdue pending approval of the incident as expired. Move the loop body of expireDueApprovals into a private helper so both paths share it, including setting actions to expired, cancelDependents and the approval_expired audit entry.
 
 ### A timeout escalation after the gate leaves live pending approvals on an escalated incident
 
-- **Severity:** medium · **Status:** open · **Where:** [`src/app/incident-service.ts:434`](../src/app/incident-service.ts#L434)
+- **Severity:** medium · **Status:** fixed in 0.2.0 (the stop path closes every pending approval as expired with the cause in the audit and cancels its action, falling back to the stored action when the abort lands mid-superstep; `applyDecision` refuses escalated or resolved incidents; e2e test in `gate.e2e.test.ts`) · **Where:** [`src/app/incident-service.ts:434`](../src/app/incident-service.ts#L434)
 - **Scenario:** The deadline is checked after each state the graph emits (line 420). When a run with a real LLM goes past runTimeoutMs, the timeout can trigger right after the gate state, which already wrote pending approvals to the store. The timeout path runs the escalation and reporter nodes on that state, and the incident is persisted as 'escalated'. The approvals stay 'pending', and ApprovalService.list('pending') and the War Room show them. When a human approves one, applyDecision marks the action 'approved' and adds an approval_approved audit entry. The phase is 'reporting', not 'awaiting_approval', so it never becomes 'resume'. The action never runs, but the audit trail says a human approved it.
 - **Suggested fix:** When the stop path (recursion_limit or timeout) runs, close every pending approval of the incident in the persist transaction, either as expired or rejected by the system with an audit entry, and cancel their actions. Also make applyDecision and expireDueApprovals refuse with incident_not_accepting when the incident is escalated or resolved.
 
@@ -62,7 +62,7 @@ The only high-severity finding, the half-open circuit breaker that could stay bl
 
 ### LLM- or MCP-supplied runbookRef is never validated, so it decides whether a step is raised to tier 3
 
-- **Severity:** medium · **Status:** open · **Where:** [`src/domain/autonomy/catalog.ts:147`](../src/domain/autonomy/catalog.ts#L147)
+- **Severity:** medium · **Status:** fixed in 0.2.0 (`ClassificationContext.knownRunbookRefs`, built with `runbookRefsOf` from the retrieved matches in the gate and in MCP proposals; an unknown ref raises to tier 3 with the reason "runbook reference not among the retrieved runbooks"; unit and MCP e2e tests) · **Where:** [`src/domain/autonomy/catalog.ts:147`](../src/domain/autonomy/catalog.ts#L147)
 - **Scenario:** classifyAction raises the tier to 3 only when runbookRef === null. Nothing ever checks that ref. The planner's PlanStep.runbookRef is `z.string().nullable()` in src/contracts/plan.ts:9, and gate-node.ts:47 passes the step straight in. The MCP input accepts any string up to 120 characters (contracts/api.ts:139, incident-service.ts:253). Example: the runbook retriever refuses (no runbook above the threshold, so state.runbookMatches is empty), but an injected or hallucinating planner emits runbookRef: "anything#x" on block_image_tag or tag_resource_for_review. The step keeps catalog tier 2, becomes `ready` and runs in the batch with no human approval. An MCP client can do the same by passing runbookRef: "x". This breaks AGENTS.md ('Never read a tier ... from LLM output') and constitution 1 and 5: free LLM text decides whether the no_runbook raise applies.
 - **Suggested fix:** Treat runbookRef as evidence that must be checked. Add `knownRunbookRefs: ReadonlySet<string>` to ClassificationContext. In the gate, build it from state.runbookMatches (`${runbookId}#${section}`). In proposeExternalAction, build it from blackboard.runbookMatches or the RunbookRepository. Raise to tier 3 with REASONS.noRunbook when the ref is null OR not in the set. Add a unit test: an unknown ref with no matches must give tier 3.
 
@@ -88,7 +88,7 @@ The only high-severity finding, the half-open circuit breaker that could stay bl
 
 ### Real-provider cost is always 0: model-prices.json is empty and unknown models silently cost 0
 
-- **Severity:** medium · **Status:** open · **Where:** [`src/llm/usage.ts:16`](../src/llm/usage.ts#L16)
+- **Severity:** medium · **Status:** fixed in 0.2.0, partly (no longer silent: `missingPrices` plus a startup `warn` with `event: llm_price_missing`, documented in the README; the cost of an unpriced model still records as 0, and reading OpenRouter's reported cost is future work) · **Where:** [`src/llm/usage.ts:16`](../src/llm/usage.ts#L16)
 - **Scenario:** data/model-prices.json ships with "models": {}. With LLM_PROVIDER=openrouter and OPENROUTER_MODEL=anthropic/claude-x, estimateCostUsd hits `if (!p) return 0`, so every llm_calls row and every incident cost total reads $0.00. This is true for the primary and the fallback model. Nothing logs or flags it, so cost dashboards and budgets look fine while real money is spent. A typo in a model id also falls back to 0 without any signal.
 - **Suggested fix:** Have createLlmProvider check that the primary and fallback models both exist in prices.models when llmProvider==='openrouter', and fail config or log a loud warning at startup if not. Make estimateCostUsd return null, or carry a costKnown:false flag, for unknown models, and record it as unknown instead of 0. As an alternative, read OpenRouter's reported cost (usage.cost, via `usage: {include: true}`) rather than estimating.
 
