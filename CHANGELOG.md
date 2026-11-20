@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.3.0] - 2026-11-20
 
 The 18 low-severity findings of the November 2026 review, all fixed. Details and tests per finding in [`docs/code-review-2026-11.md`](docs/code-review-2026-11.md).
 
@@ -27,6 +27,7 @@ The 18 low-severity findings of the November 2026 review, all fixed. Details and
 
 ### Changed
 
+- Version bumped to 0.3.0 in both packages.
 - Every Portuguese code comment in `src/`, `tests/`, `scripts/` and `web/` is translated to English; the language test now also covers comments (with a short allowlist for the Portuguese decision words the parser accepts and the pt-BR number formats the numeric guard reads).
 
 - `tsconfig.json` uses `module` and `moduleResolution` `nodenext`, so the typecheck rejects extensionless relative imports the way Node does.

@@ -9,7 +9,7 @@
 [![Node 24.21](https://img.shields.io/badge/node-24.21-brightgreen?logo=nodedotjs&logoColor=white)](.nvmrc)
 [![TypeScript 7](https://img.shields.io/badge/TypeScript-7.0-3178c6?logo=typescript&logoColor=white)](tsconfig.json)
 [![Tests](https://img.shields.io/badge/tests-378%20backend%20%2B%2037%20web-brightgreen)](#tests-and-quality)
-[![Version 0.2.0](https://img.shields.io/badge/version-0.2.0-blue)](CHANGELOG.md)
+[![Version 0.3.0](https://img.shields.io/badge/version-0.3.0-blue)](CHANGELOG.md)
 
 [**Live War Room demo**](https://flaviorg.github.io/incident-copilot/) · [Quick start](#quick-start) · [Architecture](docs/architecture.md) · [Threat model](docs/threat-model.md) · [Changelog](CHANGELOG.md)
 
@@ -562,7 +562,7 @@ The most important point first: **the fake provider proves the mechanics, not th
 - **Simulated world.** No action touches real infrastructure.
 - **Simulated clock in the demo.** The demo MTTR is the simulated timeline, not a measured time.
 - **Scripted narrative.** With the system clock, the numbers in the fake's narrative do not match and the post-mortem comes out through the template (the numeric guard working, but without a narrative).
-- **November 2026 review.** A full review with verification lives in [`docs/code-review-2026-11.md`](docs/code-review-2026-11.md): 31 confirmed findings, all fixed (13 in 0.2.0, the 18 low-severity ones after it). The two follow-ups it left open, an API token for a non-loopback `HOST` and translating the Portuguese code comments, are done too.
+- **November 2026 review.** A full review with verification lives in [`docs/code-review-2026-11.md`](docs/code-review-2026-11.md): 31 confirmed findings, all fixed (13 in 0.2.0, the 18 low-severity ones in 0.3.0). The two follow-ups it left open, an API token for a non-loopback `HOST` and translating the Portuguese code comments, are done too.
 - **In-memory protections.** The circuit breaker, the execution rate limiter and the token-attempt lock are per process; restarting the API resets all three. Half-open, the breaker treats a whole execution batch as its single trial: the verifier records the outcome, a failure reopens it, and a batch with no outcome (throttled, or nothing mitigated) hands the trial back.
 - **Global token lock.** The 5 wrong attempts (or attempts without a token) count for the whole process, not per client: whoever gets it wrong 5 times in 10 min blocks decisions for everyone, including the operator with the right token, for 10 min. The API only listens on `127.0.0.1`; the risk is accepted in the [threat model](docs/threat-model.md).
 - **Single token.** There are no users or roles.

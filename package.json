@@ -1,6 +1,6 @@
 {
   "name": "incident-copilot",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Multi-agent incident copilot: the model proposes; code and humans decide",
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
