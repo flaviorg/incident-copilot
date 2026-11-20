@@ -1,5 +1,5 @@
-// Compõe tudo a partir da config: única fonte usada por API, MCP, CLI e testes. Sem estado global.
-// Cresce nas tarefas 15, 22, 29, 34 e 35.
+// Builds everything from the config: the single source used by the API, MCP, CLI and tests. No global state.
+// Grew in tasks 15, 22, 29, 34 and 35.
 import type { Config } from "../config.ts";
 import { collectSecrets } from "../infra/redact.ts";
 import { createLogger } from "../infra/logger.ts";
@@ -64,26 +64,26 @@ export type Container = {
   runbooks: RunbookRepository;
   tools: ToolRegistry;
   prices: CloudPrices;
-  /** Mundo simulado: dry run, execução, reversão e sinais pós-ação. */
+  /** Simulated world: dry run, execution, revert and post-action signals. */
   infra: SimulatedInfra;
   assumptions: BusinessAssumptions;
   modelPrices: ModelPrices;
-  /** Provedor com timeout, retry, fallback (openrouter) e registro de chamadas. */
+  /** Provider with timeout, retry, fallback (openrouter) and call recording. */
   llm: LlmProvider;
-  /** O fake por baixo de `llm` quando o provedor é fake (testes usam calls() e assertAllConsumed()); senão null. */
+  /** The fake under `llm` when the provider is fake (tests use calls() and assertAllConsumed()); otherwise null. */
   fake: FakeLlmProvider | null;
-  /** Tetos do spec 6.2, com os ajustes injetados (testes). */
+  /** Caps from spec 6.2, with injected overrides (tests). */
   limits: Limits;
-  /** Circuit breaker e limite de execuções, por processo (spec 6.7). */
+  /** Circuit breaker and execution limit, per process (spec 6.7). */
   guards: ExecutionGuards;
   trace: TraceSink;
-  /** Abre, executa, retoma e lê incidentes (as três portas usam só isto). */
+  /** Opens, runs, resumes and reads incidents (the three ports use only this). */
   incidents: IncidentService;
-  /** Decisões humanas com token; a última decisão do lote dispara a retomada. */
+  /** Human decisions with a token; the batch's last decision triggers the resume. */
   approvals: ApprovalService;
-  /** Tentativas de token erradas, por processo (5 em 10 min bloqueiam 10 min). */
+  /** Wrong token attempts, per process (5 in 10 min lock for 10 min). */
   attempts: TokenAttemptLimiter;
-  /** Agregações do /stats por SQL. */
+  /** /stats aggregations in SQL. */
   stats: StatsService;
   close(): void;
 };
@@ -92,16 +92,16 @@ export type ContainerOverrides = {
   clock?: Clock;
   transformScenario?: (s: LoadedScenario) => LoadedScenario;
   logWrite?: (line: string) => void;
-  /** Fixtures do provedor fake; padrão: fixtures/llm/*.json. */
+  /** Fake provider fixtures; default: fixtures/llm/*.json. */
   fixtures?: FixtureFile[];
   limits?: Partial<Limits>;
-  /** Só para testes: troca nós do grafo (por exemplo, parar no portão para testar o nó isolado). */
+  /** Tests only: replaces graph nodes (for example, stopping at the gate to test that node alone). */
   nodes?: Partial<GraphNodes>;
-  /** Só para testes: breaker já aberto ou limiter já cheio (spec 7.4). */
+  /** Tests only: a breaker already open or a limiter already full (spec 7.4). */
   guards?: Partial<ExecutionGuards>;
 };
 
-/** Início do relógio simulado antes do primeiro alinhamento (open alinha ao detectedAt do cenário). */
+/** Simulated clock start before the first alignment (open aligns it to the scenario's detectedAt). */
 const SIMULATED_CLOCK_START = new Date("2026-10-04T00:00:00.000Z");
 
 export function createContainer(config: Config, o: ContainerOverrides = {}): Container {
@@ -134,7 +134,7 @@ export function createContainer(config: Config, o: ContainerOverrides = {}): Con
   const limits: Limits = { ...DEFAULT_LIMITS, ...o.limits };
   const trace = new TraceSink({ store, ids, clock, secrets });
 
-  // Equipe (Tarefa 22).
+  // Team (task 22).
   const escalation = createEscalationNode({ trace, audit: (e) => store.appendAudit(e) });
   const reporter = createReporterNode({
     llm, providerName: config.llmProvider, trace, clock, scenarios, assumptions,

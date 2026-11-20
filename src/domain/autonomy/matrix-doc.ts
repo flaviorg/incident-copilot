@@ -1,5 +1,5 @@
-// Gera docs/autonomy-matrix.md a partir do catálogo (spec 6.4 e 7.6). Puro. O teste docs-matrix compara o arquivo
-// versionado com esta saída, então a documentação não diverge do código.
+// Generates docs/autonomy-matrix.md from the catalog (spec 6.4 and 7.6). Pure. The docs-matrix test compares the
+// versioned file with this output, so the documentation does not drift from the code.
 import { ReadToolNameSchema } from "../../contracts/index.ts";
 import { EXECUTABLE_ACTIONS, EXECUTABLE_ACTION_TYPES, FORBIDDEN_ACTIONS, REASONS } from "./catalog.ts";
 

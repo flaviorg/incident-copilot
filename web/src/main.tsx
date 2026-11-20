@@ -1,4 +1,4 @@
-// Entrada da War Room (spec 10.2): monta o App em modo demo, que busca as gravações em ./demo/.
+// War Room entry point (spec 10.2): mounts the App in demo mode, which fetches the recordings from ./demo/.
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App.tsx";

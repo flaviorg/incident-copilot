@@ -1,4 +1,4 @@
-// Auditoria de inventário FinOps (spec 7.3): achados e economia mensal calculados por código, nunca pelo LLM. Puro.
+// FinOps inventory audit (spec 7.3): findings and monthly savings computed by code, never by the LLM. Pure.
 import type { Inventory } from "../../contracts/index.ts";
 
 export type CloudPrices = {
@@ -20,7 +20,7 @@ export type InventoryFinding = {
   recommendation: { actionType: "delete_volume" | "release_elastic_ip" | "resize_instance"; params: Record<string, unknown> };
 };
 
-/** CPU média de 14 dias até este valor indica instância ociosa. */
+/** 14-day average CPU up to this value indicates an idle instance. */
 export const IDLE_CPU_MAX_PCT = 10;
 
 export function roundUsd(x: number): number {
@@ -30,7 +30,7 @@ export function roundUsd(x: number): number {
 const usd = (x: number) => `US$ ${x.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })}`;
 const num = (x: number) => x.toLocaleString("en-US", { maximumFractionDigits: 1, useGrouping: false });
 
-/** Volume sem anexo, IP sem associação e instância com CPU baixa viram achados. Cofres de backup nunca viram achado. */
+/** Unattached volumes, unassociated IPs and low-CPU instances become findings. Backup vaults never become a finding. */
 export function auditInventory(inv: Inventory, prices: CloudPrices): { findings: InventoryFinding[]; totalMonthlySavingsUsd: number } {
   const findings: InventoryFinding[] = [];
 
@@ -87,7 +87,7 @@ export function auditInventory(inv: Inventory, prices: CloudPrices): { findings:
   return { findings, totalMonthlySavingsUsd };
 }
 
-/** Custo mensal projetado do inventário: volumes (GB x preço), IPs ociosos, instâncias (preço por hora x horas) e cofres. */
+/** Projected monthly cost of the inventory: volumes (GB x price), idle IPs, instances (hourly price x hours) and vaults. */
 export function projectedMonthlyCostUsd(inv: Inventory, prices: CloudPrices): number {
   const volumes = inv.volumes.reduce((acc, v) => acc + v.sizeGb * (prices.volumeGbMonthUsd[v.type] ?? 0), 0);
   const idleIps = inv.publicIps.filter((ip) => ip.associatedWith === null).length * prices.publicIpv4HourUsd * prices.hoursPerMonth;

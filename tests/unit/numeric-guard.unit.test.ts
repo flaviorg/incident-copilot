@@ -6,7 +6,7 @@ import type { TemplateInput } from "../../src/domain/report/postmortem-template.
 import { computeIncidentMetrics } from "../../src/domain/metrics/incident-metrics.ts";
 import type { IncidentMetrics, PostmortemDoc, SeriesPoint } from "../../src/contracts/index.ts";
 
-// Mesmas entradas do teste de métricas da Tarefa 11 (MTTR 11,1833 min, aprovação de 3 min).
+// Same inputs as the Task 11 metrics test (MTTR 11.1833 min, 3 min approval).
 function metrics(): IncidentMetrics {
   const series: SeriesPoint[] = [];
   const start = Date.parse("2026-10-04T09:30:00.000Z");
@@ -79,19 +79,19 @@ test("relative tolerance of 0.5%", () => {
 });
 test("scale equivalence (x100, /100) only for fractions and numbers written as percentages", () => {
   const i = templateInput();
-  // Contagens 3, 1 e 3 (ações, aprovações, evidências), linha de base 45 a 95 e MTTR 11,18: nenhum vira porcentagem.
+  // Counts 3, 1 and 3 (actions, approvals, evidence), baseline 45 to 95 and MTTR 11.18: none becomes a percentage.
   const allowed = collectAllowedNumbers({ metrics: i.metrics, timeline: [], evidence: i.diagnosis!.evidence, counts: [3, 1, 3], fractions: [0.0999] });
   for (const bad of ["300%", "100%", "0,03", "45%", "0,45", "0,95", "1.118%"]) assert.equal(checkNarrative(`value of ${bad} in the text`, allowed).passed, false, bad);
   const impact = `${String(Math.round(i.metrics.impactFraction * 1000) / 10).replace(".", ",")}%`;
   for (const ok of [impact, "9,99%", "0,0999", "9,9%", "0,099", "0,4%", "45 min", "3 actions", "11,2 min"]) assert.equal(checkNarrative(`value of ${ok} in the text`, allowed).passed, true, ok);
 });
 test("template narrative passes its own guard", () => {
-  const i = templateInput();   // métricas do teste da Tarefa 11
+  const i = templateInput();   // metrics from the Task 11 test
   const n = renderTemplateNarrative(i);
   const allowed = collectAllowedNumbers({ metrics: i.metrics, timeline: [], evidence: i.diagnosis!.evidence, counts: [i.actions.length] });
   assert.equal(checkNarrative([n.summary, n.rootCauseNarrative, ...n.prevention].join(" "), allowed).passed, true);
   assert.match(n.summary, /11\.2/);
-  assert.doesNotMatch(n.rootCauseNarrative, /20%/); // hipótese com número sem origem fica de fora do template
+  assert.doesNotMatch(n.rootCauseNarrative, /20%/); // a hypothesis with a number of unknown origin is left out of the template
 });
 test("markdown has the fixed sections and labels ROI as illustrative", () => {
   const md = renderPostmortemMarkdown(doc());

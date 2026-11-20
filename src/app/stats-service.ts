@@ -1,6 +1,6 @@
-// Agregações do /stats (spec 5.3; AC-33), todas em SQL sobre a janela pedida. Nada é agregado em memória: o código
-// só monta o objeto com zeros para as chaves ausentes. MTTR P50 e P95 por posto mais próximo (nearest-rank), só sobre
-// incidentes resolvidos; aprovação pendente vencida conta como expired por CASE, sem gravar nada.
+// Aggregations for /stats (spec 5.3; AC-33), all in SQL over the requested window. Nothing is aggregated in memory: the code
+// only builds the object with zeros for missing keys. MTTR P50 and P95 by nearest-rank, over resolved incidents only;
+// an overdue pending approval counts as expired via CASE, writing nothing.
 import type { DatabaseSync, StatementSync } from "node:sqlite";
 import { ActionStatusSchema, ApprovalStatusSchema, IncidentStatusSchema, StatsSchema } from "../contracts/index.ts";
 import type { Stats, StatsWindow } from "../contracts/index.ts";
@@ -9,8 +9,8 @@ import type { Clock } from "../infra/clock.ts";
 const STATS_WINDOW_SEC: Record<StatsWindow, number> = { "1h": 3600, "24h": 86_400, "7d": 604_800 };
 
 /**
- * Offset do percentil por posto mais próximo: ceil(p × n) − 1, mínimo 0. O épsilon evita que um produto como
- * 0,95 × 60 = 57,00000000000001 suba um posto por erro de ponto flutuante.
+ * Nearest-rank percentile offset: ceil(p × n) − 1, minimum 0. The epsilon keeps a product such as
+ * 0.95 × 60 = 57.00000000000001 from jumping a rank due to floating-point error.
  */
 export function nearestRankOffset(n: number, p: number): number {
   return Math.max(0, Math.ceil(p * n - 1e-9) - 1);
@@ -34,7 +34,7 @@ export class StatsService {
       mttrAt: p("SELECT mttr_min AS v FROM incidents WHERE status = 'resolved' AND mttr_min IS NOT NULL AND opened_at >= $since ORDER BY mttr_min LIMIT 1 OFFSET $offset"),
       actionsByTier: p("SELECT tier AS key, COUNT(*) AS n FROM actions WHERE created_at >= $since GROUP BY tier"),
       actionsByStatus: p("SELECT status AS key, COUNT(*) AS n FROM actions WHERE created_at >= $since GROUP BY status"),
-      // Mesma regra do effectiveStatus: vencida quando agora passou de expires_at.
+      // Same rule as effectiveStatus: overdue when now is past expires_at.
       approvalsByStatus: p(
         `SELECT CASE WHEN status = 'pending' AND expires_at < $now THEN 'expired' ELSE status END AS key, COUNT(*) AS n
          FROM approvals WHERE requested_at >= $since GROUP BY key`,

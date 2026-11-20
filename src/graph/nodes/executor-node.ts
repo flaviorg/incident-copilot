@@ -1,6 +1,6 @@
-// Executor (spec 4.6, 5.1 passo 11, 6.5 e 6.7; AC-14 e AC-19). Sem LLM: executa em ordem as ações prontas e aprovadas,
-// respeitando dependsOn, o circuit breaker e o limite de execuções; cada execução avança o relógio pela duração do
-// catálogo e é auditada. Sem nenhuma ação mitigadora executada, devolve escalonamento (a aresta seguinte desvia).
+// Executor (spec 4.6, 5.1 step 11, 6.5 and 6.7; AC-14 and AC-19). No LLM: runs the ready, approved actions in order,
+// respecting dependsOn, the circuit breaker and the execution limit; each execution advances the clock by the catalog
+// duration and is audited. With no mitigating action executed, returns an escalation (the next edge diverts).
 import type { EscalationReason, GatedAction } from "../../contracts/index.ts";
 import type { SimulatedInfra } from "../../infra/simulated-infra.ts";
 import type { ScenarioRepository } from "../../infra/scenarios/scenario-loader.ts";
@@ -16,7 +16,7 @@ import type { NodeFn } from "../run-context.ts";
 import { actionArgs } from "./gate-node.ts";
 import type { GatePersist } from "./gate-node.ts";
 
-/** Por processo (spec 6.7): estado em memória, compartilhado por todas as execuções do container. */
+/** Per process (spec 6.7): in-memory state, shared by all runs of the container. */
 export type ExecutionGuards = { breaker: CircuitBreaker; limiter: ActionRateLimiter };
 
 export type ExecutionDeps = {
@@ -28,7 +28,7 @@ export type ExecutionDeps = {
   persist: GatePersist;
 };
 
-/** Prioridade da tabela 4.5.1: circuit_open, throttled, mitigation_rejected (alguma rejeitada ou expirada), no_executable_actions. */
+/** Priority from table 4.5.1: circuit_open, throttled, mitigation_rejected (any rejected or expired), no_executable_actions. */
 export function executorEscalationReason(actions: GatedAction[]): EscalationReason {
   if (actions.some((a) => a.status === "blocked_circuit_open")) return "circuit_open";
   if (actions.some((a) => a.status === "throttled")) return "throttled";
@@ -131,7 +131,7 @@ export function createExecutorNode(d: ExecutionDeps): NodeFn {
         audit(a, "action_executed", { summary: r.result.summary });
       } else {
         a.status = "failed";
-        observe(a, false, `falhou (${r.result.summary})`);
+        observe(a, false, `failed (${r.result.summary})`);
         d.persist.action(a);
         audit(a, "action_failed", { summary: r.result.summary });
         const opened = d.guards.breaker.recordFailure(d.clock.now());

@@ -23,15 +23,15 @@ test("deploy: handoff sequence up to the gate, audited plan and a postmortem", a
   assert.equal(v.diagnosis!.category, "bad_deploy");
   assert.equal(v.runbookMatches[0]!.runbookId, "orders-5xx-after-deploy");
   assert.equal(v.traceCount, c.store.listTrace(v.incident.id).length);
-  // Roteiro até o portão, em ordem. O portão não chama o LLM; o que vem depois dele (aprovação, relatório) muda com as
-  // tarefas 27 a 30, então este teste não afirma o status final do caminho feliz.
+  // Script up to the gate, in order. The gate does not call the LLM; what comes after it (approval, report) changes with
+  // tasks 27 to 30, so this test does not assert the final status of the happy path.
   assert.deepEqual(c.fake.consumedIds(), ["sup-1", "tel-1", "tel-2", "tel-3", "tel-4", "sup-2", "sup-3", "plan-0", "aud-0", "sup-4"]);
-  // Uma linha em runs por invocação, com início, fim e desfecho.
+  // One row in runs per invocation, with start, end and outcome.
   const runs = c.store.listRuns(v.incident.id);
   assert.equal(runs.length, 1);
   assert.equal(runs[0]!.outcome, v.incident.status);
   assert.notEqual(runs[0]!.endedAt, null);
-  // O blackboard persistido é o último estado da invocação.
+  // The persisted blackboard is the last state of the invocation.
   const saved = c.store.loadBlackboard(v.incident.id);
   assert.equal(saved.version, 2);
   assert.equal(saved.blackboard.runId, runs[0]!.id);
@@ -78,7 +78,7 @@ test("recursion limit (5) escalates and keeps the last state", async () => {
   assert.equal(saved.runbookSearchDone, true);
   assert.equal(saved.postmortem!.status, "partial");
   assert.ok(c.store.listTrace(v.incident.id).length > 0);
-  // O escalonamento direto (fora do grafo) também grava answer do sistema e auditoria com o requestId.
+  // Direct escalation (outside the graph) also writes a system answer and an audit entry with the requestId.
   assert.equal(c.store.listTrace(v.incident.id, { type: "answer" }).filter((e) => e.payload.kind === "escalation").length, 1);
   const row = c.store.listAudit(v.incident.id).find((a) => a.event === "incident_escalated")!;
   assert.deepEqual([row.details.reason, row.details.requestId], ["recursion_limit", "req-rec"]);
@@ -146,13 +146,13 @@ test("every supervisor decision and specialist return has a handoff", async () =
 });
 
 test("incident status is derived and persisted; reads go through the service", async () => {
-  // Teto de equipe 3: escala antes do portão, então o desfecho não depende das tarefas 27 a 29.
+  // Team ceiling 3: escalates before the gate, so the outcome does not depend on tasks 27 to 29.
   const c = createTestContainer({ limits: { teamMaxIterations: 3 } });
   const v = await c.incidents.open({ scenarioId: "deploy-5xx-rollback", title: "5xx spike" }, { requestId: "req-1" });
   assert.equal(v.incident.status, "escalated");
   assert.equal(v.incident.escalation!.reason, "team_cap_reached");
   assert.equal(v.incident.title, "5xx spike");
-  // Texto para pessoas: motivo e detalhe numa frase só, pontuada.
+  // Text for people: reason and detail in a single punctuated sentence.
   const answer = c.store.listTrace(v.incident.id, { type: "answer" }).find((e) => e.payload.kind === "escalation")!;
   assert.equal(answer.payload.text, "Incident escalated to humans: team iteration cap reached (supervisor invoked 4 times; the team cap is 3).");
   assert.match(c.incidents.postmortem(v.incident.id).summary, /^Incident escalated to humans: team iteration cap reached \([^)]+\)\. This report is partial/);
@@ -167,13 +167,13 @@ test("incident status is derived and persisted; reads go through the service", a
   assert.equal(audit[0]!.details.requestId, "req-1");
   assert.throws(() => c.incidents.get("INC-9999"), (e) => e instanceof NotFoundError);
   assert.throws(() => c.incidents.trace("INC-9999"), (e) => e instanceof NotFoundError);
-  // Retomada só vale para um incidente na fase resume (marcada pelo ApprovalService na Tarefa 29).
+  // Resume only applies to an incident in the resume phase (set by the ApprovalService in Task 29).
   await assert.rejects(c.incidents.resume(v.incident.id, { requestId: null }), (e) => e instanceof ConflictError && e.code === "incident_not_accepting");
 });
 
 test("postmortem before the report is a conflict", () => {
   const c = createTestContainer();
-  // Incidente aberto sem execução do grafo: ainda sem relatório.
+  // Incident opened without a graph run: still no report.
   const { incident } = openIncidentRecord(
     { store: c.store, scenarios: c.scenarios, clock: c.clock, ids: c.ids, initialWorld: (s) => c.infra.initialWorld(s) },
     { scenarioId: "deploy-5xx-rollback" },

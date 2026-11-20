@@ -10,7 +10,7 @@ export const ApprovalSchema = z.object({
   expiresAt: z.string(),
   decidedAt: z.string().nullable(),
   approver: z.string().nullable(),
-  comment: z.string().nullable(), // comentário passa por redação
+  comment: z.string().nullable(), // the comment goes through redaction
   decisionSource: z.enum(["structured", "text", "expiry"]).nullable(),
   version: z.number().int().nonnegative(),
 });

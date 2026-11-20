@@ -1,4 +1,4 @@
-// Contraste dos pares de cor declarados (spec 8.2; AC-39): pelo menos 4,5:1 nos temas claro e escuro.
+// Contrast of the declared colour pairs (spec 8.2; AC-39): at least 4.5:1 in both light and dark themes.
 import { describe, expect, it } from "vitest";
 import css from "../styles/tokens.css?raw";
 import pairs from "../styles/contrast-pairs.json";

@@ -1,4 +1,4 @@
-// Regera docs/autonomy-matrix.md a partir do catálogo (spec 7.6). Sem prompt interativo; o diff do Git é a revisão.
+// Regenerates docs/autonomy-matrix.md from the catalog (spec 7.6). No interactive prompt; the Git diff is the review.
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname } from "node:path";
 import { renderAutonomyMatrix } from "../src/domain/autonomy/matrix-doc.ts";

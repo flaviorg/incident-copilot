@@ -1,5 +1,5 @@
-// Cliente MCP real contra o servidor stdio em processo filho (spec 5.4 e 8.1), com a rede bloqueada também no filho
-// e sem herdar o ambiente (só PATH, HOME e o que o teste passar). O stderr do filho fica disponível linha a linha.
+// Real MCP client against the stdio server in a child process (spec 5.4 and 8.1), with the network blocked in the child too
+// and without inheriting the environment (only PATH, HOME and whatever the test passes). The child's stderr is available line by line.
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { CHILD_NODE_ARGS, PROJECT_ROOT } from "./spawn.ts";

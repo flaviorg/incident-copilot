@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { PROJECT_ROOT, runCli } from "../helpers/spawn.ts";
 
 const FAKE_KEY = "sk-or-v1-" + "a".repeat(40);
-/** Caminho do post-mortem impresso pela demo, a partir da raiz do projeto. */
+/** Path of the post-mortem printed by the demo, from the project root. */
 const reportPath = (stdout: string) => {
   const m = /post-mortem: (\S+)/.exec(stdout);
   assert.ok(m, "the demo did not print the post-mortem path");

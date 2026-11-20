@@ -62,7 +62,7 @@ test("planner produces revision 0 and then revision 1 with the auditor feedback"
   const calls = c.fake.calls().filter((x) => x.prompt === "planner.v1");
   assert.deepEqual(calls.map((x) => x.matchKeys), [{ revision: 0 }, { revision: 1 }]);
   assert.match(calls[1]!.user, /missing snapshot before delete_volume/);
-  assert.match(calls[0]!.user, /rollback_deployment/); // o catálogo chega como texto
+  assert.match(calls[0]!.user, /rollback_deployment/); // the catalog arrives as text
   const plans = c.store.listTrace(s0.incidentId, { type: "plan" });
   assert.deepEqual(plans.map((e) => e.payload.revision), [0, 1]);
   assert.deepEqual(c.store.listTrace(s0.incidentId, { type: "handoff" }).map((e) => `${e.payload.from}>${e.payload.to}`), ["remediation_planner>auditor", "remediation_planner>auditor"]);

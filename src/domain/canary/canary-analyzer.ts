@@ -1,4 +1,4 @@
-// Canário (spec 6.7): checagens do cenário sobre a janela pós-ação. Puro. Sem dado, reprova (fail closed).
+// Canary (spec 6.7): scenario checks over the post-action window. Pure. With no data, it fails (fail closed).
 import type { CanaryCheck, CanaryCheckResult, MetricName } from "../../contracts/index.ts";
 
 export type SignalWindow = { metrics: Partial<Record<MetricName, number[]>> };

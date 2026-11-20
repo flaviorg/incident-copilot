@@ -1,5 +1,5 @@
-// Contraste WCAG 2.x entre duas cores hexadecimais e leitura de um token do tokens.css por tema (usado no teste de
-// contraste, spec 8.2). Sem cor literal aqui: as cores vêm do tokens.css.
+// WCAG 2.x contrast between two hex colours and reading a tokens.css token per theme (used by the contrast test,
+// spec 8.2). No literal colour here: colours come from tokens.css.
 
 function channel(c: number): number {
   const s = c / 255;
@@ -14,13 +14,13 @@ function parseHex(hex: string): [number, number, number] {
   return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
 }
 
-/** Luminância relativa (WCAG 2.x). */
+/** Relative luminance (WCAG 2.x). */
 export function relativeLuminance(hex: string): number {
   const [r, g, b] = parseHex(hex);
   return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
 }
 
-/** Razão de contraste (L1 + 0,05) / (L2 + 0,05), com L1 a mais clara; a ordem dos argumentos não importa. */
+/** Contrast ratio (L1 + 0.05) / (L2 + 0.05), with L1 the lighter; argument order does not matter. */
 export function contrastRatio(fgHex: string, bgHex: string): number {
   const [hi, lo] = [relativeLuminance(fgHex), relativeLuminance(bgHex)].sort((a, b) => b - a) as [number, number];
   return (hi + 0.05) / (lo + 0.05);
@@ -34,7 +34,7 @@ function find(block: string, name: string): string | null {
   return m ? m[1]! : null;
 }
 
-/** Valor hexadecimal de um token no tema pedido; o escuro herda do claro o que não redefine (semântica do CSS). */
+/** Hex value of a token in the requested theme; dark inherits from light whatever it does not redefine (CSS semantics). */
 export function tokenHex(css: string, theme: "light" | "dark", name: string): string {
   const at = css.indexOf(DARK_MARKER);
   const light = at === -1 ? css : css.slice(0, at);

@@ -60,6 +60,7 @@ Auditor rules (design section 4.7):
 | `release_requires_unassociated` | `release_elastic_ip` requires an unassociated IP |
 | `rollback_requires_recent_deploy` | `rollback_deployment` requires a deploy of the same service up to 60 min before the impact and `toVersion` equal to the version before it |
 | `depends_on_valid` | Every `dependsOn` points to an existing step with a lower order in the plan |
+| `unique_orders` | No two steps share an `order` (added after the November 2026 review: a repeated order made `dependsOn` ambiguous) |
 
 ## How to verify
 

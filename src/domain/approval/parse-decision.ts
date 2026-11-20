@@ -1,12 +1,12 @@
-// Decisão em texto livre (spec 6.5, AC-13): só a frase inteira igual a um termo das listas vale. O LLM nunca participa.
-// Qualquer outra coisa é ambígua e a borda responde 422 sem mudar estado. Puro.
+// Free-text decision (spec 6.5, AC-13): only a whole phrase equal to a term in the lists counts. The LLM never takes part.
+// Anything else is ambiguous and the edge answers 422 without changing state. Pure.
 
 export const APPROVE_TERMS: readonly string[] = ["aprovar", "aprovo", "aprovado", "sim", "approve", "yes"];
 export const REJECT_TERMS: readonly string[] = ["rejeitar", "rejeito", "rejeitado", "nao", "reject", "no"];
 
 const EDGE_PUNCTUATION = /^[\p{P}\s]+|[\p{P}\s]+$/gu;
 
-/** Sem acentos (NFD sem marcas combinantes), minúsculas, pontuação removida só nas pontas, espaços colapsados. */
+/** No accents (NFD without combining marks), lowercase, punctuation removed only at the ends, spaces collapsed. */
 export function normalizeDecisionText(t: string): string {
   return t
     .normalize("NFD")

@@ -1,4 +1,4 @@
-// Template determinístico do post-mortem (spec 5.2 e 6.1): narrativa sem LLM e Markdown com seções fixas. Puro.
+// Deterministic post-mortem template (spec 5.2 and 6.1): narrative without an LLM and Markdown with fixed sections. Pure.
 import type {
   ActionStatus, AgentId, Confidence, Diagnosis, EscalationReason, IncidentMetrics, PostmortemDoc, PostmortemNarrative, RootCauseCategory,
 } from "../../contracts/index.ts";
@@ -24,7 +24,7 @@ export const CATEGORY_LABELS: Record<RootCauseCategory, string> = {
   unknown: "unknown",
 };
 
-/** Nome de cada agente na interface (spec 4.6). */
+/** Name of each agent in the interface (spec 4.6). */
 export const AGENT_LABELS: Record<AgentId, string> = {
   supervisor: "supervisor",
   telemetry_analyst: "telemetry analyst",
@@ -95,8 +95,8 @@ const DEFAULT_PREVENTION = [
 const fmtFixed = (n: number, d: number) => new Intl.NumberFormat("en-US", { minimumFractionDigits: d, maximumFractionDigits: d, useGrouping: false }).format(n);
 
 /**
- * Inteiro sem casas; senão, a partir de `preferredDigits` casas (1, como na exibição), o mínimo que mantém o erro
- * relativo em até 0,4% (abaixo da tolerância do guarda numérico, 0,5%).
+ * Integer with no decimals; otherwise, starting at `preferredDigits` decimals (1, as displayed), the minimum that keeps the relative
+ * error within 0.4% (below the numeric guard's 0.5% tolerance).
  */
 export function formatForNarrative(n: number, preferredDigits = 1): string {
   if (Number.isInteger(n)) return fmtFixed(n, 0);
@@ -111,7 +111,7 @@ const usd = (n: number) => `US$ ${fmtFixed(n, 2)}`;
 const clock = (iso: string) => iso.slice(11, 19);
 const truncate = (text: string, max: number) => (text.length <= max ? text : text.slice(0, max - 1) + "…");
 
-/** Frase única para pessoas: motivo do escalonamento e, entre parênteses, o detalhe (que é um fragmento em minúsculas). */
+/** Single sentence for people: the escalation reason and, in parentheses, the detail (which is a lowercase fragment). */
 export function escalationSentence(e: { reason: EscalationReason; detail: string }): string {
   const detail = e.detail.trim().replace(/[.;:,\s]+$/, "");
   return `Incident escalated to humans: ${ESCALATION_LABELS[e.reason]}${detail ? ` (${detail})` : ""}.`;
@@ -151,7 +151,7 @@ export function renderTemplateNarrative(i: TemplateInput): PostmortemNarrative {
   } else {
     const d = i.diagnosis;
     root = `Cause classified as ${CATEGORY_LABELS[d.category]} (${CONFIDENCE_LABELS[d.confidence]} confidence).`;
-    // A hipótese vem do modelo: só entra se todos os números dela tiverem origem.
+    // The hypothesis comes from the model: it only goes in if all its numbers have a source.
     if (checkNarrative(d.hypothesis, allowed).passed) root += ` Hypothesis: ${d.hypothesis.trim().replace(/[.;:]?$/, ".")}`;
     if (evidence.length > 0) root += ` Evidence: ${evidence.map((e) => e.summary).join("; ")}.`;
   }
@@ -165,7 +165,7 @@ const rangeMin = (r: { low: number; high: number } | null) => (r === null ? "not
 const rangeUsd = (r: { low: number; high: number }) => `${usd(r.low)} to ${usd(r.high)}`;
 const cell = (s: string) => s.replace(/\|/g, "\\|").replace(/\n/g, " ");
 
-/** "fake/scripted (postmortem.v1)" ou "openrouter · anthropic/x (postmortem.v1)": o provedor só aparece se o modelo não o traz. */
+/** "fake/scripted (postmortem.v1)" or "openrouter · anthropic/x (postmortem.v1)": the provider only appears if the model does not carry it. */
 function narrativeSource(g: PostmortemDoc["generatedBy"]): string {
   if (g.model === "template") return "deterministic template";
   const model = g.model.startsWith(`${g.provider}/`) ? g.model : `${g.provider} · ${g.model}`;

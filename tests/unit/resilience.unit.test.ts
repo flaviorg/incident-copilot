@@ -80,7 +80,7 @@ test("withTimeout turns a hanging attempt into timeout and a parent abort into a
   const parent = new AbortController();
   setTimeout(() => parent.abort(), 10);
   assert.equal(kindOf(await withTimeout(hanging, 1000, parent.signal)), "aborted");
-  // Um attempt que respeita o sinal e devolve "aborted" vira "timeout" quando quem abortou foi o próprio timer.
+  // An attempt that honors the signal and returns "aborted" becomes "timeout" when the timer itself aborted.
   const polite = (signal: AbortSignal) =>
     new Promise<LlmResult<{ ok: boolean }>>((resolve) => signal.addEventListener("abort", () => resolve(llmFailure("aborted", "x"))));
   assert.equal(kindOf(await withTimeout(polite, 20, new AbortController().signal)), "timeout");
@@ -129,7 +129,7 @@ test("createLlmProvider builds without network", () => {
 test("withCallRecording stores successes and failures and ticks 20 s", async () => {
   const rows: LlmCallRecord[] = [];
   const clock = new SimulatedClock(new Date("2026-10-04T09:42:30.000Z"));
-  const p = withCallRecording(stub(["ok", "server_error"]), { store: { recordLlmCall: (c) => void rows.push(c) }, clock, tickSec: 20 });
+  const p = withCallRecording(stub(["ok", "server_error"]), { store: { recordLlmCall: (c) => void rows.push(c as LlmCallRecord) }, clock, tickSec: 20 });
   assert.ok((await p.generate(prompt, {}, ctx)).success);
   assert.equal(kindOf(await p.generate(prompt, {}, ctx)), "server_error");
   assert.equal(clock.now().toISOString(), "2026-10-04T09:43:10.000Z");
@@ -162,4 +162,92 @@ test("an OpenRouter container with an unpriced model logs a loud llm_price_missi
   } finally {
     c.close();
   }
+});
+
+// ---------- Review 2026-11: LLM and resilience findings ----------
+
+test("a buildUser defect in OpenRouterProvider throws instead of posing as a provider outage", async () => {
+  const broken = { ...prompt, buildUser: () => { throw new z.ZodError([]); } };
+  let invoked = 0;
+  const p = new OpenRouterProvider({ apiKey: "k", model: "m", baseUrl: "u", prices, chatFactory: () => ({ async invoke() { invoked++; return { raw: {}, parsed: { ok: true } }; } }) });
+  await assert.rejects(() => p.generate(broken, {}, ctx), z.ZodError);
+  assert.equal(invoked, 0);
+});
+
+test("4xx other than 408/429 is not retried; 401/402/403 also skip the fallback", async () => {
+  for (const status of [400, 404]) {
+    const p = withChat({ throws: { status } });
+    const r = await p.generate(prompt, {}, ctx);
+    assert.ok(!r.success && r.error.retryable === false, `HTTP ${status}`);
+    assert.notEqual(r.success ? null : r.error.fallbackUseful, false, `HTTP ${status} may still try the fallback`);
+  }
+  for (const status of [401, 402, 403]) {
+    const r = await withChat({ throws: { status } }).generate(prompt, {}, ctx);
+    assert.ok(!r.success && r.error.retryable === false && r.error.fallbackUseful === false, `HTTP ${status}`);
+  }
+  for (const status of [408, 429, 503]) {
+    const r = await withChat({ throws: { status } }).generate(prompt, {}, ctx);
+    assert.ok(!r.success && r.error.retryable !== false, `HTTP ${status} is retryable`);
+  }
+  // resilient honours the flags
+  let primaryCalls = 0; let fallbackCalls = 0;
+  const failing = (status: number, onCall: () => void) => new OpenRouterProvider({
+    apiKey: "k", model: "m", baseUrl: "u", prices, chatFactory: () => ({ async invoke() { onCall(); throw { status }; } }),
+  });
+  await resilient(failing(401, () => primaryCalls++), { ...opts, fallback: failing(401, () => fallbackCalls++) }).generate(prompt, {}, ctx);
+  assert.deepEqual([primaryCalls, fallbackCalls], [1, 0]);
+  primaryCalls = 0; fallbackCalls = 0;
+  await resilient(failing(404, () => primaryCalls++), { ...opts, fallback: failing(404, () => fallbackCalls++) }).generate(prompt, {}, ctx);
+  assert.deepEqual([primaryCalls, fallbackCalls], [1, 1]);
+});
+
+test("retry waits with exponential backoff and honours Retry-After", async () => {
+  const waits: number[] = [];
+  const sleep = async (ms: number) => void waits.push(ms);
+  await resilient(stub(["server_error", "server_error"]), { ...opts, backoffMs: 100, sleep, random: () => 0 }).generate(prompt, {}, ctx);
+  assert.deepEqual(waits, [100]);
+  waits.length = 0;
+  const limited = {
+    name: "openrouter" as const,
+    async generate<I, O>(): Promise<LlmResult<O>> { return llmFailure("rate_limit", "429", "m", { retryAfterMs: 2500 }); },
+  };
+  await resilient(limited, { ...opts, backoffMs: 100, sleep, random: () => 0 }).generate(prompt, {}, ctx);
+  assert.deepEqual(waits, [2500]);
+  waits.length = 0;
+  await resilient(stub(["server_error", "ok"]), { ...opts, sleep }).generate(prompt, {}, ctx);
+  assert.deepEqual(waits, [], "no backoff configured means no wait");
+});
+
+test("usage of failed attempts is summed into the logical call and recorded with attempts and fallback", async () => {
+  const usage = { promptTokens: 10, completionTokens: 4, costUsd: 0.5 };
+  const invalidTwice = {
+    name: "openrouter" as const,
+    async generate<I, O>(): Promise<LlmResult<O>> { return llmFailure("invalid_output", "bad", "primary", { usage }); },
+  };
+  const rows: LlmCallRecord[] = [];
+  const clock = new SimulatedClock(new Date("2026-10-04T09:00:00Z"));
+  const p = withCallRecording(resilient(invalidTwice, { ...opts, fallback: stub(["ok"], "fallback-model") }), { store: { recordLlmCall: (c) => void rows.push(c as LlmCallRecord) }, clock, tickSec: 20 });
+  const r = await p.generate(prompt, {}, ctx);
+  assert.ok(r.success && r.model === "fallback-model");
+  assert.deepEqual([rows[0]!.promptTokens, rows[0]!.completionTokens, rows[0]!.costUsd], [23, 10, 1]);
+  assert.equal(rows[0]!.attempts, 3);
+  assert.equal(rows[0]!.usedFallback, true);
+  assert.equal(rows[0]!.model, "fallback-model");
+});
+
+test("OpenRouterProvider keeps the usage of an invalid output and estimates a missing usage", async () => {
+  const bad = await withChat({ parsed: { ok: "x" }, usage: { input_tokens: 7, output_tokens: 3 } }).generate(prompt, {}, ctx);
+  assert.ok(!bad.success);
+  assert.deepEqual([bad.usage?.promptTokens, bad.usage?.completionTokens], [7, 3]);
+  const noUsage = await withChat({ parsed: { ok: true } }).generate(prompt, {}, ctx);
+  assert.ok(noUsage.success);
+  assert.ok(noUsage.usage.promptTokens > 0 && noUsage.usage.completionTokens > 0);
+  assert.equal(noUsage.usage.estimated, true);
+});
+
+test("a timeout records which model timed out", async () => {
+  const hanging = new OpenRouterProvider({ apiKey: "k", model: "vendor/slow", baseUrl: "u", prices, chatFactory: () => ({ invoke: () => new Promise(() => {}) }) });
+  const r = await resilient(hanging, { ...opts, attempts: 2, timeoutMs: 10 }).generate(prompt, {}, ctx);
+  assert.ok(!r.success && r.error.kind === "timeout");
+  assert.equal(r.model, "vendor/slow");
 });

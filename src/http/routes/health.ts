@@ -1,4 +1,4 @@
-// GET /health (spec 5.3): provedor ativo e versão; nenhum erro previsto.
+// GET /health (spec 5.3): active provider and version; no errors expected.
 import type { FastifyInstance } from "fastify";
 import type { Container } from "../../app/container.ts";
 import { APP_VERSION } from "../../infra/app-info.ts";

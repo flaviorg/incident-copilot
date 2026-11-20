@@ -1,5 +1,5 @@
-// Foco preso no diálogo (spec 10.2; AC-39): ao ativar, o foco entra no primeiro controle; Tab e Shift+Tab circulam
-// dentro do contêiner; foco que escapa volta; Escape chama onEscape; ao desativar, o foco volta para quem abriu.
+// Focus trapped in the dialog (spec 10.2; AC-39): on activation, focus enters the first control; Tab and Shift+Tab cycle
+// inside the container; focus that escapes is brought back; Escape calls onEscape; on deactivation, focus returns to the opener.
 import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
 

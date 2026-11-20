@@ -1,4 +1,4 @@
-// Logger JSON, uma linha por evento, em stderr, sempre redigido (spec 6.9).
+// JSON logger, one line per event, on stderr, always redacted (spec 6.9).
 import type { Config } from "../config.ts";
 import { redactSecrets } from "./redact.ts";
 

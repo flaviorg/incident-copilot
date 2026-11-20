@@ -39,7 +39,7 @@ test("half-open failure reopens", () => {
   assert.equal(b.state(t(321)), "open");
   assert.equal(b.canExecute(t(619)), false);
   assert.equal(b.state(t(620)), "half_open");
-  // Falha registrada com o breaker já aberto não reabre nem conta como nova abertura.
+  // A failure recorded with the breaker already open does not reopen it nor count as a new opening.
   const c = new CircuitBreaker({ failureThreshold: 1, cooldownSec: 300 });
   assert.equal(c.recordFailure(t(0)), true);
   assert.equal(c.recordFailure(t(10)), false);
@@ -66,7 +66,7 @@ test("rate limiter: 5 per minute globally and 1 per action and target in 10 min"
   for (let i = 0; i < 5; i++) assert.equal(l.tryAcquire("a", `t${i}`, t(i)).ok, true);
   assert.deepEqual(l.tryAcquire("a", "t9", t(10)), { ok: false, reason: "global" });
   assert.deepEqual(l.tryAcquire("a", "t0", t(70)), { ok: false, reason: "repeat" });
-  assert.equal(l.tryAcquire("b", "t0", t(70)).ok, true); // outra ação no mesmo alvo
+  assert.equal(l.tryAcquire("b", "t0", t(70)).ok, true); // another action on the same target
   assert.equal(l.tryAcquire("a", "t0", t(601)).ok, true);
 });
 
@@ -77,7 +77,7 @@ test("token attempts: 5 failures in 10 min lock for 10 min", () => {
   k.recordFailure(t(240));
   assert.equal(k.isLocked(t(300)), true);
   assert.equal(k.isLocked(t(240 + 601)), false);
-  // Falhas espalhadas além da janela de 10 min não bloqueiam.
+  // Failures spread beyond the 10 min window do not block.
   const spread = new TokenAttemptLimiter({ maxFailures: 3, windowMin: 10, lockMin: 10 });
   spread.recordFailure(t(0));
   spread.recordFailure(t(300));

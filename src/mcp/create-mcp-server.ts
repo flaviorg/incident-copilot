@@ -1,5 +1,5 @@
-// Servidor MCP "incident-copilot" (spec 5.4) sobre o mesmo container da API (mesmo DB_PATH). Três tools: duas de
-// leitura e uma de proposta que nunca aprova nem executa.
+// "incident-copilot" MCP server (spec 5.4) over the same container as the API (same DB_PATH). Three tools: two read
+// tools and one proposal tool that never approves or executes.
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Container } from "../app/container.ts";
 import { APP_VERSION } from "../infra/app-info.ts";

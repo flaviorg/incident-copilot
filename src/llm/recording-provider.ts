@@ -1,5 +1,5 @@
-// Registro de chamadas (spec 6.9): cada chamada lógica de LLM vira linha em llm_calls, com sucesso ou tipo de erro,
-// e avança o relógio simulado (spec 7.5: 20 s por chamada). Erro de fixture não é chamada de modelo: sobe sem registro.
+// Call recording (spec 6.9): each logical LLM call becomes a row in llm_calls, with success or the error type,
+// and advances the simulated clock (spec 7.5: 20 s per call). A fixture error is not a model call: it propagates unrecorded.
 import type { SqliteIncidentStore } from "../infra/db/incident-store.ts";
 import type { Clock } from "../infra/clock.ts";
 import type { LlmProvider, LlmResult, PromptDef, RunContext } from "./provider.ts";
@@ -21,12 +21,16 @@ export function withCallRecording(
         runId: ctx.runId,
         promptVersion: prompt.version,
         model: r.success ? r.model : (r.model ?? p.name),
-        promptTokens: r.success ? r.usage.promptTokens : 0,
-        completionTokens: r.success ? r.usage.completionTokens : 0,
-        costUsd: r.success ? r.usage.costUsd : 0,
+        // A failure may still carry billed usage (invalid outputs, summed by `resilient`).
+        promptTokens: r.usage?.promptTokens ?? 0,
+        completionTokens: r.usage?.completionTokens ?? 0,
+        costUsd: r.usage?.costUsd ?? 0,
         latencyMs: r.success ? r.latencyMs : Math.max(0, Date.now() - started),
         success: r.success,
         errorKind: r.success ? null : r.error.kind,
+        attempts: r.attempts ?? 1,
+        usedFallback: r.usedFallback ?? false,
+        usageEstimated: r.usage?.estimated === true,
         ts: d.clock.now().toISOString(),
       });
       return r;

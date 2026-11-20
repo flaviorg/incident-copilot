@@ -1,5 +1,5 @@
-// Mundo inicial a partir do cenário: deployments com o histórico de versões e o inventário (uma cópia viva e uma
-// congelada). Usado só por SimulatedInfra.initialWorld.
+// Initial world from the scenario: deployments with the version history and the inventory (one live copy and one
+// frozen copy). Used only by SimulatedInfra.initialWorld.
 import type { WorldState } from "../contracts/index.ts";
 import type { LoadedScenario } from "./scenarios/scenario-loader.ts";
 

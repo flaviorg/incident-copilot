@@ -1,6 +1,6 @@
-// Relator (spec 4.6, 5.7 e 6.1): números por funções puras; o LLM só redige a narrativa de incidente resolvido e um guarda
-// numérico descarta texto com número sem origem (AC-23). Incidente escalado recebe relatório parcial pelo template, sem LLM.
-// O relator nunca roteia para escalonamento: falha do LLM vira template.
+// Reporter (spec 4.6, 5.7 and 6.1): numbers from pure functions; the LLM only writes the narrative of a resolved incident and a
+// numeric guard discards text with a number of unknown origin (AC-23). An escalated incident gets a partial report from the template, no LLM.
+// The reporter never routes to escalation: an LLM failure falls back to the template.
 import type {
   Approval, Blackboard, GatedAction, IncidentMetrics, LlmCallRecord, PostmortemDoc, PostmortemNarrative, TraceEvent,
 } from "../../contracts/index.ts";
@@ -43,13 +43,13 @@ const TEMPLATE = "template";
 const APPROVAL_STATUS_LABELS: Record<Approval["status"], string> = { pending: "pending", approved: "approved", rejected: "rejected", expired: "expired" };
 const VERDICT_LABELS: Record<string, string> = { approve: "approved", revise: "asks for revision", reject: "rejected", coerced: "choice corrected", blocked: "blocked" };
 
-/** resolvedAt = horário do último canário saudável no trace; sem ele, agora. */
+/** resolvedAt = time of the last healthy canary in the trace; without it, now. */
 function resolvedAtOf(events: TraceEvent[], now: Date): string {
   const canary = events.filter((e) => e.type === "critique" && e.payload.by === "canary" && e.payload.verdict === "approve").at(-1);
   return canary?.ts ?? now.toISOString();
 }
 
-/** Linha do tempo determinística: só texto gerado por código (sem brief do LLM), a partir do trace e das aprovações. */
+/** Deterministic timeline: only code-generated text (no LLM brief), from the trace and the approvals. */
 function buildTimeline(bb: Blackboard, events: TraceEvent[], approvals: Approval[], impactStartedAt: string): { ts: string; text: string }[] {
   const items: { ts: string; text: string }[] = [
     { ts: impactStartedAt, text: "impact start: first sample above the alert threshold" },
@@ -121,7 +121,7 @@ export function createReporterNode(d: ReporterDeps): NodeFn {
       llmCalls: d.read.llmCalls(state.incidentId),
       assumptions: d.assumptions,
     };
-    // Métricas para os fatos da narrativa e o guarda numérico; as de LLM são recalculadas depois da chamada do post-mortem.
+    // Metrics for the narrative facts and the numeric guard; the LLM ones are recalculated after the post-mortem call.
     let metrics = computeIncidentMetrics(metricsInput);
     const timeline = buildTimeline(state, events, approvals, metrics.impactStartedAt);
     const peak = peakErrorRate(scenario, metrics.impactStartedAt, resolvedAt ?? now.toISOString());
@@ -177,7 +177,7 @@ export function createReporterNode(d: ReporterDeps): NodeFn {
       }
     }
 
-    // Chamadas, tokens e custo de LLM (medidos) contam também a chamada da narrativa; os demais valores não mudam.
+    // LLM calls, tokens and cost (measured) also count the narrative call; the other values do not change.
     if (resolved && state.diagnosis !== null) metrics = computeIncidentMetrics({ ...metricsInput, llmCalls: d.read.llmCalls(state.incidentId) });
 
     const postmortem: PostmortemDoc = {
@@ -186,7 +186,7 @@ export function createReporterNode(d: ReporterDeps): NodeFn {
       status,
       summary: narrative.summary,
       impact: {
-        service: state.alert.service ?? state.alert.account ?? "desconhecido",
+        service: state.alert.service ?? state.alert.account ?? "unknown",
         durationMin: metrics.mttrMin,
         peakErrorRate: peak,
         monthlySavingsUsd: metrics.monthlySavingsUsd,

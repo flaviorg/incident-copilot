@@ -1,12 +1,13 @@
-// Entrypoint da API (spec 5.3 e 8.4): lê a config, compõe o container e escuta em HOST:PORT (padrão 127.0.0.1:3000).
-// Config inválida sai com código 1 e uma linha JSON em stderr, sem ecoar valores.
-import { ConfigError, loadConfig } from "./config.ts";
+// API entry point (spec 5.3 and 8.4): reads the config, builds the container and listens on HOST:PORT (default 127.0.0.1:3000).
+// An invalid config exits with code 1 and one JSON line on stderr, without echoing values.
+import { assertApiExposureSafe, ConfigError, loadConfig } from "./config.ts";
 import { createContainer } from "./app/container.ts";
 import { buildServer } from "./http/server.ts";
 
 let config;
 try {
   config = loadConfig(process.env);
+  assertApiExposureSafe(config);
 } catch (e) {
   if (!(e instanceof ConfigError)) throw e;
   process.stderr.write(JSON.stringify({ ts: new Date().toISOString(), level: "error", msg: e.message, variables: e.variables }) + "\n");

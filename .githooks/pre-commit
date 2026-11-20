@@ -1,7 +1,7 @@
 #!/bin/sh
-# Pre-commit do incident-copilot (spec 6.6 e AC-41): typecheck, testes unitários e varredura de segredos.
-# Instale só depois de a pasta ter Git próprio: npm run setup:hooks (muda core.hooksPath do repositório).
-# Os testes de ponta a ponta rodam no CI e em npm run verify, para o hook continuar rápido.
+# incident-copilot pre-commit (spec 6.6 and AC-41): typecheck, unit tests and secret scan.
+# Install it only once the folder has its own Git repository: npm run setup:hooks (sets the repository's core.hooksPath).
+# End-to-end tests run in CI and in npm run verify, so the hook stays fast.
 set -e
 cd "$(dirname "$0")/.."
 npm run --silent typecheck

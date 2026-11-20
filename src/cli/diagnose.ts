@@ -1,5 +1,5 @@
-// `diagnose --scenario <id>`: só o analista de telemetria (fake por padrão), com relógio simulado e banco em memória.
-// Imprime o trace do ReAct (pensamento, ação, observação) e o diagnóstico.
+// `diagnose --scenario <id>`: only the telemetry analyst (fake by default), with a simulated clock and an in-memory database.
+// Prints the ReAct trace (thought, action, observation) and the diagnosis.
 import { parseArgs } from "node:util";
 import { loadConfig } from "../config.ts";
 import { createContainer } from "../app/container.ts";

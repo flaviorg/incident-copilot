@@ -1,4 +1,4 @@
-// check:tokens (spec 4.8 e 10.2): cor literal fora de web/src/styles/tokens.css é erro.
+// check:tokens (spec 4.8 e 10.2): a literal color outside web/src/styles/tokens.css is an error.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { findColorLiterals, scanTokens } from "../../scripts/check-tokens.ts";

@@ -1,6 +1,6 @@
-// Abertura do registro de um incidente (spec 5.1, passo 1 e 7.5): alinha o relógio ao alerta, calcula o deslocamento,
-// grava incidente, blackboard inicial (phase "new") e auditoria incident_opened numa transação. Não executa o grafo.
-// Usado pelo IncidentService.open, pela CLI `diagnose` e pelos testes de nós isolados.
+// Opening an incident record (spec 5.1, step 1 and 7.5): aligns the clock to the alert, computes the offset,
+// writes the incident, initial blackboard (phase "new") and incident_opened audit in one transaction. Does not run the graph.
+// Used by IncidentService.open, the `diagnose` CLI and isolated node tests.
 import type { Blackboard, Incident, WorldState } from "../contracts/index.ts";
 import type { SqliteIncidentStore } from "../infra/db/incident-store.ts";
 import type { ScenarioRepository, LoadedScenario } from "../infra/scenarios/scenario-loader.ts";
@@ -20,7 +20,7 @@ function initialBlackboardFor(incidentId: string, scenario: LoadedScenario, worl
   return {
     incidentId,
     scenarioId: scenario.id,
-    runId: "", // cada invocação do grafo recebe o seu (IncidentService.run)
+    runId: "", // each graph invocation gets its own (IncidentService.run)
     phase: "new",
     timeOffsetSec: scenario.offsetSec,
     alert: scenario.alert,
@@ -46,7 +46,7 @@ export function openIncidentRecord(
   i: { scenarioId: string; title?: string },
   ctx: { requestId: string | null },
 ): { incident: Incident; blackboard: Blackboard; version: number } {
-  const base = d.scenarios.get(i.scenarioId); // NotFoundError("scenario_not_found") se não existir
+  const base = d.scenarios.get(i.scenarioId); // NotFoundError("scenario_not_found") if it does not exist
   const detected = new Date(base.alert.detectedAt);
   const aligned = d.clock.alignTo(detected);
   const offsetSec = Math.round((aligned.getTime() - detected.getTime()) / 1000);

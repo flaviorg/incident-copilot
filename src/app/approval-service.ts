@@ -1,7 +1,7 @@
-// Decisões humanas sobre aprovações (spec 5.1 passo 10, 6.5 e 6.6; AC-13 a AC-18). O token é comparado em tempo
-// constante e nunca ecoado; o texto livre só vale se for exatamente um termo das listas; o LLM nunca decide.
-// Sem pendências restantes, a última decisão dispara a retomada pelo executor. A retomada que escala (inclusive por
-// LLM indisponível ou timeout) devolve a view escalada: decide não lança nesse caso.
+// Human decisions on approvals (spec 5.1 step 10, 6.5 and 6.6; AC-13 to AC-18). The token is compared in constant
+// time and never echoed; free text only counts if it is exactly one term from the lists; the LLM never decides.
+// With no pending approvals left, the last decision triggers the resume by the executor. A resume that escalates (including due to
+// LLM unavailable or timeout) returns the escalated view: decide does not throw in that case.
 import { DecisionBodySchema } from "../contracts/index.ts";
 import type { Approval, ApprovalStatus, DecisionBody, IncidentView } from "../contracts/index.ts";
 import type { SqliteIncidentStore } from "../infra/db/incident-store.ts";
@@ -38,8 +38,8 @@ export class ApprovalService {
   }
 
   /**
-   * Ordem do spec 6.5: corpo, token configurado, bloqueio, token, texto ambíguo, aprovação existe, expiração,
-   * pendente, transição. Expirada: materializa a expiração do incidente, retoma se não restar pendência e responde
+   * Order from spec 6.5: body, configured token, lockout, token, ambiguous text, approval exists, expiry,
+   * pending, transition. Expired: materializes the incident's expiry, resumes if no pending remain and responds
    * approval_expired.
    */
   async decide(approvalId: string, body: DecisionBody, token: string | undefined, ctx: RunCtx): Promise<{ approval: Approval; incident: IncidentView }> {
@@ -113,7 +113,7 @@ export class ApprovalService {
     return { approval: { ...stored, status: effectiveStatus(stored, clock.now()) }, incident };
   }
 
-  /** Aprovações com o status efetivo pedido (vencida aparece como expired); não grava nada. */
+  /** Approvals with the requested effective status (overdue shows as expired); writes nothing. */
   list(status: ApprovalStatus): Approval[] {
     const now = this.d.clock.now();
     return this.d.store
@@ -122,7 +122,7 @@ export class ApprovalService {
       .filter((a) => a.status === status);
   }
 
-  /** Retoma só se a decisão deixou o incidente na fase resume. */
+  /** Resumes only if the decision left the incident in phase resume. */
   private async resumeIfReady(incidentId: string, ctx: RunCtx): Promise<IncidentView | null> {
     if (this.d.store.loadBlackboard(incidentId).blackboard.phase !== "resume") return null;
     return this.d.incidents.resume(incidentId, ctx);

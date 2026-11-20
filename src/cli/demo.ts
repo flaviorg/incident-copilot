@@ -1,6 +1,6 @@
-// `demo [--scenario <id>] [--reject] [--persist] [--json] [--live]` (spec 5.5 e 10.3; AC-38): roda o cenário inteiro com
-// relógio simulado e banco em memória (ou DB_PATH com --persist). O operador demo decide cada aprovação pendente
-// com um token efêmero gerado no processo e nunca impresso. Força o provedor fake; --live exige o OpenRouter configurado.
+// `demo [--scenario <id>] [--reject] [--persist] [--json] [--live]` (spec 5.5 and 10.3; AC-38): runs the whole scenario with a
+// simulated clock and an in-memory database (or DB_PATH with --persist). The demo operator decides every pending approval
+// with an ephemeral token generated in-process and never printed. Forces the fake provider; --live requires a configured OpenRouter.
 import { randomBytes } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
@@ -26,13 +26,13 @@ const time = (iso: string) => iso.slice(11, 19);
 
 async function runDemo(o: DemoOptions, io: { out: (line: string) => void; env: Record<string, string | undefined> }): Promise<number> {
   const dbPath = o.persist ? (io.env.DB_PATH ?? projectPath("data", "incident-copilot.db")) : ":memory:";
-  // Logs JSON (stderr) só a partir de warn, salvo LOG_LEVEL no ambiente: a saída da demo é o roteiro em pt-BR.
+  // JSON logs (stderr) only from warn up, unless LOG_LEVEL is set in the environment: the demo output is the human-readable script on stdout.
   const loaded = loadConfig({ ...io.env, CLOCK: "simulated", DB_PATH: dbPath, LOG_LEVEL: io.env.LOG_LEVEL ?? "warn" }, { forceFake: !o.live });
-  // --live sem OpenRouter configurado falha em vez de cair no fake em silêncio (quem esqueceu o .env não acha que rodou o modelo).
+  // --live without OpenRouter configured fails instead of silently falling back to the fake (so nobody who forgot the .env thinks the model ran).
   if (o.live && loaded.llmProvider !== "openrouter") {
     throw new UsageError("--live requires OPENROUTER_API_KEY and OPENROUTER_MODEL in the environment or in .env (and LLM_PROVIDER empty or openrouter)");
   }
-  // Token efêmero quando o ambiente não define um; vai para a redação junto com os demais segredos.
+  // Ephemeral token when the environment does not define one; it goes to redaction along with the other secrets.
   const config = { ...loaded, approvalToken: loaded.approvalToken ?? randomBytes(24).toString("base64url") };
   const token = config.approvalToken;
   const c = createContainer(config);
@@ -50,7 +50,7 @@ async function runDemo(o: DemoOptions, io: { out: (line: string) => void; env: R
     try {
       view = await c.incidents.open({ scenarioId: scenario.id }, { requestId: null });
     } catch (e) {
-      // O incidente já foi gravado escalado (llm_unavailable ou timeout); a demo mostra o desfecho.
+      // The incident was already recorded as escalated (llm_unavailable or timeout); the demo shows the outcome.
       if (!(e instanceof LlmUnavailableError || e instanceof RunTimeoutError)) throw e;
       view = c.incidents.get(c.incidents.list({ limit: 1 })[0]!.id);
     }

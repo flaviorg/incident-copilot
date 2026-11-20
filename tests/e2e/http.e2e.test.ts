@@ -1,4 +1,4 @@
-// API HTTP via app.inject, sem abrir porta (spec 4.4, 5.3 e 6.9; AC-01, AC-16, AC-18, AC-30, AC-32, AC-33).
+// HTTP API through app.inject, without opening a port (spec 4.4, 5.3 e 6.9; AC-01, AC-16, AC-18, AC-30, AC-32, AC-33).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildServer } from "../../src/http/server.ts";
@@ -46,7 +46,7 @@ test("unknown route uses the error envelope without stack", async () => {
   assert.ok(!JSON.stringify(b).includes("stack"));
 });
 
-// ---------- Tarefa 33: incidentes e aprovações ----------
+// ---------- Task 33: incidents and approvals ----------
 
 test("POST /incidents creates and stops awaiting approval", async () => {
   const r = await post(app(), "/incidents", { scenarioId: "deploy-5xx-rollback" });
@@ -67,7 +67,7 @@ test("400 with issues, 404 for unknown scenario", async () => {
   const nf = await post(a, "/incidents", { scenarioId: "nope" });
   assert.equal(nf.statusCode, 404);
   assert.equal(nf.json().error.code, "scenario_not_found");
-  // Revisão final: um id de 60 KB voltava inteiro na mensagem do 404.
+  // Final review: a 60 KB id came back whole in the 404 message.
   const huge = await post(a, "/incidents", { scenarioId: "x".repeat(60_000) });
   assert.deepEqual([huge.statusCode, huge.json().error.code, huge.json().error.issues[0].path], [400, "validation_error", "scenarioId"]);
   assert.ok(huge.body.length < 1_000, String(huge.body.length));
@@ -113,7 +113,7 @@ test("list, view, trace, audit and postmortem readiness", async () => {
   assert.equal((await get(a, "/incidents/INC-9999/postmortem")).statusCode, 404);
   assert.equal((await get(a, "/incidents/INC-0001/postmortem?format=xml")).statusCode, 400);
 
-  // Segundo incidente do mesmo cenário no mesmo processo, com X-Request-Id próprio.
+  // Second incident of the same scenario in the same process, with its own X-Request-Id.
   const second = await post(a, "/incidents", { scenarioId: "deploy-5xx-rollback" }, { "x-request-id": "req-1" });
   assert.equal(second.statusCode, 201);
   assert.equal(second.headers["x-request-id"], "req-1");
@@ -174,7 +174,7 @@ test("429 after five wrong tokens, 503 without APPROVAL_TOKEN, 409 approval_expi
   const b = buildServer(c);
   await post(b, "/incidents", { scenarioId: "deploy-5xx-rollback" });
   c.clock.tick(31 * 60);
-  // Leitura projeta a expiração sem gravar nada.
+  // A read projects the expiry without writing anything.
   assert.deepEqual((await get(b, "/approvals?status=expired")).json().map((x: { id: string }) => x.id), ["APR-0001"]);
   assert.equal((await get(b, "/incidents/INC-0001")).json().approvals[0].status, "expired");
   assert.equal(c.store.getApproval("APR-0001")!.status, "pending");
@@ -203,10 +203,10 @@ test("decision stays 200 when the resume escalates because the LLM is down", asy
   assert.equal(r.json().incident.incident.escalation.reason, "llm_unavailable");
 });
 
-// ---------- Tarefa 34: /stats ----------
+// ---------- Task 34: /stats ----------
 
 test("GET /stats after an approved, a rejected and an expired run", async () => {
-  // Fixture do deploy com o sup-1 da guard-coercion (pede o portão sem plano): a guarda coage em todo incidente.
+  // Deploy fixture with the guard-coercion sup-1 (asks for the gate without a plan): the guard coerces in every incident.
   const coerced = readFixture("tests/fixtures/llm/guard-coercion.json").turns.find((t) => t.id === "sup-1")!;
   const fx = patchFixture(readFixture("fixtures/llm/deploy-5xx-rollback.json"), { replace: { "sup-1": { output: coerced.output } } });
   const c = createTestContainer({ fixture: fx });
@@ -243,7 +243,7 @@ test("GET /stats after an approved, a rejected and an expired run", async () => 
 
 test("the audit trail returned by the API can be verified by the client (prevHash and hash)", async () => {
   const a = app();
-  // Dois incidentes intercalados no mesmo banco: cada trilha é uma cadeia própria, desde o gênese.
+  // Two interleaved incidents in the same database: each trail is its own chain, from genesis.
   await post(a, "/incidents", { scenarioId: "deploy-5xx-rollback" });
   await post(a, "/incidents", { scenarioId: "deploy-5xx-rollback" });
   await post(a, "/approvals/APR-0001/decision", { decision: "approve", approver: "ana" }, { "x-approval-token": TOKEN });
@@ -252,10 +252,119 @@ test("the audit trail returned by the API can be verified by the client (prevHas
     assert.ok(rows.length >= 4);
     assert.equal(rows[0]!.prevHash, "0".repeat(64));
     for (const [i, r] of rows.entries()) {
-      // incidentId vem da URL; o resto do corpo do hash vem da própria resposta.
+      // incidentId comes from the URL; the rest of the hashed body comes from the response itself.
       const body = { id: r.id, ts: r.ts, incidentId, actor: r.actor, event: r.event, tier: r.tier, details: r.details };
       assert.equal(r.hash, sha256Hex(r.prevHash + "\n" + canonicalJson(body)), r.id);
       if (i > 0) assert.equal(r.prevHash, rows[i - 1]!.hash, `${r.id} chains to the previous row of the same incident`);
     }
   }
+});
+
+// ---------- Review 2026-11: DNS rebinding, cross-site writes, run cap, escaped secrets ----------
+
+test("a foreign Host header gets 421; loopback names pass", async () => {
+  const a = app();
+  const bad = await get(a, "/health", { host: "evil.example:3000" });
+  assert.equal(bad.statusCode, 421);
+  assert.equal(bad.json().error.code, "host_not_allowed");
+  for (const host of ["localhost:3000", "127.0.0.1:3000", "[::1]:3000", "localhost"]) {
+    assert.equal((await get(a, "/health", { host })).statusCode, 200, host);
+  }
+  const extra = buildServer(createTestContainer({ env: { ALLOWED_HOSTS: "box.local:3000" } }));
+  assert.equal((await get(extra, "/health", { host: "box.local:3000" })).statusCode, 200);
+  assert.equal((await get(extra, "/health", { host: "box.local:9999" })).statusCode, 421);
+});
+
+test("a cross-site Origin on a write gets 403; same-host Origin and GETs pass", async () => {
+  const a = app();
+  const cross = await post(a, "/incidents", { scenarioId: "deploy-5xx-rollback" }, { origin: "https://evil.example" });
+  assert.equal(cross.statusCode, 403);
+  assert.equal(cross.json().error.code, "cross_origin_write");
+  assert.equal((await get(a, "/health", { origin: "https://evil.example" })).statusCode, 200);
+  const same = await post(a, "/incidents", { scenarioId: "deploy-5xx-rollback" }, { origin: "http://localhost:3000" });
+  assert.equal(same.statusCode, 201);
+});
+
+test("POST /incidents over MAX_CONCURRENT_RUNS gets 429", async () => {
+  const c = createTestContainer({ env: { MAX_CONCURRENT_RUNS: "1" } });
+  // Holds the first run open so the second request arrives while it is still running.
+  let release!: () => void;
+  const hold = new Promise<void>((r) => { release = r; });
+  const realOpen = c.incidents.open.bind(c.incidents);
+  let calls = 0;
+  c.incidents.open = async (...args: Parameters<typeof realOpen>) => {
+    if (++calls === 1) await hold;
+    return realOpen(...args);
+  };
+  const a = buildServer(c);
+  const first = post(a, "/incidents", { scenarioId: "deploy-5xx-rollback" });
+  await new Promise((r) => setTimeout(r, 20));
+  const limited = await post(a, "/incidents", { scenarioId: "cost-anomaly" });
+  assert.equal(limited.statusCode, 429);
+  assert.equal(limited.json().error.code, "too_many_runs");
+  release();
+  assert.equal((await first).statusCode, 201);
+  assert.equal((await post(a, "/incidents", { scenarioId: "cost-anomaly" })).statusCode, 201, "the slot is released");
+});
+
+test("an approval token with JSON-escaped characters is never echoed", async () => {
+  const token = 'Tok"en\\0123456789abc';
+  const c = createTestContainer({ approvalToken: token });
+  const a = buildServer(c);
+  a.get("/__echo", async () => ({ echo: token }));
+  const r = await get(a, "/__echo");
+  assert.ok(!r.body.includes(JSON.stringify(token).slice(1, -1)), r.body);
+  assert.equal(r.json().echo, "[REDACTED]");
+});
+
+test("POST /incidents/:id/resume retries a failed resume and refuses other phases", async () => {
+  let failOnce = true;
+  let realExecutor: import("../../src/graph/run-context.ts").NodeFn | null = null;
+  const c = createTestContainer({
+    nodes: {
+      executor: async (s, cfg) => {
+        if (failOnce) { failOnce = false; throw new Error("executor defect"); }
+        return realExecutor!(s, cfg);
+      },
+    },
+  });
+  const { createExecutorNode } = await import("../../src/graph/nodes/executor-node.ts");
+  realExecutor = createExecutorNode({
+    infra: c.infra, scenarios: c.scenarios, guards: c.guards, trace: c.trace, clock: c.clock,
+    persist: { action: (a) => c.store.upsertAction(a), approval: (a) => c.store.createApproval(a), audit: (e) => c.store.appendAudit(e) },
+  });
+  const a = buildServer(c);
+  assert.equal((await post(a, "/incidents", { scenarioId: "deploy-5xx-rollback" })).statusCode, 201);
+  const early = await post(a, "/incidents/INC-0001/resume", {});
+  assert.equal(early.statusCode, 409);
+  assert.equal(early.json().error.code, "incident_not_accepting");
+  const failed = await post(a, "/approvals/APR-0001/decision", { decision: "approve", approver: "ana" }, { "x-approval-token": TOKEN });
+  assert.equal(failed.statusCode, 500);
+  const again = await post(a, "/approvals/APR-0001/decision", { decision: "approve", approver: "ana" }, { "x-approval-token": TOKEN });
+  assert.equal(again.json().error.code, "approval_not_pending");
+  const r = await post(a, "/incidents/INC-0001/resume", {});
+  assert.equal(r.statusCode, 200);
+  assert.equal(r.json().incident.status, "resolved");
+});
+
+test("with API_TOKEN set, every route but /health needs Authorization: Bearer, and the token is never echoed", async () => {
+  const apiToken = "api-token-" + "q".repeat(24);
+  const a = buildServer(createTestContainer({ env: { API_TOKEN: apiToken } }));
+  assert.equal((await get(a, "/health")).statusCode, 200, "health stays open for probes");
+  for (const [method, url] of [["GET", "/incidents"], ["GET", "/scenarios"], ["GET", "/stats"], ["POST", "/incidents"]] as const) {
+    const none = await a.inject({ method, url, payload: method === "POST" ? { scenarioId: "deploy-5xx-rollback" } : undefined });
+    assert.equal(none.statusCode, 401, `${method} ${url}`);
+    assert.equal(none.json().error.code, "invalid_api_token");
+  }
+  const wrong = await get(a, "/incidents", { authorization: "Bearer wrong-wrong-wrong-wrong" });
+  assert.equal(wrong.statusCode, 401);
+  assert.ok(!wrong.body.includes(apiToken));
+  const ok = await get(a, "/incidents", { authorization: `Bearer ${apiToken}` });
+  assert.equal(ok.statusCode, 200);
+  const created = await post(a, "/incidents", { scenarioId: "deploy-5xx-rollback" }, { authorization: `Bearer ${apiToken}` });
+  assert.equal(created.statusCode, 201);
+  const decided = await post(a, "/approvals/APR-0001/decision", { decision: "approve", approver: "ana" }, { authorization: `Bearer ${apiToken}`, "x-approval-token": TOKEN });
+  assert.equal(decided.statusCode, 200, "the approval token is still required on top");
+  // Without API_TOKEN, nothing changes.
+  assert.equal((await get(app(), "/incidents")).statusCode, 200);
 });

@@ -23,14 +23,14 @@ test("deploy plan: note ready, rollback awaiting approval, block_image_tag ready
   const out = await createGateNode(gd(c))(bb);
   assert.deepEqual(out.actions!.map((a) => [a.actionType, a.tier, a.status]), [["add_incident_note", 2, "ready"], ["rollback_deployment", 3, "awaiting_approval"], ["block_image_tag", 2, "ready"]]);
   assert.equal(out.phase, "awaiting_approval");
-  assert.equal("world" in out, false); // o mundo hipotético do dry run não vaza para o blackboard
-  assert.equal(c.clock.now().getTime() - before, 6_000); // 2 s por dry run
+  assert.equal("world" in out, false); // the dry run's hypothetical world does not leak into the blackboard
+  assert.equal(c.clock.now().getTime() - before, 6_000); // 2 s per dry run
   const apr = c.store.listApprovals({ incidentId: bb.incidentId })[0]!;
   assert.equal(apr.status, "pending");
   assert.equal(apr.actionId, out.actions![1]!.id);
   assert.equal(out.actions![1]!.approvalId, apr.id);
   assert.equal(Date.parse(apr.expiresAt) - Date.parse(apr.requestedAt), 30 * 60_000);
-  // As decisões do portão saem juntas, no fim do lote: o pedido de aprovação é desse instante.
+  // The gate decisions come out together, at the end of the batch: the approval request is from that instant.
   assert.equal(apr.requestedAt, c.clock.now().toISOString());
   assert.deepEqual(out.actions!.map((a) => a.dryRun?.ok), [true, true, true]);
   assert.deepEqual(out.actions![1]!.dryRun!.changes, ["deployment/orders-api: v3.8.0 -> v3.7.2 (6 replicas)"]);
@@ -52,7 +52,7 @@ test("forbidden step is blocked without dry run, with audit and critique", async
   assert.deepEqual(a.classificationReasons, ["forbidden by construction (tier 4)"]);
   assert.ok(c.store.listAudit(bb.incidentId).some((e) => e.event === "action_blocked_forbidden" && e.tier === 4));
   assert.ok(c.store.listTrace(bb.incidentId, { type: "critique" }).some((e) => e.payload.by === "gate" && e.payload.verdict === "blocked"));
-  assert.equal(c.store.listApprovals({ incidentId: bb.incidentId }).length, 1); // só a do rollback
+  assert.equal(c.store.listApprovals({ incidentId: bb.incidentId }).length, 1); // only the rollback's
 });
 
 test("unknown type, failed dry run, dependents and scope", async () => {

@@ -1,5 +1,5 @@
-// Servidor MCP por stdio com cliente real (spec 5.4; AC-34 a AC-37). O incidente é criado pela API HTTP num arquivo
-// de banco; o servidor MCP, outro processo, abre o mesmo arquivo.
+// MCP server over stdio with a real client (spec 5.4; AC-34 to AC-37). The incident is created via the HTTP API in a database
+// file; the MCP server, another process, opens the same file.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -139,7 +139,7 @@ test("forbidden and unknown types are short isError results and are audited", as
 });
 
 test("oversized fields are refused before anything is stored or traced", async () => {
-  // Revisão final: um alvo de 50 mil caracteres virava faixa 3 com aprovação pendente e entrava inteiro no trace.
+  // Final review: a 50,000-character target became tier 3 with a pending approval and went into the trace in full.
   const { c, m } = await setup();
   try {
     const traceBefore = c.store.listTrace("INC-0001").length;

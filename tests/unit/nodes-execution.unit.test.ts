@@ -21,7 +21,7 @@ const guards = (o: Partial<ExecutionGuards> = {}): ExecutionGuards => ({
 });
 const ed = (c: Container, g: ExecutionGuards) => ({ infra: c.infra, scenarios: c.scenarios, guards: g, trace: c.trace, clock: c.clock, persist: persistOf(c) });
 
-/** Deploy depois do portão e das decisões: status por ordem do passo, fase de retomada. */
+/** Deploy after the gate and the decisions: status by step order, resume phase. */
 async function decided(statuses: Partial<Record<number, ActionStatus>>, o: TestContainerOptions = {}): Promise<{ c: Container; bb: Blackboard }> {
   const { c, bb } = await stateAtGate("deploy-5xx-rollback", o);
   const out = await createGateNode({ infra: c.infra, trace: c.trace, clock: c.clock, ids: c.ids, approvalTtlMin: 30, persist: persistOf(c) })(bb);
@@ -31,7 +31,7 @@ async function decided(statuses: Partial<Record<number, ActionStatus>>, o: TestC
 }
 
 const events = (c: Container, id: string) => c.store.listAudit(id).map((e) => e.event);
-const sinceGate = (c: Container, id: string) => events(c, id).slice(4); // incident_opened + 3 do portão
+const sinceGate = (c: Container, id: string) => events(c, id).slice(4); // incident_opened + 3 from the gate
 
 const badCanary = (s: LoadedScenario): LoadedScenario => {
   if (!s.after) return s;
@@ -50,7 +50,7 @@ test("executes ready and approved actions in order and audits each one", async (
   assert.deepEqual(sinceGate(c, bb.incidentId), ["action_executed", "action_executed", "action_executed"]);
   assert.equal(out.world!.deployments["orders-api"]!.version, "v3.7.2");
   assert.deepEqual(out.world!.deployments["orders-api"]!.blockedTags, ["3.8.0"]);
-  // Cada execução começa quando a anterior termina (duração do catálogo: 1, 90 e 5 s).
+  // Each execution starts when the previous one ends (catalog duration: 1, 90 and 5 s).
   assert.deepEqual(out.actions!.map((a) => (Date.parse(a.executedAt!) - t0) / 1000), [0, 1, 91]);
   assert.equal(c.clock.now().getTime() - t0, 96_000);
   assert.equal(out.actions![1]!.resultSummary, "deployment/orders-api: v3.8.0 -> v3.7.2 (6 replicas)");
@@ -169,7 +169,7 @@ test("healthy canary verifies; failing canary reverts in reverse order and escal
     assert.match(critique.payload.feedback, /^healthy canary: 5xx 0.5% ≤ 5%; P99 205 ms ≤ 270 ms$/);
     const handoff = c.store.listTrace(bb.incidentId, { type: "handoff" }).at(-1)!;
     assert.deepEqual([handoff.payload.from, handoff.payload.to], ["verifier", "supervisor"]);
-    // Sucesso do canário zera as falhas consecutivas: uma nova falha não abre o breaker.
+    // Canary success resets the consecutive failures: a new failure does not open the breaker.
     assert.equal(g.breaker.recordFailure(c.clock.now()), false);
   }
   {
@@ -179,7 +179,7 @@ test("healthy canary verifies; failing canary reverts in reverse order and escal
     const executed = { ...bb, ...(await createExecutorNode(ed(c, g))(bb)) };
     const bad = await createVerifierNode(ed(c, g))(executed);
     assert.equal(bad.verification!.healthy, false);
-    // Ordem da reversão: inversa da execução, só as reversíveis (add_incident_note não reverte).
+    // Rollback order: reverse of execution, only the reversible ones (add_incident_note does not revert).
     assert.deepEqual(c.store.listTrace(id, { agent: "verifier", type: "action" }).map((e) => e.payload.tool), ["revert:block_image_tag", "revert:rollback_deployment"]);
     assert.deepEqual(bad.actions!.map((a) => a.status), ["succeeded", "reverted", "reverted"]);
     assert.deepEqual(bad.verification!.revertedActionIds, [executed.actions[2]!.id, executed.actions[1]!.id]);

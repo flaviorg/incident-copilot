@@ -1,9 +1,9 @@
-// Rotas do grafo decididas por código (spec 4.5 e 4.5.1). Funções puras sobre o blackboard: nenhuma rota para
-// escalonamento vem do LLM; qualquer nó que defina `escalation` desvia para o nó escalation na aresta seguinte.
+// Graph routes decided by code (spec 4.5 and 4.5.1). Pure functions over the blackboard: no route to
+// escalation comes from the LLM; any node that sets `escalation` diverts to the escalation node on the next edge.
 import type { Blackboard, Limits } from "../contracts/index.ts";
 import { supervisorTargetOf } from "./nodes/supervisor-node.ts";
 
-/** Nomes lógicos dos nós (os AgentId do grafo), usados pelas funções de rota e por GraphNodes. */
+/** Logical node names (the graph's AgentIds), used by the route functions and by GraphNodes. */
 export const NODE_NAMES = [
   "supervisor", "telemetry_analyst", "runbook_retriever", "remediation_planner", "auditor",
   "gate", "executor", "verifier", "reporter", "escalation",
@@ -11,9 +11,9 @@ export const NODE_NAMES = [
 export type NodeName = (typeof NODE_NAMES)[number];
 
 /**
- * Id do nó registrado no LangGraph. A biblioteca recusa um nó com o mesmo nome de uma chave do estado
- * ("supervisor is already being used as a state attribute"), e `supervisor` e `escalation` são chaves do blackboard.
- * As rotas devolvem o nome lógico; o pathMap de cada aresta traduz para o id.
+ * Node id registered in LangGraph. The library refuses a node with the same name as a state key
+ * ("supervisor is already being used as a state attribute"), and `supervisor` and `escalation` are blackboard keys.
+ * Routes return the logical name; each edge's pathMap translates it to the id.
  */
 export const GRAPH_NODE_ID: Record<NodeName, string> = {
   supervisor: "supervisor_agent",
@@ -28,15 +28,15 @@ export const GRAPH_NODE_ID: Record<NodeName, string> = {
   escalation: "escalation_node",
 };
 
-/** Valor de END no LangGraph; a rota do portão o devolve quando há aprovação pendente. */
+/** Value of END in LangGraph; the gate route returns it when there is a pending approval. */
 export const END_ROUTE = "__end__";
 
-/** START: a primeira invocação entra pelo supervisor; a retomada depois das decisões entra pelo executor. */
+/** START: the first invocation enters via the supervisor; the resume after decisions enters via the executor. */
 export function entryRoute(bb: Blackboard): "supervisor" | "executor" {
   return bb.phase === "resume" ? "executor" : "supervisor";
 }
 
-/** Escalonamento definido pelo próprio supervisor (tetos ou LLM indisponível) vence; senão, o alvo validado pela guarda. */
+/** Escalation set by the supervisor itself (caps or LLM unavailable) wins; otherwise, the target validated by the guard. */
 export function afterSupervisor(bb: Blackboard): NodeName {
   if (bb.escalation !== null) return "escalation";
   const target = supervisorTargetOf(bb);
@@ -44,7 +44,7 @@ export function afterSupervisor(bb: Blackboard): NodeName {
   return target;
 }
 
-/** telemetry_analyst e runbook_retriever voltam ao supervisor, salvo escalonamento (LLM indisponível). */
+/** telemetry_analyst and runbook_retriever return to the supervisor, unless escalated (LLM unavailable). */
 export function afterSpecialist(bb: Blackboard): "supervisor" | "escalation" {
   return bb.escalation !== null ? "escalation" : "supervisor";
 }
@@ -53,25 +53,25 @@ export function afterPlanner(bb: Blackboard): "auditor" | "escalation" {
   return bb.escalation !== null ? "escalation" : "auditor";
 }
 
-/** Reflection: volta ao planejador enquanto o veredito final for revise e houver revisões sobrando. */
+/** Reflection: goes back to the planner while the final verdict is revise and revisions remain. */
 export function afterAuditor(bb: Blackboard, limits: Limits): "remediation_planner" | "supervisor" {
   return bb.audit?.verdict === "revise" && bb.planRevision < limits.maxPlanRevisions ? "remediation_planner" : "supervisor";
 }
 
-/** Pendência de aprovação encerra a invocação; ação pronta vai ao executor; nada executável escala. */
+/** A pending approval ends the invocation; a ready action goes to the executor; nothing executable escalates. */
 export function afterGate(bb: Blackboard, pendingApprovals: number): "executor" | "escalation" | typeof END_ROUTE {
   if (pendingApprovals > 0) return END_ROUTE;
   if (bb.actions.some((a) => a.status === "ready")) return "executor";
   return "escalation";
 }
 
-/** O verificador só roda se alguma ação mitigadora terminou succeeded (spec 6.5); o motivo do escalonamento é do executor. */
+/** The verifier only runs if some mitigating action finished succeeded (spec 6.5); the escalation reason belongs to the executor. */
 export function afterExecutor(bb: Blackboard, isMitigating: (actionType: string) => boolean): "verifier" | "escalation" {
   if (bb.escalation === null && bb.actions.some((a) => a.status === "succeeded" && isMitigating(a.actionType))) return "verifier";
   return "escalation";
 }
 
-/** Canário saudável volta ao supervisor (que escolhe o relator); reprovado escala com remediation_ineffective. */
+/** A healthy canary returns to the supervisor (which picks the reporter); a failed one escalates with remediation_ineffective. */
 export function afterVerifier(bb: Blackboard): "supervisor" | "escalation" {
   return bb.escalation === null && bb.verification?.healthy === true ? "supervisor" : "escalation";
 }

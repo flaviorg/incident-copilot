@@ -1,5 +1,5 @@
-// Grafo da equipe (spec 4.5): supervisor com especialistas, Reflection do auditor, portão, execução, verificação,
-// escalonamento e relatório. Um addConditionalEdges por origem, com pathMap explícito do nome lógico para o id do nó.
+// Team graph (spec 4.5): supervisor with specialists, auditor Reflection, gate, execution, verification,
+// escalation and report. One addConditionalEdges per origin, with an explicit pathMap from logical name to node id.
 import { StateGraph, START, END } from "@langchain/langgraph";
 import type { Blackboard, Limits } from "../contracts/index.ts";
 import { IncidentGraphState } from "./state.ts";
@@ -19,19 +19,19 @@ export type IncidentStreamOptions = {
   configurable: { requestId: string | null };
 };
 
-/** O que o IncidentService usa do grafo compilado: o stream de estados completos (um por superstep). */
+/** What IncidentService uses from the compiled graph: the stream of full states (one per superstep). */
 export interface CompiledIncidentGraph {
   stream(input: Blackboard, o: IncidentStreamOptions): Promise<AsyncIterable<Blackboard>>;
 }
 
 export type GraphDeps = {
   limits: Limits;
-  /** Aprovações do incidente com status efetivo pending (lidas do store no momento da rota). */
+  /** Incident approvals with effective status pending (read from the store at route time). */
   pendingApprovals: (incidentId: string) => number;
   isMitigating: (actionType: string) => boolean;
 };
 
-/** pathMap de uma aresta: cada destino lógico possível para o id do nó (END fica como está). */
+/** pathMap of an edge: each possible logical destination to the node id (END stays as is). */
 function pathMap<T extends NodeName | typeof END_ROUTE>(targets: readonly T[]): Record<string, string> {
   return Object.fromEntries(targets.map((t) => [t, t === END_ROUTE ? END : GRAPH_NODE_ID[t as NodeName]]));
 }

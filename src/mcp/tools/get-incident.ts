@@ -1,4 +1,4 @@
-// Tool get_incident (spec 5.4): IncidentView e os `traceLimit` eventos mais recentes do trace, em ordem de seq.
+// get_incident tool (spec 5.4): IncidentView and the `traceLimit` most recent trace events, in seq order.
 import * as z from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Container } from "../../app/container.ts";

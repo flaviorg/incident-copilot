@@ -5,7 +5,7 @@ import { migrate } from "./schema.ts";
 
 const MEMORY_DB = ":memory:";
 
-/** Abre o banco com foreign_keys=ON, busy_timeout=5000 e WAL (fora de :memory:), e aplica o schema. */
+/** Opens the database with foreign_keys=ON, busy_timeout=5000 and WAL (outside :memory:), and applies the schema. */
 export function openDatabase(path: string): DatabaseSync {
   const inMemory = path === MEMORY_DB;
   if (!inMemory) mkdirSync(dirname(path), { recursive: true });

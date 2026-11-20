@@ -1,4 +1,4 @@
-// Entrada e saída da CLI: tudo que vai para stdout e stderr passa por redactSecrets.
+// CLI input and output: everything that goes to stdout and stderr passes through redactSecrets.
 export type CliIO = {
   env: Record<string, string | undefined>;
   out(text: string): void;

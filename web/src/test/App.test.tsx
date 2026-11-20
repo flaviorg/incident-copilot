@@ -1,4 +1,4 @@
-// App da War Room (spec 10.2; AC-39): cenário, reprodução até o portão, decisão, ramo escolhido, números e post-mortem.
+// War Room App (spec 10.2; AC-39): scenario, replay up to the gate, decision, chosen branch, numbers and post-mortem.
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -30,7 +30,7 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: /Post-mortem/ })).toBeTruthy();
     expect(screen.getByRole("heading", { name: /Incident numbers/ })).toBeTruthy();
     expect(screen.getByText(/narrative validated by the numeric guard/)).toBeTruthy();
-    expect(screen.getByText("resolved")).toBeTruthy(); // status no cabeçalho do incidente
+    expect(screen.getByText("resolved")).toBeTruthy(); // status in the incident header
     expect(screen.getByRole("status").textContent).toContain("Replay of a recorded run");
   });
 
@@ -42,7 +42,7 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "Confirm" }));
     while (screen.queryByRole("button", { name: "Step" })?.hasAttribute("disabled") === false) await user.click(screen.getByRole("button", { name: "Step" }));
     expect(await screen.findByText(/deterministic template narrative/)).toBeTruthy();
-    expect(screen.getByText("escalated")).toBeTruthy(); // status no cabeçalho do incidente
+    expect(screen.getByText("escalated")).toBeTruthy(); // status in the incident header
     expect(screen.queryByRole("heading", { name: /Incident numbers/ })).toBeNull();
   });
 

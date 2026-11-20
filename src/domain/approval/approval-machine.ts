@@ -1,4 +1,4 @@
-// Máquina de estados da aprovação (spec 6.5). Pura: transição tipada, projeção de expiração sem gravar nada.
+// Approval state machine (spec 6.5). Pure: typed transition, expiration projection without writing anything.
 import type { Approval, ApprovalStatus } from "../../contracts/index.ts";
 import { ApprovalTransitionError } from "../errors.ts";
 
@@ -6,19 +6,19 @@ export type ApprovalEvent =
   | { type: "approve" | "reject"; approver: string; comment: string | null; source: "structured" | "text" }
   | { type: "expire" };
 
-/** Pendente e já passou de expiresAt. */
+/** Pending and already past expiresAt. */
 export function isExpired(a: Approval, now: Date): boolean {
   return a.status === "pending" && now.getTime() > Date.parse(a.expiresAt);
 }
 
-/** Projeta "expired" para leitura sem alterar o objeto nem gravar nada. */
+/** Projects "expired" for reading without changing the object or writing anything. */
 export function effectiveStatus(a: Approval, now: Date): ApprovalStatus {
   return isExpired(a, now) ? "expired" : a.status;
 }
 
 /**
- * pending -> approved | rejected (antes de expiresAt) | expired. De qualquer outro estado, `not_pending`; decisão
- * depois do prazo, `expired`. Devolve um objeto novo com version + 1 e decidedAt = now; o erro é devolvido, não lançado.
+ * pending -> approved | rejected (before expiresAt) | expired. From any other state, `not_pending`; a decision
+ * after the deadline, `expired`. Returns a new object with version + 1 and decidedAt = now; the error is returned, not thrown.
  */
 export function transition(a: Approval, ev: ApprovalEvent, now: Date): Approval | ApprovalTransitionError {
   if (a.status !== "pending") return new ApprovalTransitionError("not_pending");

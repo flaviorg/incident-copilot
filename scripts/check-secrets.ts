@@ -1,22 +1,23 @@
-// check:secrets (spec 6.6; AC-41): varre a árvore do projeto atrás de chaves e tokens. Não lista os arquivos com
-// `git ls-files`, porque a pasta ainda vive dentro do repositório do curso; o Git só é consultado para saber se um `.env`
-// local está rastreado. Roda no pre-commit e no CI. Nunca imprime o valor achado: só caminho, linha e o nome do padrão.
+// check:secrets (spec 6.6; AC-41): scans the project tree for keys and tokens. Does not list files with
+// `git ls-files`, because the folder still lives inside the course repository; Git is only queried to know whether a local `.env`
+// is tracked. Runs in pre-commit and CI. Never prints the matched value: only path, line and pattern name.
 import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { PROJECT_ROOT } from "../src/infra/paths.ts";
 
 /**
- * Chave do OpenRouter, chave no formato `sk-` e atribuição de APPROVAL_TOKEN com valor de 8 caracteres ou mais.
- * O terceiro é montado por concatenação, para este arquivo não casar com o próprio padrão.
+ * OpenRouter key, `sk-` format key, and APPROVAL_TOKEN or API_TOKEN assignments with a value of 8 characters or more.
+ * The last two are built by concatenation, so this file does not match its own patterns.
  */
 const SECRET_PATTERNS: RegExp[] = [
   /\bsk-or-v1-[A-Za-z0-9]{20,}/g,
   /\bsk-[A-Za-z0-9]{20,}/g,
   new RegExp("APPROVAL_TOKEN" + "=\\S{8,}", "g"),
+  new RegExp("\\bAPI_TOKEN" + "=\\S{8,}", "g"),
 ];
 
-const PATTERN_NAMES = ["OpenRouter key", "sk- key", "APPROVAL_TOKEN with a value"];
+const PATTERN_NAMES = ["OpenRouter key", "sk- key", "APPROVAL_TOKEN with a value", "API_TOKEN with a value"];
 
 export type SecretFinding = { path: string; line: number; pattern: string };
 
@@ -31,30 +32,30 @@ export function scanText(text: string, path: string): SecretFinding[] {
   return out;
 }
 
-/** Pastas ignoradas em qualquer nível. */
+/** Folders ignored at any level. */
 const IGNORED_DIRS = new Set(["node_modules", ".git", "coverage"]);
-/** Caminhos ignorados a partir da raiz (com `/`). */
+/** Paths ignored from the root (with `/`). */
 const IGNORED_PATHS = new Set(["reports", "web/dist", "web/public/demo", "coverage"]);
 const isIgnoredFile = (rel: string) => /^data\/[^/]*\.db/.test(rel);
 /**
- * Arquivo de ambiente local, fora do commit pelo `.gitignore` (padrão `.env`, em qualquer nível). É onde o README manda
- * pôr a chave real ("Using a real model (OpenRouter)"), então varrê-lo quebraria o pre-commit de quem segue o README. Só entra na
- * varredura se estiver rastreado pelo Git. `.env.example` continua sendo varrido.
+ * Local environment file, kept out of commits by `.gitignore` (`.env` pattern, at any level). It is where the README tells
+ * you to put the real key ("Using a real model (OpenRouter)"), so scanning it would break the pre-commit of anyone following the README. It only enters the
+ * scan if tracked by Git. `.env.example` is still scanned.
  */
 const LOCAL_ENV_FILES = new Set([".env"]);
 
 export type ScanOptions = {
-  /** Diz se o caminho relativo (com `/`) está rastreado pelo Git. Padrão: `git ls-files --error-unmatch`. */
+  /** Tells whether the relative path (with `/`) is tracked by Git. Default: `git ls-files --error-unmatch`. */
   isTracked?: (rel: string) => boolean;
 };
 
-/** `true` só quando o Git confirma que o arquivo está no índice; sem Git ou fora de um repositório, `false`. */
+/** `true` only when Git confirms the file is in the index; without Git or outside a repository, `false`. */
 function trackedByGit(root: string, rel: string): boolean {
   const r = spawnSync("git", ["ls-files", "--error-unmatch", "--", rel], { cwd: root, stdio: "ignore" });
   return r.status === 0;
 }
 
-/** Percorre a árvore a partir de `root` e devolve os arquivos, como `join(root, caminho)`, em ordem estável. */
+/** Walks the tree from `root` and returns the files, as `join(root, path)`, in stable order. */
 export function listProjectFiles(root: string, opts: ScanOptions = {}): string[] {
   const isTracked = opts.isTracked ?? ((rel: string) => trackedByGit(root, rel));
   const out: string[] = [];
@@ -76,7 +77,7 @@ export function listProjectFiles(root: string, opts: ScanOptions = {}): string[]
   return out;
 }
 
-/** Arquivo binário (byte nulo nos primeiros 8 KB) fica de fora da varredura de texto. */
+/** A binary file (null byte in the first 8 KB) is excluded from the text scan. */
 function readText(path: string): string | null {
   const buf = readFileSync(path);
   return buf.subarray(0, 8192).includes(0) ? null : buf.toString("utf8");

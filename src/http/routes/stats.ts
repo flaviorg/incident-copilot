@@ -1,4 +1,4 @@
-// GET /stats?since=1h|24h|7d (spec 5.3; AC-33): agregações por SQL na janela pedida.
+// GET /stats?since=1h|24h|7d (spec 5.3; AC-33): SQL aggregations over the requested window.
 import type { FastifyInstance } from "fastify";
 import type { Container } from "../../app/container.ts";
 import { StatsQuerySchema } from "../../contracts/index.ts";

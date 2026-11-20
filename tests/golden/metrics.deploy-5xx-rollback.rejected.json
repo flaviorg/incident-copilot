@@ -25,7 +25,7 @@
   "copilotCostUsd": 30,
   "roiIllustrative": null,
   "llmCalls": 10,
-  "promptTokens": 10640,
+  "promptTokens": 10668,
   "completionTokens": 869,
   "assumptionsVersion": "2026-10-04",
   "sources": {

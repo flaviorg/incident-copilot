@@ -9,7 +9,7 @@ import type { WorldState } from "../../src/contracts/index.ts";
 import { SimulatedInfra } from "../../src/infra/simulated-infra.ts";
 
 const readJson = (p: string) => JSON.parse(readFileSync(p, "utf8"));
-/** Mundo inicial do cenário, o mesmo que o container usa. */
+/** Initial world of the scenario, the same one the container uses. */
 const worldOf = (s: LoadedScenario): WorldState => new SimulatedInfra({ prices: readJson("data/cloud-prices.json") }).initialWorld(s);
 
 const scenarios = new ScenarioRepository({ rootDir: "fixtures/scenarios" });

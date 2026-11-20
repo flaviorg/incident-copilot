@@ -1,4 +1,4 @@
-// Métricas do incidente (spec 5.7). Cada valor tem rótulo measured, assumption ou derived em `sources`.
+// Incident metrics (spec 5.7). Each value has a measured, assumption or derived label in `sources`.
 import * as z from "zod";
 
 export const RangeSchema = z.object({ low: z.number(), high: z.number() });
@@ -12,7 +12,7 @@ export const IncidentMetricsSchema = z.object({
   mttdMin: z.number(),
   mttrMin: z.number().nullable(),
   timeAwaitingApprovalMin: z.number(),
-  baselineMttrMin: RangeSchema, // premissa sintética
+  baselineMttrMin: RangeSchema, // synthetic assumption
   minutesSaved: RangeSchema.nullable(),
   impactFraction: z.number().min(0).max(1),
   revenuePerMinuteUsd: z.number(),

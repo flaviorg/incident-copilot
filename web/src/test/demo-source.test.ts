@@ -1,4 +1,4 @@
-// Fonte demo (spec 8.2; AC-39): só ./demo/, gravação inválida vira erro explícito e nada parcial é devolvido.
+// Demo source (spec 8.2; AC-39): only ./demo/, an invalid recording becomes an explicit error and nothing partial is returned.
 import { describe, expect, it } from "vitest";
 import { DemoRecordingSchema } from "@contracts";
 import { loadIndex, loadRecording } from "../data/demo-source.ts";

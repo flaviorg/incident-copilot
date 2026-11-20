@@ -1,4 +1,4 @@
-// Ajudantes de fixture de LLM para os testes (spec 7.2, regra 10): ler, derivar em código e montar turnos.
+// LLM fixture helpers for tests (spec 7.2, rule 10): read, derive in code and build turns.
 import { readFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { FixtureFileSchema } from "../../src/llm/fixture-format.ts";
@@ -11,12 +11,12 @@ export function readFixture(path: string): FixtureFile {
   return FixtureFileSchema.parse(JSON.parse(readFileSync(resolveFromRoot(path), "utf8")));
 }
 
-/** Turno com saída. Sem `prompt`, herda o do turno âncora em `insertBefore` do patchFixture. */
+/** Turn with output. Without `prompt`, inherits the anchor turn's in the patchFixture `insertBefore`. */
 export function turn(id: string, when: FixtureTurn["when"], output: unknown, prompt = ""): FixtureTurn {
   return { id, prompt, when, output };
 }
 
-/** Turno com falha simulada. Sem `prompt`, herda o do turno âncora em `insertBefore` do patchFixture. */
+/** Turn with a simulated failure. Without `prompt`, inherits the anchor turn's in the patchFixture `insertBefore`. */
 export function errTurn(id: string, when: FixtureTurn["when"], kind: FixtureErrorKind, prompt = ""): FixtureTurn {
   return { id, prompt, when, error: { kind } };
 }
@@ -28,7 +28,7 @@ export type FixturePatch = {
   insertBefore?: Record<string, FixtureTurn[]>;
 };
 
-/** Deriva uma fixture de outra sem alterar a base. Id inexistente lança, para erro de digitação não passar em silêncio. */
+/** Derives one fixture from another without altering the base. A nonexistent id throws, so a typo does not pass silently. */
 export function patchFixture(base: FixtureFile, p: FixturePatch): FixtureFile {
   const out = structuredClone(base);
   const ids = new Set(out.turns.map((t) => t.id));

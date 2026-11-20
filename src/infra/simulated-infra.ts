@@ -1,6 +1,6 @@
-// Mundo simulado (spec 4.2, 6.4 e 7.3): dry run, execução, reversão e sinais pós-ação sobre um WorldState imutável.
-// Cada ação executável tem uma entrada em EXECUTORS, tipado por ExecutableActionType: os tipos proibidos não têm
-// executor por construção (faixa 4, camada 1). Falhas de execução vêm de `faults` do cenário.
+// Simulated world (spec 4.2, 6.4 and 7.3): dry run, execution, reversal and post-action signals over an immutable WorldState.
+// Each executable action has an entry in EXECUTORS, typed by ExecutableActionType: forbidden types have no
+// executor by construction (tier 4, layer 1). Execution failures come from the scenario's `faults`.
 import type { DryRunResult, GatedAction, Inventory, MetricName, WorldState } from "../contracts/index.ts";
 import { EXECUTABLE_ACTIONS, isExecutable } from "../domain/autonomy/catalog.ts";
 import type { ExecutableActionType } from "../domain/autonomy/catalog.ts";
@@ -18,11 +18,11 @@ export type ExecutionResult = { ok: boolean; summary: string };
 
 type Check = { ok: true; changes: string[] } | { ok: false; reason: string };
 type Executor = {
-  /** Valida contra o mundo e descreve a mudança. */
+  /** Validates against the world and describes the change. */
   check(w: WorldState, step: ValidatedStep, prices: CloudPrices): Check;
-  /** Aplica sobre uma cópia (pode mutar `w`), só depois de um check aprovado. */
+  /** Applies on a copy (may mutate `w`), only after an approved check. */
   apply(w: WorldState, step: ValidatedStep): void;
-  /** Desfaz sobre uma cópia; devolve o motivo quando não dá para desfazer. Ausente nas ações irreversíveis. */
+  /** Undoes on a copy; returns the reason when it cannot be undone. Absent on irreversible actions. */
   revert?(w: WorldState, a: GatedAction): string | null;
 };
 
@@ -30,7 +30,7 @@ const notFound = (target: string): Check => ({ ok: false, reason: `target not fo
 const str = (v: unknown) => (typeof v === "string" ? v : String(v));
 const fmtGb = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 1, useGrouping: false });
 
-/** deployment/<serviço> */
+/** deployment/<service> */
 function deploymentOf(w: WorldState, target: string) {
   const [kind, svc, ...rest] = target.split("/");
   if (kind !== "deployment" || !svc || rest.length > 0) return null;
@@ -38,7 +38,7 @@ function deploymentOf(w: WorldState, target: string) {
   return dep ? { svc, dep } : null;
 }
 
-/** image/<serviço>:<tag> */
+/** image/<service>:<tag> */
 function imageOf(w: WorldState, target: string) {
   const [kind, ref, ...rest] = target.split("/");
   if (kind !== "image" || !ref || rest.length > 0) return null;
@@ -49,7 +49,7 @@ function imageOf(w: WorldState, target: string) {
 }
 
 type ResourceKind = "volume" | "ip" | "instance";
-/** <volume|ip|instance>/<conta>/<id> no inventário do mundo. */
+/** <volume|ip|instance>/<account>/<id> in the world's inventory. */
 function resourceOf(inv: Inventory | null, target: string, kinds: readonly ResourceKind[]) {
   const [kind, account, id, ...rest] = target.split("/");
   if (!inv || !kind || !account || !id || rest.length > 0 || account !== inv.account || !(kinds as readonly string[]).includes(kind)) return null;
@@ -204,7 +204,7 @@ export class SimulatedInfra {
     return initialWorldFrom(s);
   }
 
-  /** Não muda `w`. */
+  /** Does not change `w`. */
   dryRun(w: WorldState, step: ValidatedStep): DryRunResult {
     const spec = EXECUTABLE_ACTIONS[step.actionType];
     const c = EXECUTORS[step.actionType].check(w, step, this.prices);
@@ -217,7 +217,7 @@ export class SimulatedInfra {
     };
   }
 
-  /** Efeito puro, usado no dry run sequencial do portão e na execução. Lança se o dry run reprovaria (defeito de quem chama). */
+  /** Pure effect, used in the gate's sequential dry run and in execution. Throws if the dry run would fail (caller defect). */
   apply(w: WorldState, step: ValidatedStep): WorldState {
     const c = EXECUTORS[step.actionType].check(w, step, this.prices);
     if (!c.ok) throw new Error(`apply of ${step.actionType} on ${step.target} with a failed dry run: ${c.reason}`);
@@ -226,7 +226,7 @@ export class SimulatedInfra {
     return next;
   }
 
-  /** Falha injetada pelo cenário (`faults["<tipo>@<alvo>"] === "fail"`) ou mundo que mudou desde o portão: mundo intacto. */
+  /** Failure injected by the scenario (`faults["<type>@<target>"] === "fail"`) or a world that changed since the gate: world intact. */
   execute(w: WorldState, step: ValidatedStep, s: LoadedScenario): { world: WorldState; result: ExecutionResult } {
     if (s.file.faults[`${step.actionType}@${step.target}`] === "fail") {
       return { world: w, result: { ok: false, summary: `failure injected by the scenario in ${step.actionType} ${step.target}` } };
@@ -238,7 +238,7 @@ export class SimulatedInfra {
     return { world: next, result: { ok: true, summary: c.changes.join("; ") } };
   }
 
-  /** Só ações reversíveis do catálogo. */
+  /** Reversible catalog actions only. */
   revert(w: WorldState, a: GatedAction): { world: WorldState; result: ExecutionResult } {
     const executor = isExecutable(a.actionType) ? EXECUTORS[a.actionType] : undefined;
     if (!executor?.revert || !isExecutable(a.actionType) || !EXECUTABLE_ACTIONS[a.actionType].reversible) {
@@ -251,8 +251,8 @@ export class SimulatedInfra {
   }
 
   /**
-   * Janela pós-ação: no deploy, a 1ª variante de after.json cujo `when` casa com os fatos do mundo; com inventário,
-   * projected_monthly_cost_usd calculado dele. Sem nada disso, janela vazia (o canário reprova: fail closed).
+   * Post-action window: for a deploy, the 1st variant of after.json whose `when` matches the world facts; with inventory,
+   * projected_monthly_cost_usd computed from it. With neither, an empty window (the canary fails: fail closed).
    */
   postActionSignals(w: WorldState, s: LoadedScenario): SignalWindow {
     const metrics: Partial<Record<MetricName, number[]>> = {};
@@ -269,7 +269,7 @@ export class SimulatedInfra {
     return { metrics };
   }
 
-  /** Economia mensal do achado de inventário do alvo (sobre o inventário inicial); 0 para ações não FinOps. */
+  /** Monthly saving from the target's inventory finding (over the initial inventory); 0 for non-FinOps actions. */
   monthlySavingsFor(a: GatedAction, w: WorldState): number {
     const base = w.initialInventory;
     if (!base) return 0;
@@ -285,7 +285,7 @@ export class SimulatedInfra {
     return finding?.monthlySavingsUsd ?? 0;
   }
 
-  /** Fatos do mundo usados para escolher a variante de after.json ("deployment.<svc>.version" etc.). */
+  /** World facts used to choose the after.json variant ("deployment.<svc>.version" etc.). */
   facts(w: WorldState): Record<string, string> {
     const out: Record<string, string> = {};
     for (const [svc, d] of Object.entries(w.deployments)) {

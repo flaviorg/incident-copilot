@@ -1,5 +1,5 @@
-// Resultado das tools MCP (spec 5.4 e 6.1): content com texto curto e structuredContent validado, ambos redigidos;
-// erro vira { isError: true, content: [{ type: "text", text: motivo curto }] }, sem stack, SQL ou mensagem bruta.
+// MCP tool results (spec 5.4 and 6.1): content with short text and validated structuredContent, both redacted;
+// an error becomes { isError: true, content: [{ type: "text", text: short reason }] }, with no stack, SQL or raw message.
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type * as z from "zod";
 import type { Container } from "../app/container.ts";
@@ -7,19 +7,17 @@ import {
   ConflictError, FixturePromptDriftError, LlmUnavailableError, NotFoundError, RunTimeoutError, UnprocessableError, UnscriptedLlmCallError,
   ValidationError,
 } from "../domain/errors.ts";
-import { redactSecrets } from "../infra/redact.ts";
+import { redactSecrets, redactThenClip } from "../infra/redact.ts";
 
-/** Teto do texto de erro devolvido ao cliente MCP. */
+/** Cap on the error text returned to the MCP client. */
 const MCP_ERROR_MAX_CHARS = 180;
-
-const clip = (text: string, max: number) => (text.length <= max ? text : text.slice(0, max - 1) + "…");
 
 export function toolOk<T extends Record<string, unknown>>(c: Container, schema: z.ZodType<T>, value: T, text: string): CallToolResult {
   const structured = redactSecrets(schema.parse(value), c.secrets);
-  return { content: [{ type: "text", text: redactSecrets(clip(text, 1000), c.secrets) }], structuredContent: structured };
+  return { content: [{ type: "text", text: redactThenClip(text, 1000, c.secrets) }], structuredContent: structured };
 }
 
-/** Motivo curto em inglês por classe de erro (tabela do spec 6.1). */
+/** Short reason in English per error class (table in spec 6.1). */
 function shortReason(e: unknown): { text: string; unexpected: boolean } {
   if (e instanceof ValidationError) {
     const fields = e.issues.map((i) => i.path).join(", ");
@@ -41,10 +39,10 @@ export function toolError(c: Container, e: unknown, tool: string): CallToolResul
   if (unexpected) {
     const err = e as { name?: unknown; message?: unknown };
     c.logger.error("unexpected error in an MCP tool", {
-      tool, error: typeof err?.name === "string" ? err.name : "Error", detail: typeof err?.message === "string" ? clip(err.message, 500) : null,
+      tool, error: typeof err?.name === "string" ? err.name : "Error", detail: typeof err?.message === "string" ? redactThenClip(err.message, 500, c.secrets) : null,
     });
   } else {
-    c.logger.info("MCP tool refused the request", { tool, reason: clip(text, MCP_ERROR_MAX_CHARS) });
+    c.logger.info("MCP tool refused the request", { tool, reason: redactThenClip(text, MCP_ERROR_MAX_CHARS, c.secrets) });
   }
-  return { isError: true, content: [{ type: "text", text: redactSecrets(clip(text, MCP_ERROR_MAX_CHARS), c.secrets) }] };
+  return { isError: true, content: [{ type: "text", text: redactThenClip(text, MCP_ERROR_MAX_CHARS, c.secrets) }] };
 }

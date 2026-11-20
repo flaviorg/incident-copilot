@@ -1,21 +1,21 @@
-// Guarda numérico (spec 5.7 e AC-23): o LLM só redige; todo número da narrativa precisa vir de um valor calculado,
-// do timeline ou das evidências. Identificadores (versões, horários, datas, ids de recurso, CVE) são ignorados. Puro.
+// Numeric guard (spec 5.7 and AC-23): the LLM only writes; every number in the narrative must come from a computed value,
+// the timeline or the evidence. Identifiers (versions, times, dates, resource ids, CVE) are ignored. Pure.
 import type { Evidence, IncidentMetrics } from "../../contracts/index.ts";
 
 const DEFAULT_TOLERANCE = 0.005;
 
 const THOUSANDS = /^[1-9]\d{0,2}(?:\.\d{3})+$/;
 
-// Removidos antes da extração, nesta ordem. Cada trecho vira um espaço.
+// Removed before extraction, in this order. Each match becomes a space.
 const IDENTIFIER_PATTERNS: { re: RegExp; keep?: (m: string) => boolean }[] = [
   { re: /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?/g }, // ISO 8601
-  { re: /\b\d{4}-\d{2}-\d{2}\b/g }, // data ISO
-  { re: /\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/g }, // data dd/mm(/aaaa)
-  { re: /\b\d{1,2}:\d{2}(?::\d{2})?\b/g }, // horário
+  { re: /\b\d{4}-\d{2}-\d{2}\b/g }, // ISO date
+  { re: /\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/g }, // date dd/mm(/yyyy)
+  { re: /\b\d{1,2}:\d{2}(?::\d{2})?\b/g }, // time
   { re: /\bCVE-\d{4}-\d{4,}\b/gi }, // CVE
-  { re: /\bv\d+(?:\.\d+)+\b/gi }, // versão com v
-  { re: /\b\d+\.\d+\.\d+(?:\.\d+)*\b/g, keep: (m) => THOUSANDS.test(m) }, // versão sem v (milhar pt-BR fica)
-  { re: /\b[A-Za-z][A-Za-z0-9]*(?:[-_][A-Za-z0-9]+)+\b/g, keep: (m) => !/\d/.test(m) }, // id de recurso: letras + dígitos com - ou _
+  { re: /\bv\d+(?:\.\d+)+\b/gi }, // version with v
+  { re: /\b\d+\.\d+\.\d+(?:\.\d+)*\b/g, keep: (m) => THOUSANDS.test(m) }, // version without v (pt-BR thousands stay)
+  { re: /\b[A-Za-z][A-Za-z0-9]*(?:[-_][A-Za-z0-9]+)+\b/g, keep: (m) => !/\d/.test(m) }, // resource id: letters + digits with - or _
 ];
 
 const NUMBER = /(?<![\p{L}\d_.,])([1-9]\d{0,2}(?:\.\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?)(?![\p{L}\d_]|[.,]\d)(\s?%)?/gu;
@@ -26,7 +26,7 @@ function parseNumber(raw: string): number {
   return Number(raw);
 }
 
-/** Quantidades do texto em pt-BR (`11,2`, `1.240`) ou en (`11.2`), com o trecho original (`20%`). */
+/** Quantities in the text in pt-BR (`11,2`, `1.240`) or en (`11.2`), with the original span (`20%`). */
 export function extractNumbers(text: string): { raw: string; value: number }[] {
   let cleaned = text;
   for (const { re, keep } of IDENTIFIER_PATTERNS) cleaned = cleaned.replace(re, (m) => (keep?.(m) ? m : " "));
@@ -41,13 +41,13 @@ export function extractNumbers(text: string): { raw: string; value: number }[] {
 const close = (x: number, a: number, tol: number) => (a === 0 ? x === 0 : Math.abs(x - a) <= tol * Math.abs(a));
 
 /**
- * Valores aceitos, separados pela forma escrita: `percent` para número com "%" e `plain` para o resto. A equivalência
- * de escala (9,4% e 0,094) só existe para frações (×100 vai para `percent`) e para números escritos com "%" na linha do
- * tempo ou nas evidências (÷100 vai para `plain`). Uma contagem 3 ou a linha de base 45 não autorizam "300%" nem "45%".
+ * Accepted values, separated by written form: `percent` for a number with "%" and `plain` for the rest. Scale equivalence
+ * (9,4% and 0,094) exists only for fractions (×100 goes to `percent`) and for numbers written with "%" in the timeline
+ * or in the evidence (÷100 goes to `plain`). A count of 3 or the baseline 45 do not authorize "300%" or "45%".
  */
 export type AllowedNumbers = { plain: number[]; percent: number[] };
 
-/** Cada número do texto precisa casar, com tolerância relativa (padrão 0,5%), com um valor aceito da mesma forma. */
+/** Each number in the text must match, within relative tolerance (default 0.5%), an accepted value of the same form. */
 export function checkNarrative(text: string, allowed: AllowedNumbers, tolerance = DEFAULT_TOLERANCE): { passed: boolean; rejected: string[] } {
   const rejected: string[] = [];
   for (const n of extractNumbers(text)) {
@@ -69,9 +69,9 @@ function numbersIn(value: unknown, out: number[]): void {
 }
 
 /**
- * Valores calculados (métricas, inclusive extremos das faixas), números do timeline e das evidências, e contagens.
- * `fractions` são valores medidos entre 0 e 1 que a narrativa pode citar como porcentagem (ex.: pico da taxa de erro);
- * `impactFraction` das métricas entra nessa lista sozinho.
+ * Computed values (metrics, including range endpoints), timeline and evidence numbers, and counts.
+ * `fractions` are measured values between 0 and 1 that the narrative may cite as a percentage (e.g. error rate peak);
+ * the metrics' `impactFraction` goes in that list alone.
  */
 export function collectAllowedNumbers(i: {
   metrics: IncidentMetrics; timeline: { ts: string; text: string }[]; evidence: Evidence[]; counts: number[]; fractions?: number[];

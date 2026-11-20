@@ -1,4 +1,4 @@
-// Componentes acessíveis (spec 10.2; AC-39): faixa por texto e ícone, rótulo da demo, ROI ilustrativo e axe sem violações.
+// Accessible components (spec 10.2; AC-39): tier by text and icon, demo label, illustrative ROI and axe with no violations.
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -95,7 +95,7 @@ describe("components", () => {
   it("axe finds no violations in conversation, gate, dialog and postmortem", async () => {
     for (const ui of [<AgentConversation events={evts} />, <ApprovalGate {...gateProps} />, <ApprovalDialog open {...dlgProps} />, <PostmortemView doc={doc} />]) {
       const { container, unmount } = render(ui);
-      const res = await axe.run(container, { rules: { "color-contrast": { enabled: false } } }); // jsdom não calcula contraste; ver tokens-contrast
+      const res = await axe.run(container, { rules: { "color-contrast": { enabled: false } } }); // jsdom does not compute contrast; see tokens-contrast
       expect(res.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
       unmount();
     }

@@ -31,7 +31,7 @@ export const TraceEventSchema = z.discriminatedUnion("type", [
     by: z.enum(["auditor", "supervisor_guard", "gate", "numeric_guard", "canary"]),
     verdict: z.enum(["approve", "revise", "reject", "coerced", "blocked"]),
     feedback: z.string().max(600),
-    // Só o auditor preenche: o veredito do modelo foi endurecido pelas regras em código (o /stats conta este campo).
+    // Only the auditor fills this in: the model's verdict was hardened by the in-code rules (/stats counts this field).
     overridden: z.boolean().optional(),
   }) }),
   TraceBase.extend({ type: z.literal("answer"), payload: z.object({ kind: z.enum(["diagnosis", "postmortem", "escalation"]), text: z.string().max(2000) }) }),

@@ -1,11 +1,11 @@
-// Entrypoint MCP por stdio (spec 5.4; AC-34). O stdout é exclusivo do JSON-RPC: antes de qualquer import da aplicação,
-// console.log, console.info e console.debug passam a escrever em stderr. Por isso o resto vem por import dinâmico
-// (imports estáticos seriam avaliados antes deste redirecionamento). Logs JSON vão para stderr pelo logger.
+// MCP stdio entrypoint (spec 5.4; AC-34). stdout is reserved for JSON-RPC: before any application import,
+// console.log, console.info and console.debug start writing to stderr. That is why the rest comes via dynamic import
+// (static imports would be evaluated before this redirect). JSON logs go to stderr via the logger.
 console.log = (...args: unknown[]) => console.error(...args);
 console.info = (...args: unknown[]) => console.error(...args);
 console.debug = (...args: unknown[]) => console.error(...args);
 
-export {}; // módulo ES sem import estático (o top-level await exige módulo)
+export {}; // ES module with no static import (top-level await requires a module)
 
 const { ConfigError, loadConfig } = await import("../config.ts");
 const { createContainer } = await import("../app/container.ts");

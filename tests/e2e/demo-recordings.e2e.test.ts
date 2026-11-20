@@ -1,4 +1,4 @@
-// Gravações da War Room geradas em memória (spec 5.2, 7.6 e 10.2; AC-39): schema, tamanho, prefixo comum e determinismo.
+// War Room recordings generated in memory (spec 5.2, 7.6 and 10.2; AC-39): schema, size, common prefix and determinism.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, readdirSync, readFileSync } from "node:fs";
@@ -31,10 +31,10 @@ for (const id of ["deploy-5xx-rollback", "cost-anomaly"]) {
     assert.equal(rec.branches.approved.postmortem!.status, "final");
     assert.equal(rec.branches.rejected.postmortem!.status, "partial");
     assert.ok(rec.branches.approved.metrics);
-    // A auditoria do ramo continua a cadeia do prefixo comum.
+    // The branch audit continues the common prefix's chain.
     assert.ok(rec.branches.approved.audit.length > 0);
     assert.ok(!rec.branches.approved.audit.some((e) => rec.common.audit.some((c) => c.id === e.id)));
-    assert.deepEqual((await recordScenario(id)).common, rec.common); // determinístico
+    assert.deepEqual((await recordScenario(id)).common, rec.common); // deterministic
   });
 }
 

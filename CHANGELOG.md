@@ -2,6 +2,39 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+The 18 low-severity findings of the November 2026 review, all fixed. Details and tests per finding in [`docs/code-review-2026-11.md`](docs/code-review-2026-11.md).
+
+### Added
+
+- `POST /incidents/:id/resume` retries a resume whose run failed after every approval was decided; before, the incident stayed `mitigating` forever.
+- `ALLOWED_HOSTS` and `MAX_CONCURRENT_RUNS` (default 2) settings.
+- `API_TOKEN`: with it set, every HTTP route except `GET /health` needs `Authorization: Bearer <API_TOKEN>` (401 `invalid_api_token`). It is required when `HOST` is not a loopback address, so `npm start` refuses to expose the API without one, and it must differ from `APPROVAL_TOKEN`.
+- Auditor rule in code `unique_orders`: a plan with a repeated step order goes back for revision.
+- `llm_calls` columns `attempts`, `used_fallback` and `usage_estimated` (schema version 3; older databases are migrated in place).
+- `npm run web:verify` (records the demo once, then web tests and build).
+- `language.unit.test.ts`: no Portuguese in backend string literals or in the human-facing config files.
+
+### Fixed
+
+- **DNS rebinding.** A `Host` that is not a loopback name, `HOST` or one of `ALLOWED_HOSTS` gets 421; a write with a cross-site `Origin` gets 403.
+- **Redaction.** Text is redacted before it is clipped (logs and MCP output), and a secret is also matched in its JSON-escaped form.
+- **Runs left open by a crashed process** are closed as `abandoned` after `RUN_TIMEOUT_MS` + 60 s instead of blocking the incident for good.
+- **Failed reverts after a failed canary** are written to the action, the `canary_rollback` audit (`revertFailedActionIds`) and the escalation detail.
+- **LLM resilience.** A `buildUser` defect throws instead of posing as an outage; retries back off (500 ms base, jitter, `Retry-After`, capped at 10 s); 4xx other than 408/429 is not retried, and 401/402/403 skip the fallback; tokens of failed attempts are counted; missing usage is estimated and flagged; timeouts record the model that timed out.
+- Remaining Portuguese strings in the trace, audit and post-mortem ("dry run failed", "failed", "unknown", "alert"), and in `.env.example`, the workflows, the pre-commit hook, `.npmrc` and the `package.json` description.
+
+### Changed
+
+- Every Portuguese code comment in `src/`, `tests/`, `scripts/` and `web/` is translated to English; the language test now also covers comments (with a short allowlist for the Portuguese decision words the parser accepts and the pt-BR number formats the numeric guard reads).
+
+- `tsconfig.json` uses `module` and `moduleResolution` `nodenext`, so the typecheck rejects extensionless relative imports the way Node does.
+- `mcp:inspect` pins `@modelcontextprotocol/inspector@2.13.0`.
+- CI runs on pushes to `main` and on pull requests, with a concurrency group that cancels superseded runs; `verify` records the demo once.
+- The Pages workflow runs the web typecheck, `check:tokens` and the web tests before building.
+- Goldens regenerated: only the fake's estimated `promptTokens` changed (the auditor input now carries six rule checks).
+
 ## [0.2.0] - 2026-11-20
 
 ### Changed

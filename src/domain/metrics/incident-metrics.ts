@@ -1,5 +1,5 @@
-// Métricas do incidente por funções puras (spec 5.7). Nenhuma chama o LLM.
-// Minutos economizados e ROI são faixas sobre linha de base sintética, rotulados como ilustrativos.
+// Incident metrics as pure functions (spec 5.7). None calls the LLM.
+// Minutes saved and ROI are ranges over a synthetic baseline, labeled as illustrative.
 import type { Alert, Approval, GatedAction, IncidentMetrics, MetricName, MetricSource, Range, RootCauseCategory, SeriesPoint } from "../../contracts/index.ts";
 import { firstViolation, meanBetween } from "../telemetry/series.ts";
 
@@ -21,14 +21,14 @@ export type MetricsInput = {
   approvals: Approval[];
   actions: GatedAction[];
   category: RootCauseCategory;
-  firstMitigationAt: string | null; // resolvido pelo chamador (o catálogo, que sabe o que mitiga, chega na Tarefa 23)
+  firstMitigationAt: string | null; // resolved by the caller (the catalog, which knows what mitigates, arrives in Task 23)
   executedSavingsUsd: number[];
   llmCalls: { costUsd: number; promptTokens: number; completionTokens: number }[];
   assumptions: BusinessAssumptions;
 };
 
 const DEFAULT_BASELINE_MTTR_MIN: Range = { low: 45, high: 95 };
-/** Sinal de erro usado em impactFraction. */
+/** Error signal used in impactFraction. */
 export const ERROR_RATE_METRIC: MetricName = "http_5xx_rate";
 
 const round4 = (x: number) => Math.round(x * 1e4) / 1e4;
@@ -57,7 +57,7 @@ const METRIC_SOURCES: Record<string, MetricSource> = {
   completionTokens: "measured",
 };
 
-/** Primeira amostra do sinal principal que viola o limiar até a detecção; sem sinal com limiar (custo), a própria detecção. */
+/** First sample of the main signal that violates the threshold up to detection; with no signal that has a threshold (cost), detection itself. */
 export function impactStartOf(alert: Alert, series: Partial<Record<MetricName, SeriesPoint[]>>): string {
   const points = series[alert.signal];
   if (alert.threshold === null || !points) return alert.detectedAt;

@@ -1,6 +1,6 @@
-// BM25 lexical com escore normalizado para recusa por limiar (spec 4.6 e AC-25). Puro.
-// idf(t) = ln(1 + (N − n + 0.5) / (n + 0.5)); teto da consulta = soma, sobre termos únicos da consulta, de idf(t) × (k1 + 1);
-// normalizedScore = score / teto (sempre abaixo de 1).
+// Lexical BM25 with a normalized score for threshold-based refusal (spec 4.6 and AC-25). Pure.
+// idf(t) = ln(1 + (N − n + 0.5) / (n + 0.5)); query ceiling = sum, over the query's unique terms, of idf(t) × (k1 + 1);
+// normalizedScore = score / ceiling (always below 1).
 import { tokenize } from "./tokenize.ts";
 
 type Doc = { id: string; tf: Map<string, number>; length: number };

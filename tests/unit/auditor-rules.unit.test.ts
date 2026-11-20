@@ -14,7 +14,7 @@ const deploy = scenarios.get("deploy-5xx-rollback");
 const costEv: AuditEvidence = { inventory: cost.inventory, deploys: cost.deploys, impactStartedAt: impactStartOf(cost.alert, cost.series) };
 const deployEv: AuditEvidence = { inventory: null, deploys: deploy.deploys, impactStartedAt: impactStartOf(deploy.alert, deploy.series) };
 
-// Os planos dos cenários vêm das próprias fixtures do fake, para a regra e o roteiro não divergirem.
+// The scenario plans come from the fake's own fixtures, so the rule and the script do not diverge.
 const planTurn = (file: string, id: string) => readFixture(file).turns.find((t) => t.id === id)!.output as RemediationPlan;
 const costRev0 = () => planTurn("fixtures/llm/cost-anomaly.json", "plan-0");
 const costRev1 = () => planTurn("fixtures/llm/cost-anomaly.json", "plan-1");
@@ -74,4 +74,14 @@ test("verdict combination: code is the floor", () => {
   assert.deepEqual(combineAuditorVerdict(failing(), "approve"), { verdict: "revise", overridden: true });
   assert.deepEqual(combineAuditorVerdict(failing(), null), { verdict: "revise", overridden: false });
   assert.deepEqual(combineAuditorVerdict(passing(), null), { verdict: "approve", overridden: false });
+});
+
+test("unique_orders fails a plan with repeated step orders", () => {
+  // Review 2026-11: two steps with order 1 made dependsOn [1] ambiguous in the gate, executor and cascade.
+  const dup = plan([step(1, "add_incident_note", "incident/INC-0001"), step(1, "block_image_tag", "image/orders-api:v3.8.0"), step(2, "add_incident_note", "incident/INC-0001", {}, [1])]);
+  const check = runAuditorRules(dup, deployEv).find((c) => c.rule === "unique_orders")!;
+  assert.equal(check.passed, false);
+  assert.match(check.detail, /order 1 appears 2 times/);
+  const ok = runAuditorRules(deployRev0(), deployEv).find((c) => c.rule === "unique_orders")!;
+  assert.equal(ok.passed, true);
 });

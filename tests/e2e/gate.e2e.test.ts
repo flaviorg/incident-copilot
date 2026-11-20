@@ -67,7 +67,7 @@ test("expired approval: reads project it, decision materializes it and answers a
   assert.equal(after.incident.escalation!.reason, "mitigation_rejected");
   assert.deepEqual(after.actions.map((a) => a.status), ["succeeded", "expired", "cancelled"]);
   assert.ok(c.store.listAudit(v.incident.id).some((e) => e.event === "approval_expired" && e.actor === "system:approval-expiry"));
-  // A expiração já foi materializada: nova tentativa é approval_not_pending.
+  // The expiry was already materialized: a new attempt is approval_not_pending.
   await assert.rejects(approveAs(c, "bia"), (e) => e instanceof ConflictError && e.code === "approval_not_pending");
 });
 
@@ -81,7 +81,7 @@ test("token rules", async () => {
   for (let i = 0; i < 3; i++) await c.approvals.decide("APR-0001", { decision: "approve", approver: "ana" }, "x".repeat(20), { requestId: null }).catch(() => {});
   await assert.rejects(approveAs(c, "ana"), LockedError);
   assert.ok(!c.logs.join("\n").includes("wrong-token-000000"));
-  // Passados os 10 minutos de bloqueio, o token certo volta a valer.
+  // After the 10-minute lockout, the right token is valid again.
   c.clock.tick(10 * 60 + 1);
   assert.equal((await approveAs(c, "ana")).approval.status, "approved");
   const off = createTestContainer({ approvalToken: null });
@@ -110,7 +110,7 @@ test("second decision is rejected and the action executes once", async () => {
   await approveAs(c, "ana");
   await assert.rejects(approveAs(c, "bia"), (e) => e instanceof ConflictError && e.code === "approval_not_pending");
   assert.equal(c.store.listAudit(v.incident.id).filter((e) => e.event === "action_executed" && e.details.actionType === "rollback_deployment").length, 1);
-  // Duas decisões disparadas juntas: uma vale, a outra recebe 409, e a ação roda uma vez só.
+  // Two decisions fired together: one wins, the other gets 409, and the action runs only once.
   const { c: c2, v: v2 } = await open();
   const results = await Promise.allSettled([approveAs(c2, "ana"), approveAs(c2, "bia")]);
   assert.deepEqual(results.map((x) => x.status).sort(), ["fulfilled", "rejected"]);
@@ -130,7 +130,7 @@ test("resumes after container restart on the same db file", async () => {
 });
 
 test("rejection cascades to a dependent step that was waiting for its own approval", async () => {
-  // Passo 3 sem runbook sobe para faixa 3 e ganha a própria aprovação; ele depende do rollback.
+  // Step 3 without a runbook goes up to tier 3 and gets its own approval; it depends on the rollback.
   const base = readFixture("fixtures/llm/deploy-5xx-rollback.json");
   const plan = structuredClone(base.turns.find((t) => t.id === "plan-0")!.output) as RemediationPlan;
   plan.steps[2]!.runbookRef = null;
@@ -146,9 +146,9 @@ test("rejection cascades to a dependent step that was waiting for its own approv
 });
 
 test("failed dry run, open breaker, full limiter and failing canary end as the spec says", async () => {
-  // Rollback para v9.9.9: a regra rollback_requires_recent_deploy reprova o plano nas 3 revisões; esgotadas as revisões,
-  // todos os passos sobem para faixa 3. O dry run do rollback falha (sem aprovação), o dependente é cancelado e só a
-  // nota pede aprovação. Aprovada a nota, nada mitigador roda: no_executable_actions.
+  // Rollback to v9.9.9: the rollback_requires_recent_deploy rule rejects the plan in all 3 revisions; once the revisions are exhausted,
+  // all steps go up to tier 3. The rollback dry run fails (no approval), the dependent is cancelled and only the
+  // note asks for approval. Once the note is approved, nothing mitigating runs: no_executable_actions.
   {
     const base = readFixture("fixtures/llm/deploy-5xx-rollback.json");
     const plan = structuredClone(base.turns.find((t) => t.id === "plan-0")!.output) as RemediationPlan;
@@ -169,7 +169,7 @@ test("failed dry run, open breaker, full limiter and failing canary end as the s
     assert.deepEqual(r.incident.actions.map((a) => a.status), ["succeeded", "rejected_by_dry_run", "cancelled"]);
     assert.equal(r.incident.incident.escalation!.reason, "no_executable_actions");
   }
-  // Breaker aberto antes da execução: nada roda e o incidente escala com circuit_open.
+  // Breaker open before execution: nothing runs and the incident escalates with circuit_open.
   {
     const breaker = new CircuitBreaker({ failureThreshold: 3, cooldownSec: 300 });
     const { c } = await open({ guards: { breaker } });
@@ -179,7 +179,7 @@ test("failed dry run, open breaker, full limiter and failing canary end as the s
     assert.deepEqual(r.incident.actions.map((a) => a.status), ["blocked_circuit_open", "blocked_circuit_open", "cancelled"]);
     assert.equal(r.incident.incident.escalation!.reason, "circuit_open");
   }
-  // Limiter cheio: as execuções são recusadas com throttled.
+  // Limiter full: executions are refused with throttled.
   {
     const limiter = new ActionRateLimiter({ perMinute: 5, repeatWindowMin: 10 });
     const { c } = await open({ guards: { limiter } });
@@ -189,7 +189,7 @@ test("failed dry run, open breaker, full limiter and failing canary end as the s
     assert.deepEqual(r.incident.actions.map((a) => a.status), ["throttled", "throttled", "cancelled"]);
     assert.equal(r.incident.incident.escalation!.reason, "throttled");
   }
-  // Canário reprovado: reverte block_image_tag e rollback (ordem inversa), audita canary_rollback e escala.
+  // Canary failed: reverts block_image_tag and rollback (reverse order), audits canary_rollback and escalates.
   {
     const constant = (value: number) => ({ segments: [{ fromSec: 0, toSec: 60, kind: "constant" as const, value }] });
     const badCanary = (s: LoadedScenario): LoadedScenario => (s.after
@@ -206,8 +206,8 @@ test("failed dry run, open breaker, full limiter and failing canary end as the s
 });
 
 /**
- * Container cujo nó gate é o portão real seguido de `after`, no mesmo superstep. Simula o que chega entre o commit das
- * aprovações (feito pelo portão) e a gravação final do blackboard (feita no fim da execução).
+ * Container whose gate node is the real gate followed by `after`, in the same superstep. Simulates what arrives between the commit of the
+ * approvals (done by the gate) and the final blackboard write (done at the end of the execution).
  */
 function containerWithGateHook(after: (c: TestContainer) => Promise<void>): TestContainer {
   let realGate: NodeFn | null = null;
@@ -228,9 +228,9 @@ function containerWithGateHook(after: (c: TestContainer) => Promise<void>): Test
 }
 
 test("a decision sent while the opening run is still going is refused and the incident stays consistent", async () => {
-  // Revisão final: a aprovação já aparece pendente antes de a execução de abertura gravar o blackboard. Uma decisão
-  // nessa janela era aceita, mandava o lote para o executor dentro da abertura e a gravação final caía em
-  // version_conflict, deixando o incidente irrecuperável.
+  // Final review: the approval already shows as pending before the opening run writes the blackboard. A decision
+  // in that window was accepted, sent the batch to the executor inside the opening and the final write fell into
+  // version_conflict, leaving the incident unrecoverable.
   let during: unknown = null;
   const c = containerWithGateHook(async (c) => {
     assert.deepEqual(c.approvals.list("pending").map((a) => a.id), ["APR-0001"]);
@@ -243,14 +243,14 @@ test("a decision sent while the opening run is still going is refused and the in
   assert.equal(c.store.getApproval("APR-0001")!.status, "pending");
   assert.ok(!c.store.listAudit(v.incident.id).some((e) => e.event === "approval_approved" || e.event === "action_executed"));
   assert.deepEqual(c.store.listRuns(v.incident.id).map((x) => x.outcome), ["awaiting_approval"]);
-  // Terminada a abertura, a mesma decisão vale e o incidente resolve.
+  // Once the opening finishes, the same decision is valid and the incident resolves.
   const r = await approveAs(c, "ana");
   assert.equal(r.incident.incident.status, "resolved");
   assert.deepEqual(c.store.listRuns(v.incident.id).map((x) => x.outcome), ["awaiting_approval", "resolved"]);
 });
 
 test("a run whose final save fails still records its end", async () => {
-  // Qualquer escrita concorrente no blackboard derruba a gravação final por versão; a linha em runs não pode ficar sem fim.
+  // Any concurrent write to the blackboard fails the final write on version; the row in runs cannot be left without an end.
   const c = containerWithGateHook(async (c) => {
     const id = incidentIdOfStore(c);
     const { blackboard, version } = c.store.loadBlackboard(id);
@@ -318,4 +318,73 @@ test("a timeout escalation after the gate closes the pending approvals, and a la
   assert.equal(c.store.listActions(id).find((a) => a.order === 2)!.status, "cancelled");
   await assert.rejects(approveAs(c, "ana"), (e) => e instanceof ConflictError);
   assert.ok(!c.store.listAudit(id).some((e) => e.event === "approval_approved"));
+});
+
+// ---------- Review 2026-11: failed reverts, stuck resume, abandoned runs ----------
+
+const failingCanary = (s: LoadedScenario): LoadedScenario => {
+  const constant = (value: number) => ({ segments: [{ fromSec: 0, toSec: 60, kind: "constant" as const, value }] });
+  return s.after
+    ? { ...s, after: { ...s.after, variants: s.after.variants.map((x, i) => (i === 0 ? { ...x, series: { http_5xx_rate: constant(0.09), p99_latency_ms: constant(1200) } } : x)) } }
+    : s;
+};
+
+test("a revert that fails after a failed canary is recorded, audited and named in the escalation", async () => {
+  const { c, v } = await open({ transformScenario: failingCanary });
+  const realRevert = c.infra.revert.bind(c.infra);
+  c.infra.revert = (w, a) => (a.actionType === "rollback_deployment"
+    ? { world: w, result: { ok: false, summary: "deployment API refused the rollback" } }
+    : realRevert(w, a));
+  const r = await approveAs(c, "ana");
+  const rollback = r.incident.actions.find((a) => a.actionType === "rollback_deployment")!;
+  assert.equal(rollback.status, "succeeded", "the change is still in the world");
+  assert.match(rollback.resultSummary ?? "", /revert FAILED: deployment API refused the rollback/);
+  assert.match(c.store.listActions(v.incident.id).find((a) => a.id === rollback.id)!.resultSummary ?? "", /revert FAILED/, "persisted");
+  const audit = c.store.listAudit(v.incident.id).find((e) => e.event === "canary_rollback")!;
+  assert.deepEqual(audit.details.revertFailedActionIds, [rollback.id]);
+  assert.match(r.incident.incident.escalation!.detail, /revert of rollback_deployment FAILED: deployment API refused the rollback/);
+});
+
+test("a resume that failed can be retried through IncidentService.resume once the run is closed", async () => {
+  // A resume whose run throws (here: the executor node, once) left phase "resume" with every approval decided, and
+  // decide() then answered approval_not_pending forever.
+  let failOnce = true;
+  let realExecutor: NodeFn | null = null;
+  const c: TestContainer = createTestContainer({
+    nodes: {
+      executor: async (s, cfg) => {
+        if (failOnce) { failOnce = false; throw new Error("executor defect"); }
+        return realExecutor!(s, cfg);
+      },
+    },
+  });
+  const { createExecutorNode } = await import("../../src/graph/nodes/executor-node.ts");
+  realExecutor = createExecutorNode({
+    infra: c.infra, scenarios: c.scenarios, guards: c.guards, trace: c.trace, clock: c.clock,
+    persist: { action: (a) => c.store.upsertAction(a), approval: (a) => c.store.createApproval(a), audit: (e) => c.store.appendAudit(e) },
+  });
+  const v = await c.incidents.open({ scenarioId: DEPLOY }, { requestId: null });
+  await assert.rejects(approveAs(c, "ana"), /executor defect/);
+  assert.equal(c.store.loadBlackboard(v.incident.id).blackboard.phase, "resume");
+  await assert.rejects(approveAs(c, "ana"), (e) => e instanceof ConflictError && e.code === "approval_not_pending");
+  const r = await c.incidents.resume(v.incident.id, { requestId: "req-retry" });
+  assert.equal(r.incident.status, "resolved");
+});
+
+test("a run row left open by a crashed process is closed as abandoned after the lease, and decisions go through", async () => {
+  const { c, v } = await open();
+  // Another process crashed mid-run long ago: its row has no end.
+  const old = new Date(c.clock.now().getTime() - (c.config.runTimeoutMs + 5 * 60_000)).toISOString();
+  c.store.recordRun({ id: "RUN-CRASHED", incidentId: v.incident.id, startedAt: old, endedAt: null, outcome: null });
+  const r = await approveAs(c, "ana");
+  assert.equal(r.incident.incident.status, "resolved");
+  const crashed = c.store.listRuns(v.incident.id).find((x) => x.id === "RUN-CRASHED")!;
+  assert.notEqual(crashed.endedAt, null);
+  assert.equal(crashed.outcome, "abandoned");
+});
+
+test("a recent open run from another process still blocks decisions", async () => {
+  const { c, v } = await open();
+  c.store.recordRun({ id: "RUN-ELSEWHERE", incidentId: v.incident.id, startedAt: c.clock.now().toISOString(), endedAt: null, outcome: null });
+  await assert.rejects(approveAs(c, "ana"), (e) => e instanceof ConflictError && e.code === "incident_not_accepting");
 });

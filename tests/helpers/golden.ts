@@ -1,4 +1,4 @@
-// Golden de métricas (spec 7.6) e execução de um ramo inteiro de cenário (abre, decide todas as pendentes, retoma).
+// Metrics golden (spec 7.6) and execution of a whole scenario branch (opens, decides all pending, resumes).
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
@@ -8,7 +8,7 @@ import type { IncidentView } from "../../src/contracts/index.ts";
 import { createTestContainer, TEST_APPROVAL_TOKEN } from "./container.ts";
 import type { TestContainer, TestContainerOptions } from "./container.ts";
 
-/** UPDATE_GOLDEN=1 grava tests/golden/<name>.json; senão compara com deepEqual. */
+/** UPDATE_GOLDEN=1 grava tests/golden/<name>.json; otherwise compares with deepEqual. */
 export function assertGolden(name: string, actual: unknown): void {
   const path = projectPath("tests", "golden", `${name}.json`);
   if (process.env.UPDATE_GOLDEN === "1") {
@@ -21,8 +21,8 @@ export function assertGolden(name: string, actual: unknown): void {
 }
 
 /**
- * Abre o cenário e decide todas as aprovações pendentes (approve ou reject) com o token de teste, avançando
- * demo.approvalLatencySec antes de cada decisão. A última decisão dispara a retomada.
+ * Opens the scenario and decides all pending approvals (approve or reject) with the test token, advancing
+ * demo.approvalLatencySec before each decision. The last decision triggers the resume.
  */
 export async function runScenarioBranch(
   scenarioId: string,

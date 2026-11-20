@@ -1,4 +1,4 @@
-// Caminhos a partir da raiz do projeto (independe do diretório atual).
+// Paths from the project root (independent of the current directory).
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 

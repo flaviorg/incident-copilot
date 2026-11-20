@@ -1,4 +1,4 @@
-// Enums compartilhados (spec 5.2). Seguro para navegador: só importa zod.
+// Shared enums (spec 5.2). Browser-safe: only imports zod.
 import * as z from "zod";
 
 export const SeveritySchema = z.enum(["sev1", "sev2", "sev3"]);
@@ -20,5 +20,5 @@ export const ActionStatusSchema = z.enum([
 export const ApprovalStatusSchema = z.enum(["pending", "approved", "rejected", "expired"]);
 export const TraceTypeSchema = z.enum(["thought", "action", "observation", "plan", "critique", "answer", "handoff"]);
 export const ReadToolNameSchema = z.enum(["query_metrics", "query_logs", "list_deploys", "audit_cloud_inventory"]);
-// Tipos de erro de LLM (spec 4.3, LlmError.kind); usado também em llm_calls.error_kind.
+// LLM error kinds (spec 4.3, LlmError.kind); also used in llm_calls.error_kind.
 export const LlmErrorKindSchema = z.enum(["timeout", "rate_limit", "server_error", "invalid_output", "aborted"]);

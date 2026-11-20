@@ -1,4 +1,4 @@
-// `scenarios`: lista os cenários de demo.
+// `scenarios`: lists the demo scenarios.
 import { loadConfig } from "../config.ts";
 import { createContainer } from "../app/container.ts";
 import { renderTable } from "./render.ts";

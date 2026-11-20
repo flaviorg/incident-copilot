@@ -1,5 +1,5 @@
-// Estado do grafo: o próprio blackboard (spec 5.2). Cada chave usa o redutor padrão do LangGraph para objetos Zod
-// (último valor), então cada nó devolve só as chaves que mudou e o resto do estado segue intacto.
+// Graph state: the blackboard itself (spec 5.2). Each key uses LangGraph's default reducer for Zod objects
+// (last value), so each node returns only the keys it changed and the rest of the state stays intact.
 import { BlackboardSchema } from "../contracts/index.ts";
 import type { Blackboard } from "../contracts/index.ts";
 

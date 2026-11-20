@@ -1,4 +1,4 @@
-// `record-demo [--out <dir>]` (spec 5.5 e 7.6): gera as gravações da War Room com os dois ramos (padrão web/public/demo).
+// `record-demo [--out <dir>]` (spec 5.5 and 7.6): generates the War Room recordings with both branches (default web/public/demo).
 import { relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { recordAll } from "../app/demo-recorder.ts";

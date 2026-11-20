@@ -1,4 +1,4 @@
-// GET /scenarios (spec 5.3): resumo dos cenários de demo.
+// GET /scenarios (spec 5.3): summary of the demo scenarios.
 import type { FastifyInstance } from "fastify";
 import type { Container } from "../../app/container.ts";
 

@@ -1,5 +1,5 @@
-// Um só gerador de ids em todos os modos (spec 4.3 e 7.5): contadores na tabela `sequences`.
-// Num banco novo tudo é determinístico; num banco persistido os ids continuam a sequência.
+// A single id generator in all modes (spec 4.3 and 7.5): counters in the `sequences` table.
+// On a fresh database everything is deterministic; on a persisted database the ids continue the sequence.
 import type { SqliteIncidentStore } from "./db/incident-store.ts";
 
 export interface Ids {

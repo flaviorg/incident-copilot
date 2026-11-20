@@ -23,7 +23,7 @@ export class CircuitBreaker {
     return now.getTime() - this.openedAtMs < this.cooldownMs ? "open" : "half_open";
   }
 
-  /** Fechado deixa passar; aberto barra; meia-aberto deixa passar só a primeira tentativa. */
+  /** Closed lets through; open blocks; half-open lets only the first attempt through. */
   canExecute(now: Date): boolean {
     const s = this.state(now);
     if (s === "closed") return true;
@@ -46,7 +46,7 @@ export class CircuitBreaker {
     this.trialTaken = false;
   }
 
-  /** Devolve true quando esta falha abriu (ou reabriu) o breaker. */
+  /** Returns true when this failure opened (or reopened) the breaker. */
   recordFailure(now: Date): boolean {
     const s = this.state(now);
     if (s === "open") return false;

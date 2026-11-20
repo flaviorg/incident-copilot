@@ -1,5 +1,5 @@
-// Tradução de erros tipados em status HTTP e corpo de erro (spec 5.3 e 6.1). Sem stack e sem mensagem bruta de
-// biblioteca: erro inesperado vira 500 internal_error com texto genérico, e o detalhe fica só no log (com requestId).
+// Translation of typed errors into HTTP status and error body (spec 5.3 and 6.1). No stack and no raw library
+// message: an unexpected error becomes 500 internal_error with generic text, and the detail stays only in the log (with requestId).
 import type * as z from "zod";
 import type { ErrorBody as ErrorBodyContract } from "../contracts/index.ts";
 import {
@@ -13,7 +13,7 @@ export type ErrorBody = ErrorBodyContract;
 export type HttpError = {
   status: number;
   body: ErrorBody;
-  /** true quando o erro não é do domínio nem da borda: quem chama loga o detalhe em stderr. */
+  /** true when the error is neither a domain nor an edge error: the caller logs the detail to stderr. */
   unexpected: boolean;
 };
 
@@ -23,7 +23,7 @@ const body = (code: string, message: string, requestId: string, issues?: { path:
   error: { code, message, requestId, ...(issues ? { issues } : {}) },
 });
 
-/** Erro do Fastify (parser de corpo, limite de tamanho): tem `code` FST_* e `statusCode`. */
+/** Fastify error (body parser, size limit): has a `code` FST_* and `statusCode`. */
 function fastifyError(e: unknown): { code: string; statusCode: number } | null {
   if (typeof e !== "object" || e === null) return null;
   const code = (e as { code?: unknown }).code;
@@ -53,13 +53,13 @@ export function toHttpError(e: unknown, requestId: string): HttpError {
     if (f.code === "FST_ERR_CTP_INVALID_MEDIA_TYPE") return known(415, "unsupported_media_type", "unsupported content-type; use application/json");
     if (f.statusCode >= 400 && f.statusCode < 500) return known(f.statusCode, "bad_request", "bad request");
   }
-  // JSON malformado no parser padrão chega como SyntaxError com statusCode 400.
+  // Malformed JSON in the default parser arrives as a SyntaxError with statusCode 400.
   if (e instanceof SyntaxError && (e as { statusCode?: unknown }).statusCode === 400) return known(400, "invalid_json", "invalid JSON body");
 
   return { status: 500, body: body("internal_error", INTERNAL_ERROR_MESSAGE, requestId), unexpected: true };
 }
 
-/** Valida corpo, params ou query com Zod (messages in English); falha vira ValidationError com issues { path, message }. */
+/** Validates body, params or query with Zod (messages in English); a failure becomes ValidationError with issues { path, message }. */
 export function parseOr400<T>(schema: z.ZodType<T>, value: unknown): T {
   const r = parseWithIssues(schema, value);
   if (!r.success) throw new ValidationError(`invalid input: ${formatIssues(r.issues)}`, r.issues);

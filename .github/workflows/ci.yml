@@ -1,9 +1,16 @@
-# CI do incident-copilot (spec 8.4 e AC-41): typecheck do backend e da web, testes do backend e da web, build da web,
-# check:tokens e check:secrets. Nenhum segredo configurado: o provedor fake roda os testes sem rede.
+# incident-copilot CI (spec 8.4 and AC-41): backend and web typecheck, backend and web tests, web build,
+# check:tokens and check:secrets. No secrets configured: the fake provider runs the tests without network.
 # Action major versions checked against the official releases on 2026-10-04 (checkout v7.0.1, setup-node v7.0.0).
 name: CI
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -26,7 +33,6 @@ jobs:
       - run: npm run typecheck
       - run: npm run typecheck:web
       - run: npm test
-      - run: npm run web:test
-      - run: npm run web:build
+      - run: npm run web:verify
       - run: npm run check:tokens
       - run: npm run check:secrets

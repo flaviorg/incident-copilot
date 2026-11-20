@@ -1,7 +1,7 @@
 // Token usage and estimated cost (spec 5.7 and 7.2, rule 7). The fake costs 0. A real model without a price in
 // data/model-prices.json also records 0, so the container warns at startup (missingPrices) instead of staying silent.
 
-/** Cerca de 4 caracteres por token (221522). */
+/** About 4 characters per token (221522). */
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }

@@ -2,17 +2,17 @@
 
 Review of `main` at `41b9623`, done on 2026-11-20 before the 0.2.0 War Room redesign. Five reviewers each covered one area (correctness, security, LLM and resilience, repository and CI, War Room). Every finding was then checked by a separate verifier that read the cited code and tried to refute it. Only the findings that survived are listed: 31 confirmed, 14 rejected.
 
-Status: **fixed in 0.2.0** means the change is on this branch; **open** means it is a recommendation, not yet done.
+Status: **fixed in 0.2.0** means the change shipped in 0.2.0; **fixed, unreleased** means it comes after 0.2.0 and is listed under "Unreleased" in the changelog.
 
 ## Summary
 
-| Severity | Confirmed | Fixed in 0.2.0 |
-|---|---|---|
-| high | 1 | 1 |
-| medium | 6 | 6 |
-| low | 24 | 6 |
+| Severity | Confirmed | Fixed in 0.2.0 | Fixed after 0.2.0 |
+|---|---|---|---|
+| high | 1 | 1 | 0 |
+| medium | 6 | 6 | 0 |
+| low | 24 | 6 | 18 |
 
-The only high-severity finding, the half-open circuit breaker that could stay blocked until the process restarts, is fixed in 0.2.0. All six medium findings are fixed too. The 18 open items are low severity.
+Every confirmed finding is now fixed. The high and medium ones shipped in 0.2.0; the 18 low-severity items followed, each with a regression test where the behavior can be tested, together with the two follow-ups they named: an API token for a non-loopback `HOST`, and translating the Portuguese code comments.
 
 ## Correctness
 
@@ -36,25 +36,25 @@ The only high-severity finding, the half-open circuit breaker that could stay bl
 
 ### A failed or crashed resume leaves the incident stuck for good
 
-- **Severity:** low · **Status:** open · **Where:** [`src/app/incident-service.ts:176`](../src/app/incident-service.ts#L176)
+- **Severity:** low · **Status:** fixed, unreleased (runs get a lease: a row with no end that this process is not running and that started more than `RUN_TIMEOUT_MS` + 60 s ago is closed as `abandoned`; `resume()` refuses while a run is live; new `POST /incidents/:id/resume` retries a failed resume; tests in `gate.e2e.test.ts` and `http.e2e.test.ts`) · **Where:** [`src/app/incident-service.ts:176`](../src/app/incident-service.ts#L176)
 - **Scenario:** (a) A resume run throws, for example a version_conflict on the final save, a fixture error or a defect. failRun closes the runs row, but the blackboard keeps phase 'resume'. That phase was saved by applyDecision. resumeIfReady (approval-service.ts:126) is the only thing that triggers resume(), and it only runs from decide() on an approval that is still pending. Every approval is already decided, so decide returns 409 approval_not_pending. The incident stays 'mitigating' forever with no way to retry. (b) The process crashes or is killed during any run. The runs row keeps endedAt=null, and requireNoRunInProgress then refuses every later decision and expiry for that incident with incident_not_accepting, permanently.
 - **Suggested fix:** Give a run a lease: treat runs with endedAt null and startedAt older than runTimeoutMs plus a margin as abandoned, and close them on startup or on read. Add a resume path that can be retried, through an endpoint or by letting decide/get call resume when phase === 'resume' and no run is in progress.
 
 ### The verifier hides failed reverts after a failed canary
 
-- **Severity:** low · **Status:** open · **Where:** [`src/graph/nodes/verifier-node.ts:67`](../src/graph/nodes/verifier-node.ts#L67)
+- **Severity:** low · **Status:** fixed, unreleased (a failed revert keeps status `succeeded`, gets `revert FAILED: <summary>` in `resultSummary`, is persisted, is listed in `revertFailedActionIds` of the `canary_rollback` audit, and leads the escalation detail; e2e test in `gate.e2e.test.ts`) · **Where:** [`src/graph/nodes/verifier-node.ts:67`](../src/graph/nodes/verifier-node.ts#L67)
 - **Scenario:** The canary fails. The verifier reverts the actions that can be reverted, in reverse order. When infra.revert returns ok:false, the action stays status 'succeeded' and is not persisted. No audit entry records the failure, and only a trace observation shows it. The canary_rollback audit lists only revertedActionIds. The escalation detail says 'reverted in reverse order: X' for the actions that worked, or 'nothing to revert'. The on-call human reads that the rollback was done while the world still has a change that did not work.
 - **Suggested fix:** When a revert fails, set a resultSummary (or a dedicated status such as revert_failed), persist the action, and add revertFailedActionIds to the canary_rollback audit details. Mention the failed reverts in escalation.detail, for example 'revert of X FAILED: <summary>'.
 
 ### Duplicate step orders are accepted and make dependsOn resolution ambiguous
 
-- **Severity:** low · **Status:** open · **Where:** [`src/contracts/plan.ts:4`](../src/contracts/plan.ts#L4)
+- **Severity:** low · **Status:** fixed, unreleased (new auditor rule in code `unique_orders`, so a plan with a repeated order goes back for revision; unit test in `auditor-rules.unit.test.ts`; goldens regenerated, only the fake's estimated `promptTokens` changed) · **Where:** [`src/contracts/plan.ts:4`](../src/contracts/plan.ts#L4)
 - **Scenario:** Neither PlanStepSchema nor the auditor rules require unique 'order' values. Example: the LLM plan has two steps with order 1, A (blocked_forbidden) and B (awaiting_approval), and step 2 has dependsOn [1]. The gate (gate-node.ts:67), the executor (executor-node.ts:81) and cancelDependents (incident-service.ts:213) each resolve a dependency with find(order === n), which takes whichever step comes first. Depending on array order, step 2 can be cancelled wrongly, or can pass the dependency check while depending on a blocked step. Rejecting B also cancels every step that depends on order 1.
 - **Suggested fix:** Add a refine to RemediationPlanSchema requiring unique orders, or add an auditor rule 'unique_orders' that fails the plan when orders repeat.
 
 ### Portuguese human-facing strings remain in the trace, audit and post-mortem
 
-- **Severity:** low · **Status:** open · **Where:** [`src/graph/nodes/gate-node.ts:83`](../src/graph/nodes/gate-node.ts#L83)
+- **Severity:** low · **Status:** fixed, unreleased ("dry run failed", "failed", "unknown", "alert"; `language.unit.test.ts` scans every string literal in `src/` for Portuguese words, with one allowlisted message that lists the accepted Portuguese decision terms) · **Where:** [`src/graph/nodes/gate-node.ts:83`](../src/graph/nodes/gate-node.ts#L83)
 - **Scenario:** AGENTS.md and constitution section 7 require English for all human-facing text. Portuguese strings still reach the trace, audit and post-mortem: gate-node.ts:83 ('dry run falhou'), executor-node.ts:123 ('falhou (...)'), and telemetry-node.ts:75-76 ('desconhecido', 'alerta: ...'), which ends up in Diagnosis.evidence and the post-mortem. incident-service.ts:281 already uses 'dry run failed' for the same event, so the same event is worded differently depending on its source.
 - **Suggested fix:** Replace them with 'dry run failed', 'failed', 'unknown' and 'alert'. Add a test asserting the trace summaries and evidence for these paths are in English, and run npm run regen if any golden changes.
 
@@ -68,19 +68,19 @@ The only high-severity finding, the half-open circuit breaker that could stay bl
 
 ### No Host/Origin check and no auth on mutating routes: DNS rebinding can drive the API
 
-- **Severity:** low · **Status:** open · **Where:** [`src/http/server.ts:29`](../src/http/server.ts#L29)
+- **Severity:** low · **Status:** fixed, unreleased (`src/http/host-guard.ts`: a Host that is not a loopback name, `HOST` or one of `ALLOWED_HOSTS` gets 421 `host_not_allowed`; a write with a cross-site `Origin` gets 403 `cross_origin_write`; `MAX_CONCURRENT_RUNS`, default 2, caps runs started by `POST /incidents` and `/resume` with 429 `too_many_runs`; tests in `http.e2e.test.ts`. Follow-up done: `API_TOKEN` as `Authorization: Bearer` on every route but `/health`, required at startup when `HOST` is not loopback; tests in `config.unit.test.ts` and `http.e2e.test.ts`) · **Where:** [`src/http/server.ts:29`](../src/http/server.ts#L29)
 - **Scenario:** The API binds 127.0.0.1 by default but never validates the Host header, and POST /incidents, GET /incidents/:id/audit, /trace and so on need no credential. A malicious page the operator visits can DNS-rebind its domain to 127.0.0.1:3000 and then make same-origin JSON requests. It can (a) POST /incidents repeatedly: each call runs the full graph against OpenRouter, costing real money with no rate limit; (b) read every incident, trace and audit; (c) trip the global approval lockout above. With HOST=0.0.0.0 (for example in a container), this is reachable from the network without rebinding.
 - **Suggested fix:** Add an onRequest hook that rejects requests whose Host is not in an allowlist (127.0.0.1:PORT, localhost:PORT, [::1]:PORT, plus configured names), and rejects a cross-site Origin on non-GET requests. Add a per-client rate limit or a concurrency cap on POST /incidents. Consider an optional API token for mutating routes when HOST is not loopback.
 
 ### Text is truncated before redaction in logs and MCP output, so a secret's prefix can leak
 
-- **Severity:** low · **Status:** open · **Where:** [`src/http/server.ts:46`](../src/http/server.ts#L46)
+- **Severity:** low · **Status:** fixed, unreleased (new `redactThenClip` in `src/infra/redact.ts`, used in `server.ts` and every clip in `mcp/tool-result.ts`; unit test with the secret across the cut) · **Where:** [`src/http/server.ts:46`](../src/http/server.ts#L46)
 - **Scenario:** server.ts:46 and mcp/tool-result.ts:44 clip err.message to 500 characters, and only afterwards does the logger call redactSecrets. tool-result.ts:19 and :49 also clip before redacting. If a secret straddles the cut (for example an upstream message that echoes the key at offset 480), the clipped string holds only part of it. The literal match in redactString fails, and that prefix (for example 'sk-or-v1-' plus the next characters) is written to stderr logs or MCP content. trace-sink.ts:76 already does this in the correct order.
 - **Suggested fix:** Always redact before clipping: `clipText(redactSecrets(e.message, c.secrets), 500)` in server.ts, and `clip(redactSecrets(text, c.secrets), N)` in tool-result.ts. Add a unit test with a secret placed across the clip boundary.
 
 ### HTTP redaction runs on the serialized JSON, so a secret containing JSON-escaped characters is not matched
 
-- **Severity:** low · **Status:** open · **Where:** [`src/http/server.ts:31`](../src/http/server.ts#L31)
+- **Severity:** low · **Status:** fixed, unreleased (`redactSecrets` also matches each secret's JSON-escaped form; unit test, plus an HTTP test with a token containing `"` and `\`) · **Where:** [`src/http/server.ts:31`](../src/http/server.ts#L31)
 - **Scenario:** The onSend hook calls redactSecrets on the already-serialized payload string. If APPROVAL_TOKEN contains a character that JSON.stringify escapes (`"`, `\` or a control character), for example a password-manager token like `Ab3"x9...`, any reflection of it appears in the body as `Ab3\"x9...`. The literal match fails and the token is returned. Config only requires a length of 16 or more, with no charset limit.
 - **Suggested fix:** Redact the object before it is serialized (a preSerialization hook that calls redactSecrets on the payload object), and keep onSend for string/markdown bodies. Alternatively, also redact each secret's JSON-escaped form (`JSON.stringify(s).slice(1, -1)`). Or restrict APPROVAL_TOKEN to a URL-safe charset in config.ts.
 
@@ -94,31 +94,31 @@ The only high-severity finding, the half-open circuit breaker that could stay bl
 
 ### Input-schema bugs in buildUser are misclassified as server_error, retried, and sent to the fallback model
 
-- **Severity:** low · **Status:** open · **Where:** [`src/llm/openrouter-provider.ts:79`](../src/llm/openrouter-provider.ts#L79)
+- **Severity:** low · **Status:** fixed, unreleased (`buildUser` runs before the `try` in `OpenRouterProvider.generate`, so the defect throws like in the fake; unit test) · **Where:** [`src/llm/openrouter-provider.ts:79`](../src/llm/openrouter-provider.ts#L79)
 - **Scenario:** Every v1 prompt's buildUser calls XInputSchema.parse(input) (e.g. src/prompts/v1/planner.ts:38), and that throws ZodError on bad input from a node. In OpenRouterProvider.generate, buildUser runs inside the try. The catch passes the error to classifyProviderError, which has no status, so it returns { kind: 'server_error', 'network or provider failure' }. resilient() then retries twice and calls the fallback, and the incident escalates as llm_unavailable while the real cause, a code defect, is hidden. FakeLlmProvider calls buildUser outside any try (fake-provider.ts:68), so the same bug throws in tests. Provider behaviour diverges, and the bug only shows in production as a fake 'outage'.
 - **Suggested fix:** Build the messages (prompt.buildUser(input)) before the try, or rethrow non-provider errors (ZodError and similar) from the catch, so repository defects propagate as exceptions as provider.ts:2-3 requires. Add a unit test that buildUser throwing in OpenRouterProvider rejects instead of returning server_error.
 
 ### Retry has no backoff and retries non-retryable errors (429, 4xx auth/credit/context errors)
 
-- **Severity:** low · **Status:** open · **Where:** [`src/llm/resilience.ts:41`](../src/llm/resilience.ts#L41)
+- **Severity:** low · **Status:** fixed, unreleased (4xx other than 408/429 carries `retryable: false`, and 401/402/403 also `fallbackUseful: false`; with the real provider, retries wait 500 ms × 2^i plus up to 50% jitter, or the `Retry-After` header, capped at 10 s and abortable by the run's signal; the error kind stays `server_error`, so the SQL enum does not change; unit tests) · **Where:** [`src/llm/resilience.ts:41`](../src/llm/resilience.ts#L41)
 - **Scenario:** withRetry calls run() again immediately for every non-aborted failure. Case 1: on a 429, the second attempt fires within milliseconds and almost surely hits 429 again, so the retry is wasted and adds load to an already throttled key. Case 2: classifyProviderError maps every other HTTP status (400 context-length, 401 bad key, 402 no credits, 404 unknown model) to server_error (openrouter-provider.ts:49), so a 401 makes 2 primary calls plus 1 fallback call, all doomed. Once concurrent incidents and per-node calls are counted, this becomes a small retry storm against a provider that is already refusing.
 - **Suggested fix:** Add a non-retryable kind (e.g. 'client_error'/'config_error') for 4xx other than 408/429, and skip retry for it; also skip the fallback for 401/402 when the same key is used. For rate_limit and server_error, sleep with exponential backoff and jitter between attempts, honour Retry-After when present, and make the sleep abortable by ctx.signal.
 
 ### Tokens/cost of failed attempts (retries, invalid_output) are never recorded
 
-- **Severity:** low · **Status:** open · **Where:** [`src/llm/recording-provider.ts:24`](../src/llm/recording-provider.ts#L24)
+- **Severity:** low · **Status:** fixed, unreleased (an invalid output keeps its usage; `resilient` sums the usage of every attempt into the logical call; `llm_calls` gains `attempts` and `used_fallback` (schema version 3, added with `ALTER TABLE` on old databases); unit tests) · **Where:** [`src/llm/recording-provider.ts:24`](../src/llm/recording-provider.ts#L24)
 - **Scenario:** withCallRecording wraps resilient(), so it sees one logical result. Say the primary model returns schema-invalid JSON twice (billed both times) and the fallback then succeeds: llm_calls gets one row with only the fallback's tokens. If all attempts fail, the row has promptTokens=0, completionTokens=0, costUsd=0. On top of that, OpenRouterProvider drops res.raw.usage_metadata when safeParse fails (openrouter-provider.ts:81-84), even though tokens were consumed. As a result, the cost per incident under-reports exactly in the degraded cases where it matters most.
 - **Suggested fix:** Let LlmResult failures carry an optional usage (fill it from res.raw on invalid_output). Then either record per attempt (move withCallRecording inside resilient around each `once`) or have resilient sum the usage and cost of all attempts into the final result. Also record the attempt count and the model actually used.
 
 ### Missing usage_metadata silently becomes 0 tokens
 
-- **Severity:** low · **Status:** open · **Where:** [`src/llm/openrouter-provider.ts:85`](../src/llm/openrouter-provider.ts#L85)
+- **Severity:** low · **Status:** fixed, unreleased (missing usage falls back to `estimateTokens` over the prompt and the output, as the fake does, and the row is flagged in the new `usage_estimated` column; unit test) · **Where:** [`src/llm/openrouter-provider.ts:85`](../src/llm/openrouter-provider.ts#L85)
 - **Scenario:** Some OpenRouter-routed providers, and some OpenAI-compatible endpoints set via LLM_BASE_URL, return no usage, or return it under a field that withStructuredOutput+includeRaw does not map into usage_metadata. Then `?? 0` records 0/0 tokens and $0 for a successful call. This cannot be told apart from a genuinely free call, so token budgets and cost reports go wrong with no warning.
 - **Suggested fix:** When usage_metadata is absent, fall back to estimateTokens(system+user) and estimateTokens(JSON.stringify(parsed)), as the fake provider already does, and mark the usage as estimated (a flag column, or a log warning). As an alternative, request usage explicitly (stream_options/usage include) from OpenRouter.
 
 ### Timeout/rate-limit failures are recorded with model 'openrouter' and lose which model failed
 
-- **Severity:** low · **Status:** open · **Where:** [`src/llm/resilience.ts:21`](../src/llm/resilience.ts#L21)
+- **Severity:** low · **Status:** fixed, unreleased (`OpenRouterProvider.model` is public and `withTimeout` puts it in timeout and aborted failures; `used_fallback` records which model answered; unit test) · **Where:** [`src/llm/resilience.ts:21`](../src/llm/resilience.ts#L21)
 - **Scenario:** withTimeout's timeoutResult()/abortedResult() call llmFailure without a model. When the fallback times out, or both primary attempts time out with no fallback, recording-provider.ts:23 stores model = p.name = 'openrouter', not the model id. Operators cannot tell from llm_calls whether the primary or the fallback model was the one timing out, which hurts choosing or alerting on models.
 - **Suggested fix:** Pass the provider's model into `once` (expose a readonly model on OpenRouterProvider, or pass it to withTimeout) and include it in timeout/aborted failures. Also record a 'usedFallback' flag.
 
@@ -126,7 +126,7 @@ The only high-severity finding, the half-open circuit breaker that could stay bl
 
 ### tsconfig uses moduleResolution 'bundler' although the backend runs on native Node 24 TS, so typecheck accepts imports that crash at runtime
 
-- **Severity:** low · **Status:** open · **Where:** [`tsconfig.json:5`](../tsconfig.json#L5)
+- **Severity:** low · **Status:** fixed, unreleased (`module` and `moduleResolution` are `nodenext`; checked that an extensionless relative import now fails with TS2835; `web/tsconfig.json` keeps `bundler`) · **Where:** [`tsconfig.json:5`](../tsconfig.json#L5)
 - **Scenario:** A contributor writes `import { x } from "../domain/errors"` (no .ts) or imports a directory index in src/. With module ESNext + moduleResolution bundler, `npm run typecheck` passes, but `node src/index.ts` / `npm run demo` fails with ERR_MODULE_NOT_FOUND because Node's ESM loader needs the full extension. The AGENTS rule 'relative imports with .ts' is then enforced only by convention or by e2e tests that happen to load that file.
 - **Suggested fix:** Use `"module": "nodenext"` and `"moduleResolution": "nodenext"` (keep allowImportingTsExtensions, verbatimModuleSyntax and erasableSyntaxOnly). tsc then rejects extensionless relative specifiers the same way Node does. Keep the bundler setting only in web/tsconfig.json.
 
@@ -138,31 +138,31 @@ The only high-severity finding, the half-open circuit breaker that could stay bl
 
 ### .env.example, the CI/Pages workflows, the pre-commit hook, .npmrc and package.json description are still in Portuguese
 
-- **Severity:** low · **Status:** open · **Where:** [`.env.example:1`](../.env.example#L1)
+- **Severity:** low · **Status:** fixed, unreleased for the human-facing config files (`language.unit.test.ts` fails on Portuguese diacritics in them and in the `package.json` description); follow-up done: the Portuguese code comments in `src/`, `tests/`, `scripts/` and `web/` are translated, and `language.unit.test.ts` now also checks comments · **Where:** [`.env.example:1`](../.env.example#L1)
 - **Scenario:** A new user runs `cp .env.example .env` and every explanation of LLM_PROVIDER, OPENROUTER_API_KEY and the timeouts is in Portuguese, while README and AGENTS.md say all docs are English. The same applies to the header comments in .github/workflows/ci.yml:1-3, .github/workflows/pages.yml:1-2, .githooks/pre-commit:2-4 and .npmrc:1, and to package.json 'description' (line 4), which shows on GitHub and in npm metadata. About 130 tracked files also keep Portuguese code comments (e.g. src/domain/report/numeric-guard.ts:46, web/src/labels.ts:1-2).
 - **Suggested fix:** Translate .env.example, the workflow, hook and .npmrc comments and the package.json description to English. Translate source comments over time, and add a test or script that greps human-facing config files for common Portuguese diacritics (ção|ões|não).
 
 ### mcp:inspect runs an unpinned npx package, against the exact-version dependency rule
 
-- **Severity:** low · **Status:** open · **Where:** [`package.json:19`](../package.json#L19)
+- **Severity:** low · **Status:** fixed, unreleased (pinned to `@modelcontextprotocol/inspector@2.13.0`, released 2026-10-28) · **Where:** [`package.json:19`](../package.json#L19)
 - **Scenario:** `npm run mcp:inspect` runs `npx @modelcontextprotocol/inspector` with no version, so each machine fetches whatever 'latest' is at that moment. A breaking or compromised release runs locally with access to the repo's .env (OPENROUTER_API_KEY), because the MCP server child is started from the project directory. AGENTS.md requires 'an exact version' for any dependency.
 - **Suggested fix:** Pin the version, e.g. `npx -y @modelcontextprotocol/inspector@<exact-version> node src/mcp/server.ts`, or add it as a pinned devDependency and call the local bin.
 
 ### verify, and therefore CI, runs demo:record twice
 
-- **Severity:** low · **Status:** open · **Where:** [`package.json:24`](../package.json#L24)
+- **Severity:** low · **Status:** fixed, unreleased (new `web:verify` script records once, then runs the web tests and the build; `verify` and CI use it; `web:test` and `web:build` stay for standalone use) · **Where:** [`package.json:24`](../package.json#L24)
 - **Scenario:** `npm run verify` runs `web:test` (= demo:record + vitest) and then `web:build` (= demo:record + vite build), so the full recording pipeline runs twice. ci.yml:29-30 does the same, which adds time to every CI run and pre-push verify for no reason.
 - **Suggested fix:** Add a `web:test:only`/`web:build:only` pair, or have verify call `npm run demo:record && npm --prefix web run test && npm --prefix web run build`. Keep the chained scripts for standalone use.
 
 ### CI triggers on both push and pull_request for every branch and has no concurrency group
 
-- **Severity:** low · **Status:** open · **Where:** [`.github/workflows/ci.yml:6`](../.github/workflows/ci.yml#L6)
+- **Severity:** low · **Status:** fixed, unreleased (`push` only on `main`, `pull_request` for every branch, and `concurrency: ci-${{ github.ref }}` with `cancel-in-progress`) · **Where:** [`.github/workflows/ci.yml:6`](../.github/workflows/ci.yml#L6)
 - **Scenario:** `on: [push, pull_request]` runs the full 15-minute verify job twice for every commit on a branch with an open PR, once for push and once for pull_request. Superseded runs on quick successive pushes are not cancelled.
 - **Suggested fix:** Use `on: { push: { branches: [main] }, pull_request: {} }` and add `concurrency: { group: ci-${{ github.ref }}, cancel-in-progress: true }`.
 
 ### The Pages workflow deploys without running tests or typecheck
 
-- **Severity:** low · **Status:** open · **Where:** [`.github/workflows/pages.yml:30`](../.github/workflows/pages.yml#L30)
+- **Severity:** low · **Status:** fixed, unreleased (`typecheck:web`, `check:tokens` and `web:test` run before the build step) · **Where:** [`.github/workflows/pages.yml:30`](../.github/workflows/pages.yml#L30)
 - **Scenario:** Someone dispatches 'Pages (War Room)' from a branch or commit where web tests or the contrast and token checks fail (e.g. a broken tokens.css). The job only runs `npm run web:build`, so a War Room that fails AC-39 (contrast or focus trap) is published publicly.
 - **Suggested fix:** Add `npm run typecheck:web`, `npm run web:test` and `npm run check:tokens` before the build step, or make the deploy depend on a successful CI run for the same SHA (`workflow_run` or a reusable verify job).
 

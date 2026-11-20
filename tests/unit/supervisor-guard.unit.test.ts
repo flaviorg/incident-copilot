@@ -59,6 +59,6 @@ test("preEscalation order: team cap, react cap, low confidence after 2 runs", ()
   assert.equal(preEscalation(bb({ diagnosis: { ...low(), capReached: true } }), L)!.reason, "react_cap_low_confidence");
   assert.equal(preEscalation(bb({ diagnosis: low(), telemetryRuns: 2 }), L)!.reason, "low_confidence_diagnosis");
   assert.equal(preEscalation(bb({ diagnosis: low(), telemetryRuns: 1 }), L), null);
-  // A ordem importa: o teto de equipe vence os demais.
+  // Order matters: the team ceiling beats the others.
   assert.equal(preEscalation(bb({ supervisor: { iterations: 9, history: [] }, diagnosis: { ...low(), capReached: true }, telemetryRuns: 2 }), L)!.reason, "team_cap_reached");
 });

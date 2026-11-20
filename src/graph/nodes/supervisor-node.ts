@@ -1,5 +1,5 @@
-// Supervisor (spec 4.6 e 6.3; aula 221528): só orquestra. Confere os tetos antes do LLM, valida a escolha com a guarda
-// e registra cada decisão como handoff no trace e no histórico do blackboard.
+// Supervisor (spec 4.6 and 6.3; lesson 221528): only orchestrates. Checks the caps before the LLM, validates the choice with the guard
+// and records each decision as a handoff in the trace and in the blackboard history.
 import type { Blackboard, HandoffRecord, Limits, Phase } from "../../contracts/index.ts";
 import type { LlmProvider } from "../../llm/provider.ts";
 import { supervisorPrompt } from "../../prompts/v1/index.ts";
@@ -14,7 +14,7 @@ import type { NodeFn } from "../run-context.ts";
 
 const SUPERVISOR_TARGETS: readonly string[] = ["telemetry_analyst", "runbook_retriever", "remediation_planner", "gate", "reporter"];
 
-/** "to" da última entrada do histórico do supervisor (usado pelo roteamento logo depois do nó). */
+/** "to" of the last supervisor history entry (used by routing right after the node). */
 export function supervisorTargetOf(bb: Blackboard): SupervisorTarget | null {
   const to = bb.supervisor.history.at(-1)?.to;
   return to !== undefined && SUPERVISOR_TARGETS.includes(to) ? (to as SupervisorTarget) : null;

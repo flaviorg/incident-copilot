@@ -1,5 +1,5 @@
-// Entrada da CLI: despacha argv[2] para src/cli/<comando>.ts. Códigos de saída (spec 5.5):
-// 0 sucesso, 1 erro, 2 problema de fixture (UnscriptedLlmCallError, FixturePromptDriftError).
+// CLI entry point: dispatches argv[2] to src/cli/<command>.ts. Exit codes (spec 5.5):
+// 0 success, 1 error, 2 fixture problem (UnscriptedLlmCallError, FixturePromptDriftError).
 import { collectSecrets, redactSecrets } from "./infra/redact.ts";
 import { ConfigError } from "./config.ts";
 import { FixturePromptDriftError, NotFoundError, UnscriptedLlmCallError, ValidationError } from "./domain/errors.ts";
@@ -24,7 +24,7 @@ const USAGE = [
 ].join("\n");
 
 export async function main(argv: string[], env: Record<string, string | undefined>): Promise<number> {
-  const secrets = collectSecrets({ approvalToken: env.APPROVAL_TOKEN ?? null, openrouterApiKey: env.OPENROUTER_API_KEY ?? null });
+  const secrets = collectSecrets({ approvalToken: env.APPROVAL_TOKEN ?? null, openrouterApiKey: env.OPENROUTER_API_KEY ?? null, apiToken: env.API_TOKEN ?? null });
   const io: CliIO = {
     env,
     out: (t) => void process.stdout.write(redactSecrets(t, secrets) + "\n"),
@@ -57,7 +57,7 @@ export async function main(argv: string[], env: Record<string, string | undefine
 }
 
 if (import.meta.main) {
-  // Leitor que fecha o pipe antes do fim (ex.: `| head`): encerra em silêncio, como as ferramentas de terminal.
+  // Reader that closes the pipe before the end (e.g. `| head`): exits silently, like terminal tools.
   process.stdout.on("error", (e: NodeJS.ErrnoException) => {
     if (e.code === "EPIPE") process.exit(0);
     throw e;

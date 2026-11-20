@@ -1,6 +1,6 @@
-// Escalonamento (spec 4.5 e 6.3): rota decidida só por código. Grava a resposta do agente "system" e a auditoria
-// incident_escalated; o relatório vem depois, sempre pelo template. Não recebe LLM.
-// Sem motivo no estado, a única rota que chega aqui é o portão sem nada executável (no_executable_actions).
+// Escalation (spec 4.5 and 6.3): route decided by code only. Writes the "system" agent's response and the
+// incident_escalated audit; the report comes after, always from the template. Receives no LLM.
+// With no reason in the state, the only route that reaches here is the gate with nothing executable (no_executable_actions).
 import type { AuditEntry, Escalation } from "../../contracts/index.ts";
 import type { NewAuditEntry } from "../../infra/db/incident-store.ts";
 import { escalationSentence } from "../../domain/report/postmortem-template.ts";

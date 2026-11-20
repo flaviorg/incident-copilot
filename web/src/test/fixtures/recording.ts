@@ -1,5 +1,5 @@
-// Gravação mínima escrita à mão para os testes da War Room: 3 eventos comuns (até o portão) e 2 por ramo. Passa no
-// DemoRecordingSchema (conferido em demo-source.test.ts). Dados próprios, não copiados das fixtures do backend.
+// Minimal hand-written recording for the War Room tests: 3 common events (up to the gate) and 2 per branch. Passes
+// DemoRecordingSchema (checked in demo-source.test.ts). Own data, not copied from the backend fixtures.
 import type { Approval, AuditEntryView, DemoRecording, GatedAction, IncidentMetrics, IncidentView, PostmortemDoc, TraceEvent } from "@contracts";
 import { DEMO_LABEL } from "@contracts";
 

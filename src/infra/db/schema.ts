@@ -1,18 +1,18 @@
-// SQL do banco. Os CHECK de enum são gerados dos schemas Zod, para os dois nunca divergirem (AC-40).
+// Database SQL. The enum CHECKs are generated from the Zod schemas, so the two never diverge (AC-40).
 import type { DatabaseSync } from "node:sqlite";
 import {
   ActionStatusSchema, AgentIdSchema, ApprovalStatusSchema, AuditEventSchema, EscalationReasonSchema,
   IncidentStatusSchema, LlmErrorKindSchema, SeveritySchema, TierSchema, TraceTypeSchema,
 } from "../../contracts/index.ts";
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 const quoted = (values: readonly string[]) => values.map((v) => `'${v.replaceAll("'", "''")}'`).join(", ");
 const tiers = TierSchema.options.map((o) => o.value).join(", ");
 
 /**
- * A ordem da cadeia de hash vem de `seq` (INTEGER PRIMARY KEY AUTOINCREMENT): o rowid implícito de uma tabela sem
- * chave inteira pode ser renumerado num VACUUM, e o id AUD-#### não ordena depois de 9999.
+ * The hash chain order comes from `seq` (INTEGER PRIMARY KEY AUTOINCREMENT): the implicit rowid of a table without
+ * an integer key can be renumbered on a VACUUM, and the AUD-#### id does not sort after 9999.
  */
 function auditLogTableSql(name: string): string {
   return `CREATE TABLE IF NOT EXISTS ${name} (
@@ -127,7 +127,8 @@ CREATE TABLE IF NOT EXISTS llm_calls (
   latency_ms INTEGER NOT NULL,
   success INTEGER NOT NULL CHECK (success IN (0, 1)),
   error_kind TEXT CHECK (error_kind IS NULL OR error_kind IN (${quoted(LlmErrorKindSchema.options)})),
-  ts TEXT NOT NULL
+  ts TEXT NOT NULL,
+  ${LLM_CALL_EXTRA_COLUMNS.map((c) => c.sql).join(",\n  ")}
 );
 CREATE INDEX IF NOT EXISTS llm_calls_incident_idx ON llm_calls (incident_id);
 CREATE INDEX IF NOT EXISTS llm_calls_ts_idx ON llm_calls (ts);
@@ -143,12 +144,25 @@ CREATE INDEX IF NOT EXISTS runs_incident_idx ON runs (incident_id);
 `;
 }
 
+/** Added in version 3 (review 2026-11): attempts behind a logical call, fallback used, usage estimated. */
+const LLM_CALL_EXTRA_COLUMNS = [
+  { name: "attempts", sql: "attempts INTEGER NOT NULL DEFAULT 1 CHECK (attempts >= 1)" },
+  { name: "used_fallback", sql: "used_fallback INTEGER NOT NULL DEFAULT 0 CHECK (used_fallback IN (0, 1))" },
+  { name: "usage_estimated", sql: "usage_estimated INTEGER NOT NULL DEFAULT 0 CHECK (usage_estimated IN (0, 1))" },
+];
+
+/** Version 2 → 3: llm_calls gains the extra columns (old rows get the defaults). */
+function addLlmCallColumns(db: DatabaseSync): void {
+  const cols = new Set((db.prepare("PRAGMA table_info(llm_calls)").all() as { name: string }[]).map((c) => c.name));
+  for (const c of LLM_CALL_EXTRA_COLUMNS) if (!cols.has(c.name)) db.exec(`ALTER TABLE llm_calls ADD COLUMN ${c.sql}`);
+}
+
 const AUDIT_COLUMNS = "id, ts, incident_id, actor, event, tier, details, prev_hash, hash";
 
 /**
- * Versão 1 → 2: a audit_log ganha `seq`. A tabela é reconstruída numa transação, copiando as linhas na ordem do rowid
- * (a única que a versão 1 tinha); o DROP TABLE não dispara os gatilhos de DELETE, e os gatilhos e o índice voltam
- * pelo buildSchemaSql.
+ * Version 1 → 2: audit_log gains `seq`. The table is rebuilt in a transaction, copying the rows in rowid order
+ * (the only order version 1 had); DROP TABLE does not fire the DELETE triggers, and the triggers and the index come back
+ * through buildSchemaSql.
  */
 function addAuditSeq(db: DatabaseSync): void {
   const cols = db.prepare("PRAGMA table_info(audit_log)").all() as { name: string }[];
@@ -169,5 +183,6 @@ function addAuditSeq(db: DatabaseSync): void {
 export function migrate(db: DatabaseSync): void {
   addAuditSeq(db);
   db.exec(buildSchemaSql());
+  addLlmCallColumns(db);
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 }
