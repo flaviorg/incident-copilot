@@ -1,4 +1,4 @@
-/* Base: tipografia, fundo e foco visível. Só var(--...): nenhuma cor literal fora de tokens.css. */
+/* Base: type, ground, focus, selection and scrollbars. Only var(--...): no literal colour outside tokens.css. */
 *,
 *::before,
 *::after {
@@ -7,6 +7,7 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  scrollbar-color: var(--color-border) transparent;
 }
 
 body {
@@ -16,11 +17,29 @@ body {
   font-family: var(--font-sans);
   font-size: var(--font-size-md);
   line-height: var(--line-height);
+  font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-selection);
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+  line-height: 1.2;
+}
+
+p {
+  text-wrap: pretty;
 }
 
 a {
   color: var(--color-link);
+  text-underline-offset: 0.2em;
 }
 
 code,
@@ -34,8 +53,13 @@ pre {
   outline-offset: 2px;
 }
 
+[tabindex="-1"]:focus {
+  outline: none;
+}
+
 button {
   font: inherit;
+  color: inherit;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,4 +1,4 @@
-// Selo de faixa da Matriz de Autonomia (spec 6.4; AC-39): texto "Faixa N", ícone decorativo e cor; nunca só a cor.
+// Autonomy Matrix tier badge (spec 6.4; AC-39): "Tier N" text, decorative icon and colour; never colour alone.
 import type { ReactNode } from "react";
 import type { Tier } from "@contracts";
 import { TIER_LABELS } from "../labels.ts";
@@ -28,7 +28,7 @@ const ICONS: Record<Tier, ReactNode> = {
 export function TierBadge({ tier }: { tier: Tier }) {
   return (
     <span className={`tier-badge tier-${tier}`} title={`Tier ${tier}: ${TIER_LABELS[tier]}`}>
-      <svg aria-hidden="true" focusable="false" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         {ICONS[tier]}
       </svg>
       <span>{`Tier ${tier}`}</span>

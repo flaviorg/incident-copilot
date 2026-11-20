@@ -1,6 +1,6 @@
 // Textos da interface (spec 4.6 e 10.2). Os rótulos de status, categoria e escalonamento vêm do domínio do backend,
 // a mesma fonte do post-mortem; aqui ficam os nomes de agente da interface e a formatação en-US (só exibição).
-import type { AgentId, ApprovalStatus, IncidentStatus, Tier, TraceType } from "@contracts";
+import type { AgentId, ApprovalStatus, IncidentStatus, Tier, TraceEvent, TraceType } from "@contracts";
 
 export { ACTION_STATUS_LABELS, CATEGORY_LABELS, CONFIDENCE_LABELS, ESCALATION_LABELS } from "@domain/report/postmortem-template.ts";
 
@@ -19,6 +19,53 @@ export const AGENT_NAMES: Record<AgentId, string> = {
   system: "Escalation",
   mcp_client: "MCP client",
 };
+
+/** Who holds the authority behind an event: the thesis of the War Room, shown as the strip holder colour. */
+export type Authority = "model" | "code" | "human" | "system";
+
+export const AUTHORITY_LABELS: Record<Authority, string> = {
+  model: "model proposes",
+  code: "code decides",
+  human: "human decides",
+  system: "system",
+};
+
+/** Role line under each agent name: what that agent is allowed to do. */
+export const AGENT_ROLES: Record<AgentId, string> = {
+  supervisor: "model · routes",
+  telemetry_analyst: "model · investigates",
+  runbook_retriever: "code · BM25 search",
+  remediation_planner: "model · proposes",
+  auditor: "model + rules · reviews",
+  gate: "code · catalog tiers",
+  executor: "code · runs actions",
+  verifier: "code · canary",
+  reporter: "model · writes",
+  human: "human · decides",
+  system: "code · escalates",
+  mcp_client: "external client",
+};
+
+const AGENT_AUTHORITY: Record<AgentId, Authority> = {
+  supervisor: "model",
+  telemetry_analyst: "model",
+  runbook_retriever: "code",
+  remediation_planner: "model",
+  auditor: "model",
+  gate: "code",
+  executor: "code",
+  verifier: "code",
+  reporter: "model",
+  human: "human",
+  system: "code",
+  mcp_client: "system",
+};
+
+/** Deterministic critics (guards, gate, canary) are code even when another agent emits them. */
+export function authorityOf(e: TraceEvent): Authority {
+  if (e.type === "critique" && e.payload.by !== "auditor") return "code";
+  return AGENT_AUTHORITY[e.agent];
+}
 
 export const TIER_LABELS: Record<Tier, string> = {
   1: "decides alone (read-only)",

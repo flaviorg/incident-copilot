@@ -1,4 +1,5 @@
-// Post-mortem estruturado (spec 10.2, item 6), com o selo que diz se a narrativa passou pelo guarda numérico.
+// Structured post-mortem (spec 10.2, item 6), with the seal that says whether the narrative passed the numeric guard.
+// Narrative on the left (summary, root cause, timeline); facts on the right (impact, actions, escalation, prevention).
 import type { PostmortemDoc } from "@contracts";
 import { ACTION_STATUS_LABELS, CATEGORY_LABELS, ESCALATION_LABELS, formatNumber, formatTime, formatUsd } from "../labels.ts";
 import { TierBadge } from "./TierBadge.tsx";
@@ -6,75 +7,90 @@ import { TierBadge } from "./TierBadge.tsx";
 export function PostmortemView({ doc }: { doc: PostmortemDoc }) {
   const validated = doc.numericGuard.passed && !doc.numericGuard.usedTemplate && doc.generatedBy.model !== "template";
   return (
-    <section className="panel postmortem" aria-labelledby="postmortem-title">
-      <h2 id="postmortem-title" tabIndex={-1}>{`Post-mortem ${doc.incidentId} (${doc.status === "final" ? "final" : "partial"})`}</h2>
-      <p className={validated ? "seal seal-ok" : "seal"}>{validated ? "narrative validated by the numeric guard" : "deterministic template narrative"}</p>
-      <h3>Summary</h3>
-      <p>{doc.summary}</p>
-      <h3>Impact</h3>
-      <dl className="metrics-small">
-        <div className="metric-row">
-          <dt>Service</dt>
-          <dd>{doc.impact.service}</dd>
+    <section className="postmortem" aria-labelledby="postmortem-title">
+      <div className="postmortem-head">
+        <h2 id="postmortem-title" tabIndex={-1}>{`Post-mortem ${doc.incidentId} (${doc.status === "final" ? "final" : "partial"})`}</h2>
+        <p className={validated ? "seal seal-ok" : "seal"}>
+          <svg aria-hidden="true" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            {validated ? <path d="M3 8.5l3 3 7-7" /> : <path d="M3 4h10M3 8h10M3 12h6" />}
+          </svg>
+          {validated ? "narrative validated by the numeric guard" : "deterministic template narrative"}
+        </p>
+      </div>
+      <div className="postmortem-grid">
+        <div>
+          <h3>Summary</h3>
+          <p>{doc.summary}</p>
+          <h3>Root cause</h3>
+          <p>{`${CATEGORY_LABELS[doc.rootCause.category]}: ${doc.rootCause.narrative}`}</p>
+          {doc.rootCause.evidence.length > 0 ? (
+            <ul>
+              {doc.rootCause.evidence.map((e) => (
+                <li key={e.ref}>
+                  <code>{e.ref}</code> {e.summary}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <h3>Timeline</h3>
+          <ol className="timeline">
+            {doc.timeline.map((t, i) => (
+              <li key={`${t.ts}-${i}`}>
+                <time dateTime={t.ts}>{formatTime(t.ts)}</time> <span>{t.text}</span>
+              </li>
+            ))}
+          </ol>
         </div>
-        <div className="metric-row">
-          <dt>Duration</dt>
-          <dd>{doc.impact.durationMin === null ? "no resolution" : `${formatNumber(doc.impact.durationMin)} min`}</dd>
+        <div>
+          <h3>Impact</h3>
+          <dl className="metrics-small">
+            <div className="metric-row">
+              <dt>Service</dt>
+              <dd>{doc.impact.service}</dd>
+            </div>
+            <div className="metric-row">
+              <dt>Duration</dt>
+              <dd>{doc.impact.durationMin === null ? "no resolution" : `${formatNumber(doc.impact.durationMin)} min`}</dd>
+            </div>
+            {doc.impact.peakErrorRate !== null ? (
+              <div className="metric-row">
+                <dt>Peak error rate</dt>
+                <dd>{`${formatNumber(doc.impact.peakErrorRate * 100)}%`}</dd>
+              </div>
+            ) : null}
+            {doc.impact.monthlySavingsUsd > 0 ? (
+              <div className="metric-row">
+                <dt>Monthly savings</dt>
+                <dd>{formatUsd(doc.impact.monthlySavingsUsd)}</dd>
+              </div>
+            ) : null}
+          </dl>
+          <h3>Actions</h3>
+          <ul className="postmortem-actions">
+            {doc.actions.map((a, i) => (
+              <li key={`${a.actionType}-${i}`}>
+                <span className="action-line">
+                  <code>{a.actionType}</code> <TierBadge tier={a.tier} /> <span>{ACTION_STATUS_LABELS[a.status]}</span>
+                </span>
+                {a.decidedBy ? <span className="action-decided">{`decided by ${a.decidedBy}`}</span> : null}
+              </li>
+            ))}
+          </ul>
+          {doc.escalation ? (
+            <>
+              <h3>Escalation</h3>
+              <p>{`${ESCALATION_LABELS[doc.escalation.reason]}: ${doc.escalation.detail}`}</p>
+            </>
+          ) : null}
+          <h3>Prevention</h3>
+          <ul>
+            {doc.prevention.map((p) => (
+              <li key={p}>{p}</li>
+            ))}
+          </ul>
         </div>
-        {doc.impact.peakErrorRate !== null ? (
-          <div className="metric-row">
-            <dt>Peak error rate</dt>
-            <dd>{`${formatNumber(doc.impact.peakErrorRate * 100)}%`}</dd>
-          </div>
-        ) : null}
-        {doc.impact.monthlySavingsUsd > 0 ? (
-          <div className="metric-row">
-            <dt>Monthly savings</dt>
-            <dd>{formatUsd(doc.impact.monthlySavingsUsd)}</dd>
-          </div>
-        ) : null}
-      </dl>
-      <h3>Timeline</h3>
-      <ol className="timeline">
-        {doc.timeline.map((t, i) => (
-          <li key={`${t.ts}-${i}`}>
-            <time dateTime={t.ts}>{formatTime(t.ts)}</time> {t.text}
-          </li>
-        ))}
-      </ol>
-      <h3>Root cause</h3>
-      <p>{`${CATEGORY_LABELS[doc.rootCause.category]}: ${doc.rootCause.narrative}`}</p>
-      {doc.rootCause.evidence.length > 0 ? (
-        <ul>
-          {doc.rootCause.evidence.map((e) => (
-            <li key={e.ref}>
-              <code>{e.ref}</code> {e.summary}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      <h3>Actions</h3>
-      <ul className="postmortem-actions">
-        {doc.actions.map((a, i) => (
-          <li key={`${a.actionType}-${i}`}>
-            <code>{a.actionType}</code> <TierBadge tier={a.tier} /> {ACTION_STATUS_LABELS[a.status]}
-            {a.decidedBy ? ` · decided by ${a.decidedBy}` : ""}
-          </li>
-        ))}
-      </ul>
-      {doc.escalation ? (
-        <>
-          <h3>Escalation</h3>
-          <p>{`${ESCALATION_LABELS[doc.escalation.reason]}: ${doc.escalation.detail}`}</p>
-        </>
-      ) : null}
-      <h3>Prevention</h3>
-      <ul>
-        {doc.prevention.map((p) => (
-          <li key={p}>{p}</li>
-        ))}
-      </ul>
-      <p className="muted">{`Generated by ${doc.generatedBy.provider} (${doc.generatedBy.model}, ${doc.generatedBy.promptVersion})`}</p>
+      </div>
+      <p className="postmortem-generated">{`Generated by ${doc.generatedBy.provider} (${doc.generatedBy.model}, ${doc.generatedBy.promptVersion})`}</p>
     </section>
   );
 }
