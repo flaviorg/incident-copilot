@@ -1,0 +1,24 @@
+# One service, built from the Dockerfile. Copy copilot.example.yaml to copilot.yaml and .env.example to .env first;
+# .env must set API_TOKEN (the container listens on 0.0.0.0) and a real LLM provider (the fake refuses ingest
+# connectors). The port is published on loopback only: put a TLS reverse proxy in front for provider webhooks and
+# list its public hostname in ALLOWED_HOSTS.
+services:
+  copilot:
+    build: .
+    env_file: .env
+    # These win over .env (a copy of .env.example sets HOST=127.0.0.1 and an empty COPILOT_CONFIG, which would make the
+    # container unreachable and turn connectors off).
+    environment:
+      HOST: 0.0.0.0
+      PORT: "3000"
+      DB_PATH: /data/incident-copilot.db
+      COPILOT_CONFIG: /config/copilot.yaml
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./copilot.yaml:/config/copilot.yaml:ro
+      - copilot-data:/data
+    restart: unless-stopped
+
+volumes:
+  copilot-data:

@@ -1,0 +1,26 @@
+{
+  "action": "resolved",
+  "installation": { "uuid": "a8f3b1c2-0d4e-4f5a-9b6c-7d8e9f0a1b2c" },
+  "data": {
+    "issue": {
+      "url": "https://sentry.io/api/0/organizations/acme/issues/4815162342/",
+      "web_url": "https://acme.sentry.io/issues/4815162342/",
+      "id": "4815162342",
+      "shortId": "CHECKOUT-WEB-2F",
+      "title": "TypeError: Cannot read properties of undefined (reading 'total')",
+      "culprit": "CartSummary(app/checkout/cart-summary)",
+      "permalink": "https://acme.sentry.io/issues/4815162342/",
+      "status": "resolved",
+      "substatus": null,
+      "level": "error",
+      "priority": "high",
+      "platform": "javascript",
+      "project": { "id": "6502112", "name": "Checkout Web", "slug": "checkout-web", "platform": "javascript" },
+      "count": "1801",
+      "userCount": 342,
+      "firstSeen": "2026-10-04T09:41:30.000Z",
+      "lastSeen": "2026-10-04T10:08:45.000Z"
+    }
+  },
+  "actor": { "type": "user", "id": 1042, "name": "Dana Reyes" }
+}

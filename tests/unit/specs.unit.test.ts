@@ -7,7 +7,7 @@ import { join } from "node:path";
 
 test("every feature spec has non-goals and EARS criteria", () => {
   const dirs = readdirSync("specs").filter((d) => /^\d{3}-/.test(d));
-  assert.equal(dirs.length, 7, `expected 7 feature specs, found ${dirs.join(", ")}`);
+  assert.equal(dirs.length, 8, `expected 8 feature specs, found ${dirs.join(", ")}`);
   for (const dir of dirs) {
     const t = readFileSync(join("specs", dir, "spec.md"), "utf8");
     assert.match(t, /^## Non-goals/m, dir);
@@ -27,6 +27,6 @@ test("every acceptance criterion of the design appears in exactly one feature sp
       owner.set(id, dir);
     }
   }
-  const missing = Array.from({ length: 41 }, (_, i) => `AC-${String(i + 1).padStart(2, "0")}`).filter((id) => !owner.has(id));
+  const missing = Array.from({ length: 59 }, (_, i) => `AC-${String(i + 1).padStart(2, "0")}`).filter((id) => !owner.has(id));
   assert.deepEqual(missing, []);
 });

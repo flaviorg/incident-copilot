@@ -11,7 +11,7 @@ export function createAuditCloudInventoryTool(d: { prices: CloudPrices }): Tool<
     name: "audit_cloud_inventory",
     description: "Use to find idle resources (unattached volume, unassociated IP, instance with low CPU) and the computed monthly savings for each one.",
     paramsSchema: Params,
-    run({ account }, { scenario, world, now }) {
+    async run({ account }, { scenario, world, now }) {
       const inv = world.inventory ?? scenario.inventory;
       if (!inv || inv.account !== account) return { ok: false, summary: `no data for this account in this scenario: ${account}`, evidenceRef: null };
       const { findings, totalMonthlySavingsUsd } = auditInventory(inv, d.prices);

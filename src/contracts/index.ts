@@ -31,6 +31,13 @@ import {
   AuditEntryViewSchema, StatsSchema, ErrorBodySchema, ProposeRemediationInputSchema, ProposeRemediationResultSchema,
 } from "./api.ts";
 import { DEMO_LABEL, RecordingBranchSchema, DemoRecordingSchema } from "./demo-recording.ts";
+import {
+  MAX_ALERT_ATTRIBUTES, ConnectorIdSchema, AlertSignalSchema, NormalizedAlertSchema, IngestOutcomeSchema, IngestedAlertRecordSchema,
+  IncidentOriginSchema,
+} from "./ingest.ts";
+import {
+  ErrorGroupSchema, MetricSeriesSchema, LogEntrySchema, DeployRecordSchema, ExternalToolInfoSchema, ExternalResultSchema,
+} from "./live-telemetry.ts";
 
 export {
   SeveritySchema, IncidentStatusSchema, PhaseSchema, AgentIdSchema, TierSchema, RootCauseCategorySchema,
@@ -55,6 +62,9 @@ export {
   DecisionBodySchema, StatsWindowSchema, StatsQuerySchema, IncidentSummarySchema, IncidentViewSchema,
   AuditEntryViewSchema, StatsSchema, ErrorBodySchema, ProposeRemediationInputSchema, ProposeRemediationResultSchema,
   DEMO_LABEL, RecordingBranchSchema, DemoRecordingSchema,
+  MAX_ALERT_ATTRIBUTES, ConnectorIdSchema, AlertSignalSchema, NormalizedAlertSchema, IngestOutcomeSchema, IngestedAlertRecordSchema,
+  IncidentOriginSchema,
+  ErrorGroupSchema, MetricSeriesSchema, LogEntrySchema, DeployRecordSchema, ExternalToolInfoSchema, ExternalResultSchema,
 };
 
 export type Severity = z.infer<typeof SeveritySchema>;
@@ -137,6 +147,17 @@ export type ProposeRemediationInput = z.infer<typeof ProposeRemediationInputSche
 export type ProposeRemediationResult = z.infer<typeof ProposeRemediationResultSchema>;
 export type RecordingBranch = z.infer<typeof RecordingBranchSchema>;
 export type DemoRecording = z.infer<typeof DemoRecordingSchema>;
+export type AlertSignal = z.infer<typeof AlertSignalSchema>;
+export type NormalizedAlert = z.infer<typeof NormalizedAlertSchema>;
+export type IngestOutcome = z.infer<typeof IngestOutcomeSchema>;
+export type IngestedAlertRecord = z.infer<typeof IngestedAlertRecordSchema>;
+export type IncidentOrigin = z.infer<typeof IncidentOriginSchema>;
+export type ErrorGroup = z.infer<typeof ErrorGroupSchema>;
+export type MetricSeries = z.infer<typeof MetricSeriesSchema>;
+export type LogEntry = z.infer<typeof LogEntrySchema>;
+export type DeployRecord = z.infer<typeof DeployRecordSchema>;
+export type ExternalToolInfo = z.infer<typeof ExternalToolInfoSchema>;
+export type ExternalResult = z.infer<typeof ExternalResultSchema>;
 
 /** Default caps from spec 6.2. */
 export const DEFAULT_LIMITS: Limits = Object.freeze({

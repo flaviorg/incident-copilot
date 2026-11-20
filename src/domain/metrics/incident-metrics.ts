@@ -1,7 +1,7 @@
 // Incident metrics as pure functions (spec 5.7). None calls the LLM.
 // Minutes saved and ROI are ranges over a synthetic baseline, labeled as illustrative.
 import type { Alert, Approval, GatedAction, IncidentMetrics, MetricName, MetricSource, Range, RootCauseCategory, SeriesPoint } from "../../contracts/index.ts";
-import { firstViolation, meanBetween } from "../telemetry/series.ts";
+import { firstViolation, isMetricName, meanBetween } from "../telemetry/series.ts";
 
 export type BusinessAssumptions = {
   version: string;
@@ -59,6 +59,7 @@ const METRIC_SOURCES: Record<string, MetricSource> = {
 
 /** First sample of the main signal that violates the threshold up to detection; with no signal that has a threshold (cost), detection itself. */
 export function impactStartOf(alert: Alert, series: Partial<Record<MetricName, SeriesPoint[]>>): string {
+  if (!isMetricName(alert.signal)) return alert.detectedAt;
   const points = series[alert.signal];
   if (alert.threshold === null || !points) return alert.detectedAt;
   const upToDetection = points.filter((p) => Date.parse(p.ts) <= Date.parse(alert.detectedAt));

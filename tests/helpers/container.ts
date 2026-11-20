@@ -12,6 +12,9 @@ import type { Blackboard, Limits, PlanStep, TraceEvent, TraceType } from "../../
 import type { GraphNodes } from "../../src/graph/graph.ts";
 import type { ExecutionGuards } from "../../src/graph/nodes/executor-node.ts";
 import { readFixture } from "./fixtures.ts";
+import type { CopilotConfig } from "../../src/infra/copilot-config/schema.ts";
+import type { ConnectorDefinition } from "../../src/connectors/types.ts";
+import type { NotifierDefinition } from "../../src/notifiers/types.ts";
 
 export const TEST_APPROVAL_TOKEN = "test-token-0123456789";
 
@@ -27,6 +30,13 @@ export type TestContainerOptions = {
   guards?: Partial<ExecutionGuards>;
   /** Extra variables for loadConfig (e.g. fake OPENROUTER_API_KEY); LLM_PROVIDER stays fake and the options above win. */
   env?: Record<string, string>;
+  /** Live mode (spec 008): a parsed copilot config and the definitions it was parsed with. */
+  copilot?: CopilotConfig | null;
+  connectorDefinitions?: readonly ConnectorDefinition<unknown>[];
+  notifierDefinitions?: readonly NotifierDefinition<unknown>[];
+  /** Transport of connectors and notifiers (tests/helpers/fake-fetch.ts). */
+  fetch?: typeof fetch;
+  sleep?: (ms: number) => Promise<void>;
 };
 
 export type TestContainer = Container & { fake: FakeLlmProvider; logs: string[] };
@@ -57,6 +67,11 @@ export function createTestContainer(o: TestContainerOptions = {}): TestContainer
     ...(o.transformScenario ? { transformScenario: o.transformScenario } : {}),
     ...(o.nodes ? { nodes: o.nodes } : {}),
     ...(o.guards ? { guards: o.guards } : {}),
+    ...(o.copilot !== undefined ? { copilot: o.copilot } : {}),
+    ...(o.connectorDefinitions ? { connectorDefinitions: o.connectorDefinitions } : {}),
+    ...(o.notifierDefinitions ? { notifierDefinitions: o.notifierDefinitions } : {}),
+    ...(o.fetch ? { fetch: o.fetch } : {}),
+    ...(o.sleep ? { sleep: o.sleep } : {}),
   });
   if (!c.fake) throw new Error("test container without a fake provider");
   return { ...c, fake: c.fake, logs };
@@ -73,7 +88,7 @@ export function initialBlackboard(c: Container, scenarioId: string): Blackboard 
 }
 
 export function nodeDeps(c: Container) {
-  return { llm: c.llm, tools: c.tools, scenarios: c.scenarios, trace: c.trace, clock: c.clock, limits: c.limits };
+  return { llm: c.llm, tools: c.tools, context: c.context, trace: c.trace, clock: c.clock, limits: c.limits };
 }
 
 export function countByType(events: TraceEvent[]): Partial<Record<TraceType, number>> {

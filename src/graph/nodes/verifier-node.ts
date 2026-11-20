@@ -37,7 +37,9 @@ const isReversible = (a: GatedAction) => isExecutable(a.actionType) && EXECUTABL
 export function createVerifierNode(d: ExecutionDeps): NodeFn {
   return async (state, config) => {
     const ctx = runContextOf(state, config);
-    const scenario = d.scenarios.get(state.scenarioId, { offsetSec: state.timeOffsetSec });
+    const incident = d.context.resolve(state);
+    if (incident.kind === "live") throw new Error("verifier reached for a live incident; shadow mode routes the gate to the reporter");
+    const scenario = incident.scenario;
     d.clock.tick(CANARY_WINDOW_SEC);
     const r = analyzeCanary(scenario.file.canary, d.infra.postActionSignals(state.world, scenario), scenario.file.baselines);
     const checks = r.checks.map(describeCheck).join("; ");

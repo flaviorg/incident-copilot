@@ -1,0 +1,6 @@
+{
+  "errors": [
+    { "message": "Syntax Error: Unexpected Name \"FORM\"", "extensions": { "errorClass": "INVALID_NRQL_QUERY" } }
+  ],
+  "data": { "actor": { "account": { "nrql": null } } }
+}

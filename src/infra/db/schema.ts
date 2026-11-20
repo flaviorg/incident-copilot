@@ -2,10 +2,10 @@
 import type { DatabaseSync } from "node:sqlite";
 import {
   ActionStatusSchema, AgentIdSchema, ApprovalStatusSchema, AuditEventSchema, EscalationReasonSchema,
-  IncidentStatusSchema, LlmErrorKindSchema, SeveritySchema, TierSchema, TraceTypeSchema,
+  IncidentStatusSchema, IngestOutcomeSchema, LlmErrorKindSchema, SeveritySchema, TierSchema, TraceTypeSchema,
 } from "../../contracts/index.ts";
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 const quoted = (values: readonly string[]) => values.map((v) => `'${v.replaceAll("'", "''")}'`).join(", ");
 const tiers = TierSchema.options.map((o) => o.value).join(", ");
@@ -29,14 +29,8 @@ function auditLogTableSql(name: string): string {
 );`;
 }
 
-function buildSchemaSql(): string {
-  return `
-CREATE TABLE IF NOT EXISTS sequences (
-  name TEXT PRIMARY KEY,
-  value INTEGER NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS incidents (
+function incidentsTableSql(name: string): string {
+  return `CREATE TABLE IF NOT EXISTS ${name} (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
   service TEXT,
@@ -50,7 +44,32 @@ CREATE TABLE IF NOT EXISTS incidents (
   escalation_reason TEXT CHECK (escalation_reason IS NULL OR escalation_reason IN (${quoted(EscalationReasonSchema.options)})),
   escalation_detail TEXT,
   mttr_min REAL
+);`;
+}
+
+function actionsTableSql(name: string): string {
+  return `CREATE TABLE IF NOT EXISTS ${name} (
+  id TEXT PRIMARY KEY,
+  incident_id TEXT NOT NULL REFERENCES incidents (id),
+  ord INTEGER NOT NULL,
+  action_type TEXT NOT NULL,
+  target TEXT NOT NULL,
+  tier INTEGER NOT NULL CHECK (tier IN (${tiers})),
+  status TEXT NOT NULL CHECK (status IN (${quoted(ActionStatusSchema.options)})),
+  executed_at TEXT,
+  created_at TEXT NOT NULL,
+  json TEXT NOT NULL
+);`;
+}
+
+export function buildSchemaSql(): string {
+  return `
+CREATE TABLE IF NOT EXISTS sequences (
+  name TEXT PRIMARY KEY,
+  value INTEGER NOT NULL
 );
+
+${incidentsTableSql("incidents")}
 CREATE INDEX IF NOT EXISTS incidents_opened_idx ON incidents (opened_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS incidents_status_idx ON incidents (status);
 CREATE INDEX IF NOT EXISTS incidents_service_idx ON incidents (service);
@@ -75,18 +94,7 @@ CREATE TABLE IF NOT EXISTS trace_events (
 );
 CREATE INDEX IF NOT EXISTS trace_events_ts_idx ON trace_events (ts);
 
-CREATE TABLE IF NOT EXISTS actions (
-  id TEXT PRIMARY KEY,
-  incident_id TEXT NOT NULL REFERENCES incidents (id),
-  ord INTEGER NOT NULL,
-  action_type TEXT NOT NULL,
-  target TEXT NOT NULL,
-  tier INTEGER NOT NULL CHECK (tier IN (${tiers})),
-  status TEXT NOT NULL CHECK (status IN (${quoted(ActionStatusSchema.options)})),
-  executed_at TEXT,
-  created_at TEXT NOT NULL,
-  json TEXT NOT NULL
-);
+${actionsTableSql("actions")}
 CREATE INDEX IF NOT EXISTS actions_incident_idx ON actions (incident_id, ord);
 
 CREATE TABLE IF NOT EXISTS approvals (
@@ -141,6 +149,34 @@ CREATE TABLE IF NOT EXISTS runs (
   outcome TEXT
 );
 CREATE INDEX IF NOT EXISTS runs_incident_idx ON runs (incident_id);
+
+-- Version 4 (spec 008): alerts received by webhook and the live incident each fingerprint has open.
+CREATE TABLE IF NOT EXISTS ingested_alerts (
+  id TEXT PRIMARY KEY,
+  connector_id TEXT NOT NULL,
+  source TEXT NOT NULL,
+  external_id TEXT NOT NULL,
+  fingerprint TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('firing', 'resolved')),
+  received_at TEXT NOT NULL,
+  request_id TEXT,
+  outcome TEXT NOT NULL CHECK (outcome IN (${quoted(IngestOutcomeSchema.options)})),
+  incident_id TEXT,
+  detail TEXT,
+  json TEXT NOT NULL,
+  UNIQUE (connector_id, external_id)
+);
+CREATE INDEX IF NOT EXISTS ingested_alerts_fingerprint_idx ON ingested_alerts (connector_id, fingerprint, received_at);
+CREATE INDEX IF NOT EXISTS ingested_alerts_received_idx ON ingested_alerts (received_at DESC);
+
+CREATE TABLE IF NOT EXISTS live_incidents (
+  incident_id TEXT PRIMARY KEY REFERENCES incidents (id),
+  connector_id TEXT NOT NULL,
+  fingerprint TEXT NOT NULL,
+  opened_at TEXT NOT NULL,
+  closed_at TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS live_incidents_open_idx ON live_incidents (connector_id, fingerprint) WHERE closed_at IS NULL;
 `;
 }
 
@@ -180,8 +216,61 @@ function addAuditSeq(db: DatabaseSync): void {
   }
 }
 
+/** Tables whose CHECK lists come from enums that grow, with the SQL builder and the enums each CHECK uses. */
+const ENUM_CHECKED_TABLES: readonly { name: string; sql: (name: string) => string; enums: readonly (readonly string[])[]; orderBy: string | null }[] = [
+  { name: "incidents", sql: incidentsTableSql, enums: [IncidentStatusSchema.options, SeveritySchema.options, EscalationReasonSchema.options], orderBy: null },
+  { name: "actions", sql: actionsTableSql, enums: [ActionStatusSchema.options], orderBy: null },
+  { name: "audit_log", sql: auditLogTableSql, enums: [AuditEventSchema.options], orderBy: "seq" },
+];
+
+const columnsOf = (db: DatabaseSync, table: string): string[] =>
+  (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name);
+
+/**
+ * Version 3 → 4: a CHECK constraint cannot be altered, so a table whose stored SQL lacks any current enum literal is
+ * rebuilt following https://www.sqlite.org/lang_altertable.html#otheralter: foreign keys off (outside the transaction),
+ * create <name>_v4 with the current SQL, copy the common columns (audit_log in seq order, keeping seq and so the hash chain),
+ * drop the old table, rename, check foreign keys, commit. DROP TABLE does not fire the DELETE triggers; indexes and the
+ * append-only triggers come back through buildSchemaSql.
+ */
+export function rebuildStaleCheckTables(db: DatabaseSync): void {
+  const stale = ENUM_CHECKED_TABLES.filter((t) => {
+    const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get(t.name) as { sql: string } | undefined;
+    if (!row) return false;
+    return t.enums.some((values) => values.some((v) => !row.sql.includes(`'${v.replaceAll("'", "''")}'`)));
+  });
+  if (stale.length === 0) return;
+  const fkWasOn = Number((db.prepare("PRAGMA foreign_keys").get() as { foreign_keys: number }).foreign_keys) === 1;
+  db.exec("PRAGMA foreign_keys = OFF");
+  try {
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      for (const t of stale) {
+        const tmp = `${t.name}_v4`;
+        db.exec(`DROP TABLE IF EXISTS ${tmp}`);
+        db.exec(t.sql(tmp));
+        const target = columnsOf(db, tmp);
+        const common = columnsOf(db, t.name).filter((c) => target.includes(c));
+        const cols = common.join(", ");
+        db.exec(`INSERT INTO ${tmp} (${cols}) SELECT ${cols} FROM ${t.name}${t.orderBy ? ` ORDER BY ${t.orderBy}` : ""}`);
+        db.exec(`DROP TABLE ${t.name}`);
+        db.exec(`ALTER TABLE ${tmp} RENAME TO ${t.name}`);
+      }
+      const violations = db.prepare("PRAGMA foreign_key_check").all();
+      if (violations.length > 0) throw new Error(`schema migration to version ${SCHEMA_VERSION} found ${violations.length} foreign key violation(s)`);
+      db.exec("COMMIT");
+    } catch (e) {
+      db.exec("ROLLBACK");
+      throw e;
+    }
+  } finally {
+    if (fkWasOn) db.exec("PRAGMA foreign_keys = ON");
+  }
+}
+
 export function migrate(db: DatabaseSync): void {
   addAuditSeq(db);
+  rebuildStaleCheckTables(db);
   db.exec(buildSchemaSql());
   addLlmCallColumns(db);
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);

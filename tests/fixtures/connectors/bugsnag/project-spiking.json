@@ -1,0 +1,5 @@
+{
+  "account": { "id": "5f1c2a3b4d5e6f7a8b9c0d1e", "name": "Example Shop", "url": "https://app.bugsnag.com/example-shop" },
+  "project": { "id": "5f1c2a3b4d5e6f7a8b9c0d2f", "name": "checkout-api", "url": "https://app.bugsnag.com/example-shop/checkout-api" },
+  "trigger": { "type": "projectSpiking", "message": "checkout-api is spiking: 1,240 events in the last 5 minutes" }
+}

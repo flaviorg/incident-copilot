@@ -116,3 +116,98 @@ test("demo piped into a reader that closes early (like `| head`) exits 0 without
   assert.doesNotMatch(result.stderr, /EPIPE|\n\s+at /);
   assert.equal(result.code, 0);
 });
+
+// Spec 008 (AC-51 and AC-52): config check validates copilot.yaml and never prints a value.
+test("config check prints a summary for a valid copilot.yaml and redacts its secrets", async () => {
+  const { writeFileSync, rmSync } = await import("node:fs");
+  const dir = mkdtempSync(join(tmpdir(), "ic-cli-cfg-"));
+  const token = "am-cli-" + "r".repeat(30);
+  try {
+    const file = join(dir, "copilot.yaml");
+    writeFileSync(file, [
+      "version: 1",
+      "publicUrl: https://copilot.example.com",
+      "services:",
+      "  - name: checkout-api",
+      "    aliases: { prom: [checkout] }",
+      "connectors:",
+      "  - id: prom",
+      "    type: alertmanager",
+      "    ingest: { auth: { type: bearer, token: \"${AM_TOKEN}\" } }",
+      "  - id: old",
+      "    type: alertmanager",
+      "    enabled: false",
+    ].join("\n"));
+    const ok = await runCli(["config", "check", "--file", file], { AM_TOKEN: token });
+    assert.equal(ok.code, 0, ok.stderr);
+    assert.match(ok.stdout, /^copilot config OK: /);
+    assert.match(ok.stdout, /mode: shadow/);
+    assert.match(ok.stdout, /publicUrl: https:\/\/copilot\.example\.com/);
+    assert.match(ok.stdout, /- prom \(alertmanager\): capabilities ingest; ingest path \/ingest\/prom/);
+    assert.match(ok.stdout, /- old \(alertmanager\): disabled/);
+    assert.match(ok.stdout, /notifiers: 0/);
+    assert.match(ok.stdout, /services: 1/);
+    assert.ok(!ok.stdout.includes(token) && !ok.stderr.includes(token));
+
+    // COPILOT_CONFIG is the default file.
+    const viaEnv = await runCli(["config", "check"], { AM_TOKEN: token, COPILOT_CONFIG: file });
+    assert.equal(viaEnv.code, 0, viaEnv.stderr);
+
+    // Invalid: a literal secret, an unset variable and an unknown key; no value in the output.
+    const bad = join(dir, "bad.yaml");
+    writeFileSync(bad, [
+      "version: 1",
+      "colour: blue",
+      "connectors:",
+      "  - id: prom",
+      "    type: alertmanager",
+      `    ingest: { auth: { type: bearer, token: "${token}" } }`,
+      "  - id: two",
+      "    type: alertmanager",
+      "    ingest: { auth: { type: basic, username: am, password: \"${UNSET_PASSWORD}\" } }",
+    ].join("\n"));
+    const r = await runCli(["config", "check", "--file", bad], { AM_TOKEN: token });
+    assert.equal(r.code, 1);
+    assert.match(r.stderr, /^copilot config invalid: 1 problem\(s\)/);
+    assert.match(r.stderr, /- \(file\): unknown key colour/);
+    const r2 = await runCli(["config", "check", "--file", bad.replace("bad", "bad2")], {});
+    assert.equal(r2.code, 1);
+    assert.match(r2.stderr, /cannot read the config file/);
+    writeFileSync(bad, readFileSync(bad, "utf8").replace("colour: blue\n", ""));
+    const r3 = await runCli(["config", "check", "--file", bad], { AM_TOKEN: token });
+    assert.equal(r3.code, 1);
+    assert.match(r3.stderr, /- connectors\[0\]\.ingest\.auth\.token: secrets must be a whole \$\{VAR\} reference/);
+    assert.match(r3.stderr, /- connectors\[1\]\.ingest\.auth\.password: environment variable UNSET_PASSWORD is not set/);
+    for (const out of [r.stdout, r.stderr, r3.stdout, r3.stderr]) assert.ok(!out.includes(token));
+    const usage = await runCli(["config", "lint"]);
+    assert.equal(usage.code, 1);
+    assert.match(usage.stderr, /config check/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// copilot.example.yaml at the repository root must stay valid: every connector and notifier type, secrets as ${VAR}.
+test("config check accepts copilot.example.yaml when its variables are set", async () => {
+  const fill = (prefix: string, n: number) => prefix + "x".repeat(n);
+  const env: Record<string, string> = {
+    ALERTMANAGER_WEBHOOK_TOKEN: fill("am-", 30),
+    NEW_RELIC_WEBHOOK_TOKEN: fill("nr-hook-", 30),
+    NEW_RELIC_API_KEY: fill("NRAK-", 27),
+    SENTRY_CLIENT_SECRET: fill("", 64),
+    SENTRY_AUTH_TOKEN: fill("sentry-", 40),
+    BUGSNAG_WEBHOOK_TOKEN: fill("bugsnag_", 32),
+    BUGSNAG_AUTH_TOKEN: fill("bugsnag-", 40),
+    GENERIC_WEBHOOK_SECRET: fill("generic-", 32),
+    SLACK_WEBHOOK_URL: "https://hooks.slack.com/services/" + fill("T0/B0/", 24),
+    OUTBOUND_WEBHOOK_SIGNING_SECRET: fill("sign-", 32),
+    OUTBOUND_WEBHOOK_TOKEN: fill("out-", 32),
+  };
+  const r = await runCli(["config", "check", "--file", "copilot.example.yaml"], env);
+  assert.equal(r.code, 0, r.stderr);
+  assert.match(r.stdout, /^copilot config OK: copilot\.example\.yaml/);
+  for (const type of ["alertmanager", "newrelic", "sentry", "bugsnag", "webhook", "mcp", "slack", "outbound-webhook"]) {
+    assert.match(r.stdout, new RegExp(`\\(${type}\\)`), type);
+  }
+  for (const value of Object.values(env)) assert.ok(!r.stdout.includes(value) && !r.stderr.includes(value));
+});

@@ -9,6 +9,7 @@ import { GatedActionSchema } from "./actions.ts";
 import { IncidentMetricsSchema } from "./metrics.ts";
 import { PostmortemDocSchema } from "./postmortem.ts";
 import { InventorySchema, MetricNameSchema } from "./scenario.ts";
+import { IncidentOriginSchema } from "./ingest.ts";
 
 export const WorldStateSchema = z.object({
   deployments: z.record(z.string(), z.object({
@@ -78,6 +79,8 @@ export const BlackboardSchema = z.object({
   postmortem: PostmortemDocSchema.nullable(),
   supervisor: z.object({ iterations: z.number().int().min(0), history: z.array(HandoffRecordSchema) }),
   escalation: EscalationSchema.nullable(),
+  // Live incidents only (spec 008): absent in scenario mode, so recordings and goldens keep the same JSON.
+  origin: IncidentOriginSchema.optional(),
 });
 
 // LLM outputs

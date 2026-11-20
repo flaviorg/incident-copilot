@@ -61,3 +61,10 @@ test("graph node ids never collide with blackboard keys (LangGraph refuses a nod
   assert.equal(new Set(ids).size, NODE_NAMES.length);
   assert.equal(GRAPH_NODE_ID.telemetry_analyst, "telemetry_analyst");
 });
+
+test("shadow mode routes the gate to the reporter before anything else", () => {
+  const origin = { kind: "connector" as const, connectorId: "prom", source: "alertmanager", fingerprint: "fp", alertId: "ALR-0001", externalUrl: null, mode: "shadow" as const };
+  assert.equal(afterGate(bb({ origin, actions: [act("recommended")] }), 0), "reporter");
+  assert.equal(afterGate(bb({ origin, actions: [act("ready")] }), 3), "reporter");
+  assert.equal(afterGate(bb({ origin }), 0), "reporter");
+});

@@ -8,7 +8,7 @@ The tier of each step comes from the catalog and from context rules that only ra
 
 | Tier | Rule | What belongs here |
 |---|---|---|
-| Tier 1: decides alone | Read-only, zero risk | Tools `query_metrics`, `query_logs`, `list_deploys`, `audit_cloud_inventory` |
+| Tier 1: decides alone | Read-only, zero risk | Tools `query_metrics`, `query_logs`, `list_deploys`, `audit_cloud_inventory`, `query_errors`, `query_external` |
 | Tier 2: decides and records | Reversible change or no effect on the service, with audit | `add_incident_note`, `block_image_tag`, `tag_resource_for_review`, `create_volume_snapshot` |
 | Tier 3: requires human approval | Destructive or high impact | `rollback_deployment`, `release_elastic_ip`, `delete_volume`, `resize_instance` |
 | Tier 4: forbidden by construction | Exposing data, deleting audit or backup, disabling controls | `delete_audit_log`, `disable_security_scanner`, `export_user_data`, `run_arbitrary_command`, `delete_backups` and any type not in the catalog (deny by default) |

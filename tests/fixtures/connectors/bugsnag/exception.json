@@ -1,0 +1,30 @@
+{
+  "account": { "id": "5f1c2a3b4d5e6f7a8b9c0d1e", "name": "Example Shop", "url": "https://app.bugsnag.com/example-shop" },
+  "project": { "id": "5f1c2a3b4d5e6f7a8b9c0d2f", "name": "checkout-api", "url": "https://app.bugsnag.com/example-shop/checkout-api" },
+  "trigger": { "type": "exception", "message": "New exception in checkout-api" },
+  "error": {
+    "id": "6a0b1c2d3e4f5a6b7c8d9e01",
+    "errorId": "6a0b1c2d3e4f5a6b7c8d9e00",
+    "exceptionClass": "PaymentGatewayTimeout",
+    "message": "Upstream payment gateway did not answer within 5000 ms",
+    "context": "POST /api/checkout",
+    "firstReceived": "2026-10-04T09:41:12.000Z",
+    "receivedAt": "2026-10-04T09:44:30.250Z",
+    "url": "https://app.bugsnag.com/example-shop/checkout-api/errors/6a0b1c2d3e4f5a6b7c8d9e00?event_id=6a0b1c2d3e4f5a6b7c8d9e01",
+    "severity": "error",
+    "status": "open",
+    "unhandled": true,
+    "app": { "releaseStage": "production", "version": "2026.10.4-1", "id": "com.example.checkout" },
+    "exceptions": [
+      {
+        "errorClass": "PaymentGatewayTimeout",
+        "message": "Upstream payment gateway did not answer within 5000 ms",
+        "type": "nodejs",
+        "stacktrace": [
+          { "file": "src/payments/gateway.ts", "lineNumber": "88", "columnNumber": "17", "method": "charge", "inProject": true },
+          { "file": "src/routes/checkout.ts", "lineNumber": "41", "columnNumber": "9", "method": "handler", "inProject": true }
+        ]
+      }
+    ]
+  }
+}

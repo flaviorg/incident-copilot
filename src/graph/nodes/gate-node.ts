@@ -23,6 +23,8 @@ export type GateDeps = { infra: SimulatedInfra; trace: TraceSink; clock: Clock; 
 export const DRY_RUN_SEC = 2;
 
 const ACCEPTED: readonly GatedAction["status"][] = ["ready", "awaiting_approval"];
+/** Shadow mode (spec 008, decision 6): a recommended step counts as accepted for the steps that depend on it. */
+const ACCEPTED_SHADOW: readonly GatedAction["status"][] = [...ACCEPTED, "recommended"];
 
 /** Arguments of the `action` event in the trace: the target first, then the parameters. */
 export function actionArgs(a: Pick<GatedAction, "target" | "params">): Record<string, unknown> {
@@ -36,6 +38,9 @@ export function createGateNode(d: GateDeps): NodeFn {
   return async (state, config) => {
     const ctx = runContextOf(state, config);
     if (state.plan === null || state.audit === null) throw new Error("gate invoked without an audited plan (the supervisor guard should prevent this)");
+    // Shadow mode comes from the blackboard, so every run of a live incident behaves the same (AC-49).
+    const shadow = state.origin?.mode === "shadow";
+    const accepted = shadow ? ACCEPTED_SHADOW : ACCEPTED;
     const revisionsExhausted = state.audit.verdict === "revise";
     const scope = { service: state.alert.service, account: state.alert.account, incidentId: state.incidentId };
     const knownRunbookRefs = runbookRefsOf(state.runbookMatches);
@@ -66,13 +71,20 @@ export function createGateNode(d: GateDeps): NodeFn {
       }
       const blocker = step.dependsOn.find((n) => {
         const dep = evaluated.find((e) => e.action.order === n);
-        return !dep || !ACCEPTED.includes(dep.action.status);
+        return !dep || !accepted.includes(dep.action.status);
       });
       if (blocker !== undefined) {
         const dep = evaluated.find((e) => e.action.order === blocker);
         action.status = "cancelled";
         const why = dep ? ACTION_STATUS_LABELS[dep.action.status] : "not in the plan";
         evaluated.push({ action, event: "action_cancelled", summary: `${head}: cancelled, depends on step ${blocker} (${why})` });
+        continue;
+      }
+      if (shadow) {
+        // Classified and validated like any step, but nothing runs: no dry run, no clock tick, no approval.
+        action.status = "recommended";
+        const why = cls.tier === 3 ? "; would require human approval" : "";
+        evaluated.push({ action, event: "action_recommended", summary: `${head}: recommended (shadow mode, not executed${why})` });
         continue;
       }
       const validated = { actionType: step.actionType, target: step.target, params: cls.params };
@@ -113,7 +125,7 @@ export function createGateNode(d: GateDeps): NodeFn {
         summary += ` → awaiting ${approval.id}`;
       }
       d.trace.emit(ctx, "gate", { type: "action", payload: { tool: a.actionType, args: actionArgs(a), tier: a.tier } });
-      d.trace.emit(ctx, "gate", { type: "observation", payload: { tool: a.actionType, ok: ACCEPTED.includes(a.status), summary, evidenceRef: null } });
+      d.trace.emit(ctx, "gate", { type: "observation", payload: { tool: a.actionType, ok: accepted.includes(a.status), summary, evidenceRef: null } });
       if (a.tier === 4) {
         d.trace.emit(ctx, "gate", { type: "critique", payload: { by: "gate", verdict: "blocked", feedback: `${a.actionType} on ${a.target}: ${a.classificationReasons.join("; ")}` } });
       }
@@ -127,9 +139,24 @@ export function createGateNode(d: GateDeps): NodeFn {
           actionId: a.id, order: a.order, actionType: a.actionType, target: a.target, status: a.status, reasons: a.classificationReasons,
           dryRun: a.dryRun === null ? null : (a.dryRun.failureReason ?? a.dryRun.changes.join("; ")),
           ...(a.approvalId ? { approvalId: a.approvalId, expiresAt } : {}),
+          ...(a.status === "recommended" ? { mode: "shadow" } : {}),
           requestId: ctx.requestId,
         },
       });
+    }
+
+    if (shadow) {
+      const actions = evaluated.map((e) => e.action);
+      const n = actions.filter((a) => a.status === "recommended").length;
+      d.trace.emit(ctx, "gate", {
+        type: "handoff",
+        payload: {
+          from: "gate", to: "reporter",
+          brief: `${n} recommendation(s) recorded; shadow mode executes nothing`,
+          reason: "shadow mode: the gate classifies and records each step; people decide and act outside the copilot",
+        },
+      });
+      return { actions, phase: "reporting" };
     }
 
     const actions = evaluated.map((e) => e.action);

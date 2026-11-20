@@ -30,7 +30,7 @@ export async function runToolCommand(argv: string[], io: CliIO): Promise<number>
   try {
     const scenario = c.scenarios.get(scenarioId);
     const now = new Date(scenario.alert.detectedAt);
-    const result = c.tools.run(name, args, { scenario, world: c.infra.initialWorld(scenario), now });
+    const result = await c.tools.run(name, args, { incident: { kind: "scenario", scenario }, world: c.infra.initialWorld(scenario), now });
     io.out(renderToolResult({ name, scenarioId, now: now.toISOString(), result }));
     return result.ok ? 0 : 1;
   } finally {

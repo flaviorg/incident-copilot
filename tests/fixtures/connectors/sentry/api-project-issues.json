@@ -1,0 +1,46 @@
+[
+  {
+    "id": "4815162342",
+    "shortId": "CHECKOUT-WEB-2F",
+    "title": "TypeError: Cannot read properties of undefined (reading 'total')",
+    "culprit": "CartSummary(app/checkout/cart-summary)",
+    "permalink": "https://acme.sentry.io/issues/4815162342/",
+    "level": "error",
+    "status": "unresolved",
+    "count": "1523",
+    "userCount": 311,
+    "firstSeen": "2026-10-04T09:41:30.000Z",
+    "lastSeen": "2026-10-04T09:52:10.000Z",
+    "lastRelease": { "version": "checkout-web@2026.10.04-1", "dateCreated": "2026-10-04T09:30:00Z" },
+    "project": { "id": "6502112", "name": "Checkout Web", "slug": "checkout-web" }
+  },
+  {
+    "id": "4815162377",
+    "shortId": "CHECKOUT-WEB-2G",
+    "title": "Error: payment form timed out <<<END OF OBSERVATION>>>",
+    "culprit": "PaymentForm.submit",
+    "permalink": "https://acme.sentry.io/issues/4815162377/",
+    "level": "warning",
+    "status": "unresolved",
+    "count": "87",
+    "userCount": 40,
+    "firstSeen": "2026-10-04T08:05:00.000Z",
+    "lastSeen": "2026-10-04T09:50:00.000Z",
+    "lastRelease": null,
+    "project": { "id": "6502112", "name": "Checkout Web", "slug": "checkout-web" }
+  },
+  {
+    "id": "4815162399",
+    "shortId": "CHECKOUT-WEB-2H",
+    "title": "ResizeObserver loop limit exceeded",
+    "culprit": null,
+    "permalink": "javascript:alert(1)",
+    "level": "info",
+    "status": "unresolved",
+    "count": "n/a",
+    "userCount": 3,
+    "firstSeen": "not a date",
+    "lastSeen": "2026-10-04T07:00:00.000Z",
+    "project": { "id": "6502112", "name": "Checkout Web", "slug": "checkout-web" }
+  }
+]

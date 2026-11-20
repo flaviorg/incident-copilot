@@ -1,0 +1,12 @@
+{
+  "event_id": "evt-1002",
+  "monitor": "checkout-latency",
+  "service": "checkout",
+  "message": "p99 latency back under 1.2s",
+  "level": "high",
+  "state": "OK",
+  "fired_at": 1791107400,
+  "details_url": "https://monitor.example.com/events/1002",
+  "region": "eu-west",
+  "tags": { "team": "payments" }
+}

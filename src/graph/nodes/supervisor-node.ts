@@ -24,6 +24,7 @@ function inputOf(bb: Blackboard): SupervisorInput {
   const d = bb.diagnosis;
   return {
     alert: bb.alert,
+    ...(bb.origin ? { externalAlert: true } : {}),
     flags: {
       hasDiagnosis: d !== null,
       runbookSearchDone: bb.runbookSearchDone,

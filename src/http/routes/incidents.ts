@@ -6,22 +6,22 @@ import { parseOr400 } from "../errors.ts";
 import { IdParamsSchema } from "./params.ts";
 
 export function registerIncidentRoutes(app: FastifyInstance, c: Container, o: { maxConcurrentRuns: number }): void {
-  // Review 2026-11: each POST /incidents runs the whole graph (real LLM calls with a key), so runs are capped.
-  let running = 0;
+  // Review 2026-11: each POST /incidents runs the whole graph (real LLM calls with a key), so runs are capped. The slots
+  // are shared with the live alert queue (spec 008, AC-48).
   const tooMany = (reqId: string) => ({ error: { code: "too_many_runs", message: `at most ${o.maxConcurrentRuns} incident run(s) at a time; retry later`, requestId: reqId } });
-  const capped = async <T>(fn: () => Promise<T>): Promise<T> => {
-    running += 1;
+  const capped = async <T>(release: () => void, fn: () => Promise<T>): Promise<T> => {
     try {
       return await fn();
     } finally {
-      running -= 1;
+      release();
     }
   };
 
   app.post("/incidents", async (req, reply) => {
     const body = parseOr400(CreateIncidentBodySchema, req.body ?? {});
-    if (running >= o.maxConcurrentRuns) return reply.code(429).send(tooMany(req.id));
-    const view = await capped(() => c.incidents.open(body, { requestId: req.id }));
+    const release = c.runSlots.tryAcquire();
+    if (!release) return reply.code(429).send(tooMany(req.id));
+    const view = await capped(release, () => c.incidents.open(body, { requestId: req.id }));
     return reply.code(201).send(view);
   });
 
@@ -29,8 +29,9 @@ export function registerIncidentRoutes(app: FastifyInstance, c: Container, o: { 
   // what humans already approved, so it needs no token; 409 incident_not_accepting in any other phase.
   app.post("/incidents/:id/resume", async (req, reply) => {
     const { id } = parseOr400(IdParamsSchema, req.params);
-    if (running >= o.maxConcurrentRuns) return reply.code(429).send(tooMany(req.id));
-    return capped(() => c.incidents.resume(id, { requestId: req.id }));
+    const release = c.runSlots.tryAcquire();
+    if (!release) return reply.code(429).send(tooMany(req.id));
+    return capped(release, () => c.incidents.resume(id, { requestId: req.id }));
   });
 
   app.get("/incidents", async (req) => {

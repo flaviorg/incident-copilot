@@ -1,0 +1,15 @@
+{
+  "issueId": "6f2d1c34-9b7e-4a58-8c1e-3d5f0a1b2c3d",
+  "title": "Checkout API error rate above 5% for at least 2 minutes",
+  "priority": "CRITICAL",
+  "state": "ACKNOWLEDGED",
+  "triggerEvent": "STATE_CHANGE",
+  "issuePageUrl": "https://one.newrelic.com/alerts-ai/issues/6f2d1c34-9b7e-4a58-8c1e-3d5f0a1b2c3d",
+  "createdAt": 1791106800000,
+  "updatedAt": 1791107000000,
+  "closedAt": null,
+  "entitiesData": { "names": ["Checkout API (prod)"], "types": ["APPLICATION"] },
+  "conditionName": "Error rate above 5%",
+  "policyName": "Checkout production",
+  "workflowName": "Send to incident-copilot"
+}

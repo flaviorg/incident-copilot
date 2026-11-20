@@ -1,0 +1,7 @@
+{
+  "id": "6502112",
+  "slug": "checkout-web",
+  "name": "Checkout Web",
+  "platform": "javascript",
+  "organization": { "slug": "acme" }
+}

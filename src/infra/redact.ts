@@ -4,9 +4,13 @@ import type { Config } from "../config.ts";
 export const REDACTED = "[REDACTED]";
 const MIN_SECRET_LENGTH = 8;
 
-/** Known secrets from the config, only the defined ones with 8 characters or more. */
-export function collectSecrets(c: Pick<Config, "approvalToken" | "openrouterApiKey"> & Partial<Pick<Config, "apiToken">>): string[] {
-  return [c.approvalToken, c.openrouterApiKey, c.apiToken ?? null].filter((s): s is string => typeof s === "string" && s.length >= MIN_SECRET_LENGTH);
+/** Known secrets from the config (and `extra`, the secrets of copilot.yaml), only the defined ones with 8 characters or more. */
+export function collectSecrets(
+  c: Pick<Config, "approvalToken" | "openrouterApiKey"> & Partial<Pick<Config, "apiToken">>,
+  extra: readonly string[] = [],
+): string[] {
+  const all = [c.approvalToken, c.openrouterApiKey, c.apiToken ?? null, ...extra].filter((s): s is string => typeof s === "string" && s.length >= MIN_SECRET_LENGTH);
+  return [...new Set(all)];
 }
 
 function redactString(text: string, secrets: readonly string[]): string {

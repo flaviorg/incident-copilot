@@ -8,14 +8,14 @@
 [![MIT License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Node 24.21](https://img.shields.io/badge/node-24.21-brightgreen?logo=nodedotjs&logoColor=white)](.nvmrc)
 [![TypeScript 7](https://img.shields.io/badge/TypeScript-7.0-3178c6?logo=typescript&logoColor=white)](tsconfig.json)
-[![Tests](https://img.shields.io/badge/tests-378%20backend%20%2B%2037%20web-brightgreen)](#tests-and-quality)
-[![Version 0.3.0](https://img.shields.io/badge/version-0.3.0-blue)](CHANGELOG.md)
+[![Tests](https://img.shields.io/badge/tests-750%20backend%20%2B%2037%20web-brightgreen)](#tests-and-quality)
+[![Version 0.4.0](https://img.shields.io/badge/version-0.4.0-blue)](CHANGELOG.md)
 
-[**Live War Room demo**](https://flaviorg.github.io/incident-copilot/) · [Quick start](#quick-start) · [Architecture](docs/architecture.md) · [Threat model](docs/threat-model.md) · [Changelog](CHANGELOG.md)
+[**Live War Room demo**](https://flaviorg.github.io/incident-copilot/) · [Quick start](#quick-start) · [Connect your stack](#connect-your-stack) · [Architecture](docs/architecture.md) · [Threat model](docs/threat-model.md) · [Changelog](CHANGELOG.md)
 
 </div>
 
-A LangGraph supervisor coordinates telemetry, runbook, planning and audit agents. Risky actions go through an autonomy matrix with human approval, and forbidden ones never run, even when the model proposes them. MTTR and savings are computed from data, not by the LLM. It runs offline with a scripted fake LLM; plug in OpenRouter with two environment variables (API key and model).
+A LangGraph supervisor coordinates telemetry, runbook, planning and audit agents. Risky actions go through an autonomy matrix with human approval, and forbidden ones never run, even when the model proposes them. MTTR and savings are computed from data, not by the LLM. It runs offline with a scripted fake LLM; plug in OpenRouter with two environment variables (API key and model). Since 0.4 it can also [connect to your stack](#connect-your-stack): Alertmanager, New Relic, Sentry, Bugsnag, any JSON webhook or any MCP server send alerts and serve read-only data, and every live incident runs in **shadow mode**, where the team diagnoses and recommends but nothing executes.
 
 <p align="center">
   <a href="https://flaviorg.github.io/incident-copilot/">
@@ -32,6 +32,7 @@ A LangGraph supervisor coordinates telemetry, runbook, planning and audit agents
 - [Architecture](#architecture)
 - [Quick start](#quick-start)
 - [Usage](#usage): [CLI](#cli) · [HTTP API](#http-api) · [MCP server](#mcp-server) · [War Room](#war-room) · [Real model](#using-a-real-model-openrouter)
+- [Connect your stack](#connect-your-stack)
 - [Scenarios](#scenarios)
 - [Security and guardrails](#security-and-guardrails)
 - [Numbers without invention](#numbers-without-invention)
@@ -54,7 +55,7 @@ LLM agents can already investigate an incident and propose a fix. The problem is
 - **Four entry points, one core:** CLI, HTTP API (Fastify), MCP server (stdio) and War Room (React 19, published on GitHub Pages).
 - **Insert-only audit** with a hash chain over canonical JSON, verifiable by the client.
 - **Runs offline**, with no Docker, no key and no network after `npm install`, using a scripted fake LLM; OpenRouter plugs in with two environment variables.
-- **378 backend tests and 37 War Room tests, none using the network**, plus SDD specs with 41 acceptance criteria in EARS.
+- **750 backend tests and 37 War Room tests, none using the network**, plus SDD specs with 59 acceptance criteria in EARS.
 
 ## Architecture
 
@@ -65,6 +66,14 @@ flowchart LR
     API[HTTP API Fastify]
     MCP[MCP server stdio]
     WR[War Room React]
+    ING["POST /ingest/:connectorId<br/>provider webhooks"]
+  end
+
+  subgraph CONN [Connectors and ingest, live mode]
+    ISV["IngestService<br/>verify, parse, map, record"]
+    AQ["AlertQueue<br/>shared RunSlots"]
+    CR["ConnectorRegistry<br/>read-only queries"]
+    NS[NotificationService]
   end
 
   subgraph EQUIPE [LangGraph graph]
@@ -84,6 +93,9 @@ flowchart LR
   DB[("SQLite<br/>blackboard, trace,<br/>chained audit")]
 
   CLI & API & MCP --> SUP
+  ING --> ISV --> AQ --> SUP
+  TEL -- live tools --> CR
+  RP --> NS
   SUP --> TEL & RB & PL
   TEL & RB --> SUP
   AU --> SUP
@@ -91,6 +103,7 @@ flowchart LR
   GT -- tier 3 --> HUM --> EX
   GT -- tier 2 --> EX
   GT -. tier 4 blocked .-> GT
+  GT -- shadow mode --> RP
   VE -- healthy --> SUP --> RP
   VE -- failed --> ESC --> RP
   EQUIPE --- DB
@@ -101,7 +114,7 @@ flowchart LR
 - The approval pause persists the blackboard in SQLite, and resuming is a new invocation that enters through the executor.
 - `src/contracts` and `src/domain` are pure (no `node:*` and no outer layers), and a test guarantees it.
 
-Full diagrams (components, graph, approval state machine), route table and dependency rule: [`docs/architecture.md`](docs/architecture.md).
+Full diagrams (components, graph, approval state machine), route table and dependency rule: [`docs/architecture.md`](docs/architecture.md). Connectors, ingest, queue, shadow mode and notifiers: [`docs/connectors-architecture.md`](docs/connectors-architecture.md).
 
 <details>
 <summary><strong>The agents, one by one</strong></summary>
@@ -180,6 +193,7 @@ The full output of both scenarios, line by line, is in [`docs/demo-output.md`](d
 | `npm run demo -- --json` | Only the final object |
 | `npm run demo -- --persist` | Writes to `data/incident-copilot.db`; the second run becomes `INC-0002` |
 | `npm run cli -- demo --live` | The demo with the real model ([see below](#using-a-real-model-openrouter)) |
+| `npm run cli -- config check [--file <path>]` | Validates `copilot.yaml` (default `COPILOT_CONFIG`, then `./copilot.yaml`) and prints the connectors, notifiers and ingest paths, never a value; exit 0 when valid, 1 otherwise |
 
 ### HTTP API
 
@@ -193,6 +207,8 @@ The full output of both scenarios, line by line, is in [`docs/demo-output.md`](d
 | `GET /incidents/:id/trace`, `/audit`, `/postmortem` | trace, verifiable audit trail and post-mortem (Markdown or JSON) |
 | `GET /approvals`, `POST /approvals/:id/decision` | approval queue; decision with `X-Approval-Token`, which resumes the incident |
 | `GET /health`, `GET /scenarios`, `GET /stats` | health, scenarios and SQL statistics (MTTR P50 and P95, tiers, guards, LLM usage) |
+| `POST /ingest/:connectorId`, `POST /ingest/:connectorId/:token` | provider webhooks (live mode): verified with the connector's own scheme, recorded and queued, 202 without running the graph in the request |
+| `GET /connectors`, `GET /ingest/alerts` | configured connectors with their capabilities and ingest paths; recently ingested alerts with their outcome |
 
 <details>
 <summary><strong>Real <code>curl</code> sequence</strong> (open, wrong token, ambiguous decision, approve)</summary>
@@ -220,7 +236,7 @@ The last command shows the [numeric guard](#numbers-without-invention) at work: 
 
 </details>
 
-With `API_TOKEN` set (required when `HOST` is not loopback), every route except `/health` needs `Authorization: Bearer <API_TOKEN>`. Requests whose `Host` is not a loopback name, `HOST` or one of `ALLOWED_HOSTS` get 421 (DNS rebinding); writes with a cross-site `Origin` get 403; more than `MAX_CONCURRENT_RUNS` runs at once get 429. All routes with their error codes and the full sequence (`/health`, `/stats`, post-mortem in Markdown): [`docs/http-api.md`](docs/http-api.md).
+With `API_TOKEN` set (required when `HOST` is not loopback), every route except `/health` and the `POST /ingest/*` webhooks (which use each connector's own authentication) needs `Authorization: Bearer <API_TOKEN>`. Requests whose `Host` is not a loopback name, `HOST` or one of `ALLOWED_HOSTS` get 421 (DNS rebinding); writes with a cross-site `Origin` get 403; more than `MAX_CONCURRENT_RUNS` runs at once get 429. All routes with their error codes and the full sequence (`/health`, `/stats`, post-mortem in Markdown): [`docs/http-api.md`](docs/http-api.md).
 
 ### MCP server
 
@@ -308,6 +324,109 @@ Any endpoint compatible with the OpenAI API will work (`LLM_BASE_URL`). Every lo
 
 > **Add your model's price first.** The price table ships empty on purpose (prices change; check the current one on OpenRouter). A model with no entry is recorded at $0.00, so at startup the API, MCP server and CLI log a `warn` line with `"event": "llm_price_missing"` and the unpriced model ids. Add an entry per model (primary and fallback), for example `"models": { "<vendor>/<model>": { "inputPerMTokUsd": 3, "outputPerMTokUsd": 15 } }`.
 
+## Connect your stack
+
+Version 0.4 plugs the copilot into a company's own observability and error tools. A provider sends an alert by webhook, the copilot opens an incident (or folds the alert into an open one), the team investigates with **read-only** data from the configured providers, and the result goes to Slack or any webhook. Design: [`docs/connectors-architecture.md`](docs/connectors-architecture.md); spec: [`specs/008-connectors/spec.md`](specs/008-connectors/spec.md).
+
+### Live mode and shadow mode
+
+**What live mode does:**
+
+- `POST /ingest/:connectorId` verifies the webhook with that connector's own scheme on the raw bytes, parses it into normalized alerts, records them and answers **202** quickly; the graph runs afterwards on an in-process queue that shares `MAX_CONCURRENT_RUNS` with `POST /incidents`.
+- A repeat of the same provider event (same `externalId`) is a duplicate and changes nothing. A firing alert whose fingerprint already has an open live incident (younger than `ingest.dedupeWindowMin`) joins it without a new run. A resolved alert closes the live incident and marks it `resolved` with the provider's time.
+- The telemetry analyst gets the same tool vocabulary as in scenarios (`query_metrics`, `query_logs`, `list_deploys`) plus `query_errors` and `query_external`, each offered only when some configured connector can answer it. Results are sanitized and reach the model as untrusted observations.
+- Notifiers get `incident_opened`, `analysis_ready`, `run_failed` and `incident_resolved` messages with the diagnosis and the recommended steps with their catalog tiers.
+
+**Shadow mode is the only mode for live incidents in 0.4.** Diagnosis, runbooks, plan, auditor and the gate's tier classification run as usual, but:
+
+- **nothing executes:** no dry run, no approval request, no executor, no canary; tier 2 and tier 3 steps are recorded as `recommended` (tier 3 noted as "would require human approval");
+- tier 4 and unknown action types are blocked exactly as in scenarios;
+- the gate hands off to the reporter, which writes an `advisory` report from the template (no LLM call), and the incident ends `advised` (or `escalated`);
+- the copilot never writes back to a provider: it does not acknowledge, assign or close anything there.
+
+Scenario mode (demo, goldens, recordings, War Room) is unchanged.
+
+### Connectors and notifiers
+
+| Type | Kind | Ingest (webhook in) | Query (read only) | Setup guide |
+|---|---|---|---|---|
+| `alertmanager` | connector | Prometheus Alertmanager `webhook_config`; Bearer or Basic | no | [docs/connectors/alertmanager.md](docs/connectors/alertmanager.md) |
+| `newrelic` | connector | Workflows webhook destination; Bearer, Basic or a custom header | NerdGraph NRQL from config templates: metrics, errors, logs, deploys | [docs/connectors/newrelic.md](docs/connectors/newrelic.md) |
+| `sentry` | connector | Integration Platform webhooks (`event_alert`, `metric_alert`, `issue`), HMAC-SHA256 signature | REST: issues (errors) and releases (deploys) | [docs/connectors/sentry.md](docs/connectors/sentry.md) |
+| `bugsnag` | connector | Data Forwarding webhook; secret URL token and optional IP allowlist | Data Access API: errors and releases | [docs/connectors/bugsnag.md](docs/connectors/bugsnag.md) |
+| `webhook` | connector | any JSON, field mapping in the config; Bearer, Basic, header, HMAC or URL token | no | [docs/connectors/webhook.md](docs/connectors/webhook.md) |
+| `mcp` | connector | no | allowlisted read-only tools of any MCP server (HTTP with static headers, or stdio) | [docs/connectors/mcp.md](docs/connectors/mcp.md) |
+| `slack` | notifier | n/a | n/a: posts to an incoming webhook | [docs/connectors/slack.md](docs/connectors/slack.md) |
+| `outbound-webhook` | notifier | n/a | n/a: POSTs JSON, optionally Bearer and HMAC-signed | [docs/connectors/outbound-webhook.md](docs/connectors/outbound-webhook.md) |
+
+Each guide ends with "Facts and sources" and an "Unverified" list: the payload fixtures are built from provider documentation, not captured from real accounts, and provider facts not confirmed there are marked as such and handled defensively in code.
+
+### Quick start (about 5 minutes)
+
+Live mode needs a real model: `npm start` refuses ingest connectors with the fake provider. Set `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` as in [Using a real model](#using-a-real-model-openrouter).
+
+1. Copy the example config and keep what you use:
+
+   ```bash
+   cp copilot.example.yaml copilot.yaml
+   cp .env.example .env
+   ```
+
+   In `.env`, set `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `API_TOKEN` (16 or more characters), `COPILOT_CONFIG=./copilot.yaml` and each `${VAR}` your `copilot.yaml` references (the commented block at the end of `.env.example` lists them). Generate random values, for example `node -e "console.log(require('node:crypto').randomBytes(24).toString('hex'))"`.
+
+2. Validate it (exit 0 when valid; problems are printed as `path: rule`, never with a value):
+
+   ```bash
+   npm run cli -- config check
+   ```
+
+3. Start the API, either locally or in Docker:
+
+   ```bash
+   npm start
+   # or
+   docker compose up --build
+   ```
+
+   The container listens on `0.0.0.0`, which is why `API_TOKEN` is required (the server refuses to start without it); `docker-compose.yml` publishes the port on `127.0.0.1:3000` only and keeps the database in the `copilot-data` volume. Providers need to reach you over HTTPS: put a TLS reverse proxy in front and list its public hostname in `ALLOWED_HOSTS`, or requests with that `Host` get 421.
+
+4. Send a sample Alertmanager payload (one firing and one resolved alert for `checkout`, which the example maps to `checkout-api`) with the connector's Bearer token, then read the result with `API_TOKEN`:
+
+   ```bash
+   set -a; . ./.env; set +a
+   curl -s -X POST localhost:3000/ingest/prom \
+     -H 'content-type: application/json' \
+     -H "Authorization: Bearer $ALERTMANAGER_WEBHOOK_TOKEN" \
+     --data-binary @tests/fixtures/connectors/alertmanager/firing.json
+   curl -s localhost:3000/ingest/alerts -H "Authorization: Bearer $API_TOKEN"
+   curl -s localhost:3000/incidents -H "Authorization: Bearer $API_TOKEN"
+   ```
+
+   The first call answers 202 with `accepted: 2`. The firing alert opens a live incident that the team investigates in shadow mode; the resolved one has no open incident yet and is recorded as `ignored`. Once the run finishes, the incident is `advised` and its advisory report lists the recommended steps with their tiers.
+
+Then point a real provider at `https://<your host>/ingest/<connector id>` following its guide.
+
+### Security notes
+
+- **Per-connector authentication, mandatory.** `/ingest/*` is not behind `API_TOKEN`; each connector authenticates with its own scheme, and the config loader refuses an ingest block without one. Sentry (and the generic webhook, when configured) uses an HMAC signature over the raw body; Bugsnag uses a secret URL token; the others use Bearer, Basic or a custom header. Every comparison is constant-time, and a failure is a generic 401 with nothing recorded.
+- **Limits.** A body cap per route (`ingest.maxBodyBytes`, 1 MiB by default, 413), a token bucket per connector (`ingest.rateLimitPerMin`, 60 by default, 429 with `Retry-After`) and a bounded queue (`ingest.maxQueued`, 100 by default, 503).
+- **Untrusted text.** Alert titles and attributes, error messages, log lines, MCP tool descriptions and results are sanitized and clipped, and reach the model only as alert data or untrusted observations. No tier, approval or execution decision reads them. NRQL and other queries come only from config templates with an allowlist for substituted values; the model never writes a query, not even for an MCP tool (it only fills the `{service}` and `{window}` placeholders of your `arguments`).
+- **Outbound requests.** Base URLs come from the config only, must be https (http only for loopback where allowed), and the HTTP client refuses redirects, times out and caps responses.
+- **Redaction.** Secrets enter only as whole `${VAR}` references, join the redaction list and appear in no response, log, trace, audit entry, notification or CLI output.
+- **Tier 4 stays forbidden by construction**, live or not.
+
+More in the [threat model](docs/threat-model.md#inbound-webhooks-and-connectors-04).
+
+### Roadmap
+
+Not in 0.4, in no particular order:
+
+1. A `supervised` mode with real executors registered beside the simulated world: tier 2 runs, tier 3 asks a human. Tier 4 stays without an executor.
+2. Cross-provider correlation, so one outage seen by New Relic and Sentry opens one incident instead of two.
+3. A Prometheus query connector (PromQL from config templates).
+4. OAuth for MCP servers (0.4 sends static headers only; Sentry's hosted MCP server needs OAuth).
+5. Slack interactivity: acknowledging, escalating and approving from chat.
+
 ## Scenarios
 
 The data belongs to this project and is generated from a deterministic specification (series with a seeded PRNG). The course lessons inspire the mechanism, not the numbers.
@@ -377,7 +496,7 @@ Minutes saved and ROI are **illustrative, over a synthetic baseline**: they comp
 
 | Layer | Tool | Network | Covers |
 |---|---|---|---|
-| Unit | `node:test`, `tests/unit/*.unit.test.ts` | forbidden | pure domain, store in `:memory:`, fake, resilience, redaction, contracts, API assumptions, specs, secret scan |
+| Unit | `node:test`, `tests/unit/*.unit.test.ts` | forbidden | pure domain, store in `:memory:`, fake, resilience, redaction, contracts, API assumptions, specs, secret scan, connectors and notifiers over a fake `fetch` and an in-memory MCP server |
 | End to end | `node:test`, `tests/e2e/*.e2e.test.ts` | forbidden | graph per scenario with database assertions, HTTP via `app.inject`, MCP with a real client, CLI as a child process, recordings |
 | War Room | Vitest, jsdom, Testing Library, axe-core | forbidden | replay, demo source, dialog, focus management, gate stamps, accessibility, contrast |
 | Live (optional) | `node:test`, `tests/live/*.live.ts` | OpenRouter | structure with a real model; skipped without a key |
@@ -389,7 +508,7 @@ npm run web:test     # War Room
 npm run verify       # what CI runs: typecheck, tests, web tests and build, check:tokens, check:secrets
 ```
 
-Current count: **378 backend tests**, all passing (287 unit tests in 41 files and 91 end-to-end tests in 11 files), and **37 in the War Room**, in 6 files. The live test is skipped without a key.
+Current count: **750 backend tests**, all passing (641 unit tests in 62 files and 109 end-to-end tests in 13 files), and **37 in the War Room**, in 6 files. The live test is skipped without a key.
 
 - **No network.** `fetch` is replaced by a function that throws, in the test process and in child processes (CLI and MCP); one test starts a child through the same helpers and checks that the block holds inside it.
 - **Strict fake.** Scenario tests assert that every turn of the script was consumed and that the metrics match the golden files.
@@ -434,9 +553,9 @@ Measured on 2026-10-04, with no `.env`, after deleting everything that is genera
 
 ### Development process
 
-- **SDD.** [`specs/constitution.md`](specs/constitution.md) holds the non-negotiable principles. Each milestone has a spec in `specs/NNN-*/spec.md` (from [`001-store-and-tools`](specs/001-store-and-tools/spec.md) to [`007-war-room`](specs/007-war-room/spec.md)), with context, scope, non-goals and acceptance criteria in EARS ("When...", "If..., then...", "The system shall..."). Each of the 41 criteria appears exactly once, and a test checks it.
+- **SDD.** [`specs/constitution.md`](specs/constitution.md) holds the non-negotiable principles. Each milestone has a spec in `specs/NNN-*/spec.md` (from [`001-store-and-tools`](specs/001-store-and-tools/spec.md) to [`008-connectors`](specs/008-connectors/spec.md)), with context, scope, non-goals and acceptance criteria in EARS ("When...", "If..., then...", "The system shall..."). Each of the 59 criteria appears exactly once, and a test checks it.
 - **TDD.** Project rule: the test comes first and is seen failing. There were occasional exceptions during construction, and they were recorded in the development notes.
-- **[`AGENTS.md`](AGENTS.md).** Short, factual instructions for coding agents: commands, folder map, rules, and how to add an action to the catalog.
+- **[`AGENTS.md`](AGENTS.md).** Short, factual instructions for coding agents: commands, folder map, rules, and how to add an action to the catalog, a connector or a notifier.
 - **CI.** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the typecheck for backend and web, backend and web tests, the web build, `check:tokens` and `check:secrets`, with no secrets configured.
 - **Pre-commit.** [`.githooks/pre-commit`](.githooks/pre-commit) runs the typecheck, unit tests and `check:secrets`. Install it with `npm run setup:hooks`.
 - **Build-time post-mortems.** [`docs/incidents/`](docs/incidents/) keeps blameless post-mortems of real failures during construction, such as the fake that consumed the script per process and the focus lost at the gate. None of them is invented.
@@ -449,10 +568,12 @@ incident-copilot/
 ├── src/
 │   ├── contracts/      # Zod schemas and types shared with the War Room (no logic, no I/O)
 │   ├── domain/         # pure rules: tiers, approval, auditor, guards, canary, metrics, BM25
-│   ├── infra/          # SQLite, scenarios, runbooks, simulated world, clock, ids, logger, redaction
+│   ├── infra/          # SQLite, scenarios, runbooks, simulated world, clock, ids, logger, redaction, copilot-config/
 │   ├── llm/            # providers (fake and OpenRouter) and resilience
 │   ├── prompts/v1/     # versioned prompts
-│   ├── tools/          # the analyst's tier 1 tools (metrics, logs, deploys, inventory)
+│   ├── tools/          # the analyst's tier 1 tools (metrics, logs, deploys, inventory); tools/live/ for live incidents
+│   ├── connectors/     # connector port, shared kit and one folder per provider (registry in index.ts)
+│   ├── notifiers/      # notifier port, slack and outbound-webhook (registry in index.ts)
 │   ├── graph/          # LangGraph graph, routes and nodes (one per file, created by factories)
 │   ├── app/            # application services and container.ts
 │   ├── http/           # entry point: Fastify API
@@ -471,6 +592,8 @@ incident-copilot/
 ├── PRODUCT.md          # product context for design work (audiences, principles, constraints)
 ├── DESIGN.md           # War Room design system (strip board, authority colors, tokens)
 ├── CHANGELOG.md        # release notes
+├── copilot.example.yaml # live-mode config example: every connector and notifier type, secrets as ${VAR}
+├── Dockerfile, docker-compose.yml # API image (no web/) and a one-service compose file
 └── scripts/            # check:tokens, check:secrets, fixture rehash, doc generation
 ```
 
@@ -559,12 +682,14 @@ The module 06 lessons use Python and CrewAI; here the mechanism was reimplemente
 
 The most important point first: **the fake provider proves the mechanics, not the quality of the model.** The whole demo and the whole suite run on scripted answers. With a real LLM, the diagnosis and the plan can be worse; the guards and the gate limit the damage but do not guarantee correctness. Model quality only shows up with `npm run test:live` and real use.
 
-- **Simulated world.** No action touches real infrastructure.
+- **Simulated world.** No action touches real infrastructure. Live incidents from connectors run in shadow mode only: they recommend, they never execute (real executors are on the [roadmap](#roadmap)).
+- **Connector fixtures are not captures.** The provider payloads in `tests/fixtures/connectors/` are built from provider documentation; each guide in `docs/connectors/` lists the provider facts that are still unverified.
+- **One incident per provider.** There is no cross-provider correlation, and the alert queue is in process: a run interrupted by a crash is not resumed.
 - **Simulated clock in the demo.** The demo MTTR is the simulated timeline, not a measured time.
 - **Scripted narrative.** With the system clock, the numbers in the fake's narrative do not match and the post-mortem comes out through the template (the numeric guard working, but without a narrative).
 - **November 2026 review.** A full review with verification lives in [`docs/code-review-2026-11.md`](docs/code-review-2026-11.md): 31 confirmed findings, all fixed (13 in 0.2.0, the 18 low-severity ones in 0.3.0). The two follow-ups it left open, an API token for a non-loopback `HOST` and translating the Portuguese code comments, are done too.
 - **In-memory protections.** The circuit breaker, the execution rate limiter and the token-attempt lock are per process; restarting the API resets all three. Half-open, the breaker treats a whole execution batch as its single trial: the verifier records the outcome, a failure reopens it, and a batch with no outcome (throttled, or nothing mitigated) hands the trial back.
-- **Global token lock.** The 5 wrong attempts (or attempts without a token) count for the whole process, not per client: whoever gets it wrong 5 times in 10 min blocks decisions for everyone, including the operator with the right token, for 10 min. The API only listens on `127.0.0.1`; the risk is accepted in the [threat model](docs/threat-model.md).
+- **Global token lock.** The 5 wrong attempts (or attempts without a token) count for the whole process, not per client: whoever gets it wrong 5 times in 10 min blocks decisions for everyone, including the operator with the right token, for 10 min. By default the API only listens on `127.0.0.1`; the risk is accepted in the [threat model](docs/threat-model.md).
 - **Single token.** There are no users or roles.
 - **Numbers spelled out.** The numeric guard only extracts digits; "three minutes" in a narrative passes without being checked.
 - **Unpriced models cost $0.00.** Real-provider cost comes from `data/model-prices.json`, which ships empty; an unpriced model is recorded at 0 and the process warns at startup (`llm_price_missing`). Reading the provider's own reported cost is future work.

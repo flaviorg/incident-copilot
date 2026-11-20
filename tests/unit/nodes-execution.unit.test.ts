@@ -19,7 +19,7 @@ const guards = (o: Partial<ExecutionGuards> = {}): ExecutionGuards => ({
   limiter: new ActionRateLimiter({ perMinute: 5, repeatWindowMin: 10 }),
   ...o,
 });
-const ed = (c: Container, g: ExecutionGuards) => ({ infra: c.infra, scenarios: c.scenarios, guards: g, trace: c.trace, clock: c.clock, persist: persistOf(c) });
+const ed = (c: Container, g: ExecutionGuards) => ({ infra: c.infra, context: c.context, guards: g, trace: c.trace, clock: c.clock, persist: persistOf(c) });
 
 /** Deploy after the gate and the decisions: status by step order, resume phase. */
 async function decided(statuses: Partial<Record<number, ActionStatus>>, o: TestContainerOptions = {}): Promise<{ c: Container; bb: Blackboard }> {
@@ -202,4 +202,14 @@ test("escalation reason priority after the executor", () => {
   assert.equal(executorEscalationReason([act("rejected")]), "mitigation_rejected");
   assert.equal(executorEscalationReason([act("failed"), act("cancelled")]), "no_executable_actions");
   assert.equal(executorEscalationReason([]), "no_executable_actions");
+});
+
+test("executor and verifier refuse a live incident: shadow mode never routes there (spec 008)", async () => {
+  const { c, bb } = await decided({ 2: "approved" });
+  const origin = { kind: "connector" as const, connectorId: "prom", source: "alertmanager", fingerprint: "fp", alertId: "ALR-0001", externalUrl: null, mode: "shadow" as const };
+  const live = { resolve: () => ({ kind: "live" as const, sources: [], services: [], incidentService: "orders-api", origin }) };
+  const deps = { ...ed(c, guards()), context: live };
+  await assert.rejects(createExecutorNode(deps)({ ...bb, origin }), /executor reached for a live incident/);
+  await assert.rejects(createVerifierNode(deps)({ ...bb, origin }), /verifier reached for a live incident/);
+  assert.ok(!c.store.listAudit(bb.incidentId).some((e) => e.event === "action_executed"));
 });

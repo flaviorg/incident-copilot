@@ -1,0 +1,15 @@
+{
+  "data": {
+    "actor": {
+      "account": {
+        "nrql": {
+          "results": [
+            { "timestamp": 1791106950000, "level": "ERROR", "message": "payments-api call failed: Read timed out" },
+            { "timestamp": 1791106940000, "level": "error", "message": "payments-api call failed: Read timed out" },
+            { "timestamp": 1791106900000, "level": "WARN", "message": "retrying checkout 3/3" }
+          ]
+        }
+      }
+    }
+  }
+}

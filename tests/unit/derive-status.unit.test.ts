@@ -25,3 +25,8 @@ test("status table", () => {
   assert.equal(deriveIncidentStatus(bb({ phase: "new" }), []), "open");
   assert.equal(deriveIncidentStatus(bb({ phase: "planning" }), []), "investigating");
 });
+
+test("an advisory report makes the incident advised, unless escalated", () => {
+  assert.equal(deriveIncidentStatus(bb({ phase: "done", postmortem: pm("advisory") }), []), "advised");
+  assert.equal(deriveIncidentStatus(bb({ phase: "done", postmortem: pm("advisory"), escalation: esc() }), []), "escalated");
+});
