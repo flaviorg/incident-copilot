@@ -28,6 +28,8 @@ export type Config = {
   circuitCooldownSec: number;
   clock: "system" | "simulated";
   logLevel: "debug" | "info" | "warn" | "error";
+  /** Path of copilot.yaml (connectors, notifiers, services); null means scenario mode only (spec 008). */
+  copilotConfigPath: string | null;
 };
 
 /** Configuration error. The message lists the offending variables and the rule, never the values. */
@@ -60,6 +62,7 @@ const RULES: Record<string, string> = {
   CIRCUIT_COOLDOWN_SEC: "positive integer",
   CLOCK: "use system or simulated",
   LOG_LEVEL: "use debug, info, warn or error",
+  COPILOT_CONFIG: "path of a .yaml, .yml or .json file",
 };
 
 const positiveInt = (fallback: number) => z.coerce.number().int().positive().default(fallback);
@@ -86,6 +89,7 @@ const EnvSchema = z.object({
   CIRCUIT_COOLDOWN_SEC: positiveInt(300),
   CLOCK: z.enum(["system", "simulated"]).default("system"),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
+  COPILOT_CONFIG: z.string().max(1024).optional(),
 });
 
 export function loadConfig(env: Record<string, string | undefined>, opts: { forceFake?: boolean } = {}): Config {
@@ -148,6 +152,7 @@ export function loadConfig(env: Record<string, string | undefined>, opts: { forc
     circuitCooldownSec: e.CIRCUIT_COOLDOWN_SEC,
     clock: e.CLOCK,
     logLevel: e.LOG_LEVEL,
+    copilotConfigPath: e.COPILOT_CONFIG ?? null,
   };
 }
 

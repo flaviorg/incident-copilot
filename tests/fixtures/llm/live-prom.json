@@ -1,0 +1,222 @@
+{
+  "schemaVersion": 1,
+  "scenarioId": "live:prom",
+  "promptHashes": {
+    "supervisor.v1": "sha256:a24255b023aa0ef32a43ca948d5b986cbf2793c8800d26e3a7a3ef94a7ec1bca",
+    "telemetry-react.v1": "sha256:fcb01add11343d95372a338d7c1665bb069ecc739483b3f19cb203051f9cdc26",
+    "planner.v1": "sha256:d78ea090bba8a5f1bd03fa5dab7603256621697afa2b298a3e5e77ebfe44545b",
+    "auditor.v1": "sha256:b3962f64bb97da3181b544047156221ed186ef35d27277398e5d37155519c7ce"
+  },
+  "turns": [
+    {
+      "id": "sup-1",
+      "prompt": "supervisor.v1",
+      "when": {
+        "hasDiagnosis": false
+      },
+      "output": {
+        "next": "telemetry_analyst",
+        "brief": "Find which errors and deploys of checkout-api match the alert",
+        "reason": "No diagnosis yet for the live alert"
+      },
+      "usage": {
+        "promptTokens": 780,
+        "completionTokens": 52
+      }
+    },
+    {
+      "id": "tel-1",
+      "prompt": "telemetry-react.v1",
+      "when": {
+        "run": 1,
+        "step": 1
+      },
+      "output": {
+        "kind": "action",
+        "thought": "I will look at the most frequent error groups of checkout-api first.",
+        "tool": "query_errors",
+        "args": {
+          "service": "checkout-api",
+          "window": "30m"
+        }
+      }
+    },
+    {
+      "id": "tel-2",
+      "prompt": "telemetry-react.v1",
+      "when": {
+        "run": 1,
+        "step": 2
+      },
+      "output": {
+        "kind": "action",
+        "thought": "The top error is new; I will check whether checkout-api had a recent deploy.",
+        "tool": "list_deploys",
+        "args": {
+          "service": "checkout-api",
+          "sinceMinutes": 120
+        }
+      }
+    },
+    {
+      "id": "tel-3",
+      "prompt": "telemetry-react.v1",
+      "when": {
+        "run": 1,
+        "step": 3
+      },
+      "output": {
+        "kind": "action",
+        "thought": "v2.4.0 went out at 09:40; I will confirm when the error rate rose.",
+        "tool": "query_metrics",
+        "args": {
+          "service": "checkout-api",
+          "metric": "error_rate",
+          "window": "30m"
+        }
+      }
+    },
+    {
+      "id": "tel-4",
+      "prompt": "telemetry-react.v1",
+      "when": {
+        "run": 1,
+        "step": 4
+      },
+      "output": {
+        "kind": "final",
+        "thought": "The errors appeared with the v2.4.0 rollout and only in that release; the evidence points to a bad deploy.",
+        "diagnosis": {
+          "hypothesis": "Recent regression after the checkout-api v2.4.0 deploy: a TypeError in PriceFormatter started with the rollout at 09:40 and errors rose together; undoing the last change (back to v2.3.9) should restore the service.",
+          "category": "bad_deploy",
+          "confidence": "high",
+          "evidence": [
+            {
+              "source": "errors",
+              "ref": "errors:fake:checkout-api@09:12-09:42",
+              "summary": "412 TypeError events in PriceFormatter, all in release v2.4.0, first seen at 09:40"
+            },
+            {
+              "source": "deploys",
+              "ref": "deploys:fake:checkout-api@since 10-04T07:42",
+              "summary": "v2.4.0 deployed at 09:40; the previous version is v2.3.9"
+            }
+          ]
+        }
+      },
+      "usage": {
+        "promptTokens": 1390,
+        "completionTokens": 198
+      }
+    },
+    {
+      "id": "sup-2",
+      "prompt": "supervisor.v1",
+      "when": {
+        "hasDiagnosis": true,
+        "runbookSearchDone": false
+      },
+      "output": {
+        "next": "runbook_retriever",
+        "brief": "Search for runbooks on a regression after a deploy",
+        "reason": "bad_deploy diagnosis with high confidence; check the runbooks before planning"
+      },
+      "usage": {
+        "promptTokens": 880,
+        "completionTokens": 50
+      }
+    },
+    {
+      "id": "sup-3",
+      "prompt": "supervisor.v1",
+      "when": {
+        "hasDiagnosis": true,
+        "runbookSearchDone": true,
+        "hasPlan": false
+      },
+      "output": {
+        "next": "remediation_planner",
+        "brief": "Build the remediation plan from the retrieved runbook",
+        "reason": "Diagnosis and runbooks ready; the plan is missing"
+      },
+      "usage": {
+        "promptTokens": 910,
+        "completionTokens": 49
+      }
+    },
+    {
+      "id": "plan-0",
+      "prompt": "planner.v1",
+      "when": {
+        "revision": 0
+      },
+      "output": {
+        "summary": "Roll checkout-api back to v2.3.9 and record the reason in the incident.",
+        "steps": [
+          {
+            "order": 1,
+            "actionType": "rollback_deployment",
+            "target": "deployment/checkout-api",
+            "params": {
+              "toVersion": "v2.3.9"
+            },
+            "rationale": "The error exists only in v2.4.0 and v2.3.9 was stable before the deploy.",
+            "runbookRef": "generic-high-latency#mitigation",
+            "dependsOn": []
+          },
+          {
+            "order": 2,
+            "actionType": "add_incident_note",
+            "target": "incident/checkout-api",
+            "params": {
+              "text": "checkout-api: suspected bad deploy v2.4.0 (TypeError in PriceFormatter); rollback to v2.3.9 recommended."
+            },
+            "rationale": "Record the suspected cause and the recommendation in the incident.",
+            "runbookRef": "generic-high-latency#mitigation",
+            "dependsOn": []
+          },
+          {
+            "order": 3,
+            "actionType": "run_arbitrary_command",
+            "target": "host/checkout-api",
+            "params": {
+              "command": "systemctl restart checkout"
+            },
+            "rationale": "Restart the service hosts.",
+            "runbookRef": null,
+            "dependsOn": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "aud-0",
+      "prompt": "auditor.v1",
+      "when": {
+        "revision": 0
+      },
+      "output": {
+        "verdict": "approve",
+        "feedback": "Rollback to the version before the deploy matches the diagnosis; the arbitrary command will be blocked by the gate."
+      }
+    },
+    {
+      "id": "sup-4",
+      "prompt": "supervisor.v1",
+      "when": {
+        "hasPlan": true,
+        "hasAudit": true,
+        "verified": false
+      },
+      "output": {
+        "next": "gate",
+        "brief": "Classify each step of the audited plan",
+        "reason": "Plan approved by the auditor; moving on to the remediation gate"
+      },
+      "usage": {
+        "promptTokens": 960,
+        "completionTokens": 47
+      }
+    }
+  ]
+}

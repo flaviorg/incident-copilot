@@ -14,7 +14,7 @@ import {
 
 const rd = (c: Container) => ({ runbooks: c.runbooks, trace: c.trace });
 const pd = (c: Container) => ({ llm: c.llm, trace: c.trace, catalogText: catalogPromptText });
-const ad = (c: Container) => ({ llm: c.llm, trace: c.trace, scenarios: c.scenarios, limits: c.limits });
+const ad = (c: Container) => ({ llm: c.llm, trace: c.trace, context: c.context, limits: c.limits });
 
 test("runbooks node ranks orders-5xx first for the deploy diagnosis", async () => {
   const c = createTestContainer();

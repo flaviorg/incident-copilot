@@ -105,3 +105,45 @@ test("invalid params are rejected without dry run; with nothing pending the gate
   assert.ok(handoff.type === "handoff" && handoff.payload.to === "executor");
   assert.ok(c.store.listAudit(bb.incidentId).some((e) => e.event === "action_rejected_invalid_params"));
 });
+
+// Shadow mode (spec 008, decision 6; AC-49): same classification and blocking, but nothing runs and nobody is asked.
+const shadowOrigin = { kind: "connector" as const, connectorId: "prom", source: "alertmanager", fingerprint: "fp1", alertId: "ALR-0001", externalUrl: null, mode: "shadow" as const };
+
+test("shadow mode: tier 2 and 3 steps are recommended, tier 4 blocked, no dry run, no approval, hand-off to the reporter", async () => {
+  const { c, bb } = await stateAtGate("deploy-5xx-rollback", { extraStep: { actionType: "delete_backups", target: "backup_vault/orders-api/prod" } });
+  const before = c.clock.now().getTime();
+  const out = await createGateNode(gd(c))({ ...bb, origin: shadowOrigin });
+  assert.deepEqual(out.actions!.map((a) => [a.actionType, a.tier, a.status]), [
+    ["add_incident_note", 2, "recommended"], ["rollback_deployment", 3, "recommended"], ["block_image_tag", 2, "recommended"], ["delete_backups", 4, "blocked_forbidden"],
+  ]);
+  assert.equal(out.phase, "reporting");
+  assert.ok(out.actions!.every((a) => a.dryRun === null && a.approvalId === null));
+  assert.equal(c.clock.now().getTime(), before, "no dry run, so no simulated time");
+  assert.deepEqual(c.store.listApprovals({ incidentId: bb.incidentId }), []);
+  const audit = c.store.listAudit(bb.incidentId);
+  assert.deepEqual(audit.map((e) => e.event), ["incident_opened", "action_recommended", "action_recommended", "action_recommended", "action_blocked_forbidden"]);
+  assert.deepEqual(audit.slice(1, 4).map((e) => [e.tier, e.details.mode, e.details.status]), [[2, "shadow", "recommended"], [3, "shadow", "recommended"], [2, "shadow", "recommended"]]);
+  const events = gateEvents(c, bb.incidentId);
+  const obs = events.filter((e) => e.type === "observation").map((e) => e.type === "observation" && [e.payload.ok, e.payload.summary]);
+  assert.deepEqual(obs.slice(0, 3), [
+    [true, "add_incident_note tier 2: recommended (shadow mode, not executed)"],
+    [true, "rollback_deployment tier 3: recommended (shadow mode, not executed; would require human approval)"],
+    [true, "block_image_tag tier 2: recommended (shadow mode, not executed)"],
+  ]);
+  assert.ok(events.some((e) => e.type === "critique" && e.payload.verdict === "blocked"));
+  const handoff = events.find((e) => e.type === "handoff")!;
+  assert.ok(handoff.type === "handoff" && handoff.payload.to === "reporter" && handoff.payload.brief === "3 recommendation(s) recorded; shadow mode executes nothing");
+  assert.deepEqual(c.store.listActions(bb.incidentId), out.actions);
+});
+
+test("shadow mode keeps invalid params and dependency cancellation", async () => {
+  const { c, bb } = await stateAtGate("deploy-5xx-rollback");
+  const state = withSteps({ ...bb, origin: shadowOrigin }, (steps) => {
+    steps[1]!.params = {};
+    return steps;
+  });
+  const out = await createGateNode(gd(c))(state);
+  assert.deepEqual(out.actions!.map((a) => a.status), ["recommended", "rejected_invalid_params", "cancelled"]);
+  assert.equal(out.phase, "reporting");
+  assert.deepEqual(c.store.listAudit(bb.incidentId).map((e) => e.event).slice(1), ["action_recommended", "action_rejected_invalid_params", "action_cancelled"]);
+});

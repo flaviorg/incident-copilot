@@ -32,7 +32,7 @@ export async function runDiagnoseCommand(argv: string[], io: CliIO): Promise<num
     io.out(`incident-copilot · diagnose · provider: ${config.llmProvider === "fake" ? "scripted fake (no network, no key)" : `openrouter (${config.openrouterModel})`}`);
     io.out(`scenario ${scenarioId} · ${incident.service ?? `account ${bb.alert.account ?? "?"}`} · ${incident.severity} · ${incident.id}`);
     io.out("");
-    const node = createTelemetryNode({ llm: c.llm, tools: c.tools, scenarios: c.scenarios, trace: c.trace, clock: c.clock, limits: c.limits });
+    const node = createTelemetryNode({ llm: c.llm, tools: c.tools, context: c.context, trace: c.trace, clock: c.clock, limits: c.limits });
     const out = await node(bb, { signal: AbortSignal.timeout(config.runTimeoutMs), configurable: { requestId: null } });
     for (const e of c.store.listTrace(incident.id)) {
       const line = renderEvent(e);

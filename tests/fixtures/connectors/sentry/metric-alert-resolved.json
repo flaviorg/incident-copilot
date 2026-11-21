@@ -1,0 +1,30 @@
+{
+  "action": "resolved",
+  "installation": { "uuid": "a8f3b1c2-0d4e-4f5a-9b6c-7d8e9f0a1b2c" },
+  "data": {
+    "description_text": "12 events in the last 10 minutes\nFilter: environment:production",
+    "description_title": "Resolved: Checkout error volume",
+    "web_url": "https://acme.sentry.io/alerts/rules/details/7712/?alert=88001",
+    "metric_alert": {
+      "id": "88001",
+      "identifier": "7712",
+      "title": "Checkout error volume",
+      "status": 0,
+      "projects": [{ "id": "6502112", "name": "Checkout Web", "slug": "checkout-web" }],
+      "date_created": "2026-10-04T09:40:00.000Z",
+      "date_detected": "2026-10-04T09:44:00.000Z",
+      "date_started": "2026-10-04T09:42:00.000Z",
+      "date_closed": "2026-10-04T10:12:00.000Z",
+      "alert_rule": {
+        "id": "7712",
+        "name": "Checkout error volume",
+        "aggregate": "count()",
+        "dataset": "events",
+        "query": "environment:production",
+        "environment": "production",
+        "time_window": 10
+      }
+    }
+  },
+  "actor": { "type": "application", "id": "sentry", "name": "Sentry" }
+}

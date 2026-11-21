@@ -1,0 +1,19 @@
+{
+  "meta": { "producer": "internal-monitor" },
+  "data": {
+    "events": [
+      {
+        "ref": { "id": "n-77" },
+        "labels": ["web", "checkout"],
+        "metrics": { "latency_ms": 1840 },
+        "open": true
+      },
+      {
+        "ref": { "id": "n-78" },
+        "labels": ["web", "search"],
+        "metrics": { "latency_ms": 90 },
+        "open": false
+      }
+    ]
+  }
+}

@@ -1,5 +1,11 @@
 // Deterministic series from a specification with a seeded PRNG (spec 7.3). Pure.
+import { MetricNameSchema } from "../../contracts/index.ts";
 import type { MetricName, SeriesPoint, SeriesSegment, SeriesSpec } from "../../contracts/index.ts";
+
+/** True when an alert signal is one of the scenario metrics (a live alert may carry error_events or other). */
+export function isMetricName(s: string): s is MetricName {
+  return (MetricNameSchema.options as readonly string[]).includes(s);
+}
 
 /** mulberry32 PRNG: same seed, same sequence in [0, 1). */
 export function mulberry32(seed: number): () => number {

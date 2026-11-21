@@ -19,6 +19,13 @@ flowchart LR
     CLI["CLI src/cli.ts"]
     API["Fastify API src/http"]
     MCP["MCP stdio server src/mcp"]
+    ING["POST /ingest/:connectorId src/http/routes/ingest.ts"]
+  end
+  subgraph CONN [Connectors and ingest, live mode]
+    ISV[IngestService]
+    AQ[AlertQueue on shared RunSlots]
+    NS[NotificationService]
+    CR[ConnectorRegistry]
   end
   subgraph APP [Application]
     IS[IncidentService]
@@ -33,6 +40,7 @@ flowchart LR
     SUP --> GT[gate]
     GT --> EX[executor] --> VE[verifier]
     SUP --> RP[reporter]
+    GT -. shadow mode .-> RP
   end
   subgraph DOMINIO [Pure domain]
     CL[classifyAction]
@@ -54,6 +62,12 @@ flowchart LR
   end
   CLI --> IS
   API --> IS
+  ING --> ISV --> AQ --> IS
+  ISV --> CR
+  IS --> NS
+  TEL -- live tools --> CR
+  CR --> PROV[("Provider APIs and MCP servers, read only")]
+  NS --> OUT[("Slack, outbound webhook")]
   API --> AS
   MCP --> IS
   IS --> SUP
@@ -64,6 +78,8 @@ flowchart LR
   DR --> IS
   WR[React War Room] -- demo mode --> JSON[("web/public/demo/*.json generated at build time")]
 ```
+
+Live mode (0.4) adds the connectors box: a provider webhook goes through `IngestService` (verify, parse, map, record) onto the `AlertQueue`, which opens or deduplicates the incident and runs the same graph in shadow mode. The telemetry analyst's live tools read through the `ConnectorRegistry`; `NotificationService` sends the outcome to the configured notifiers. Details: [`docs/connectors-architecture.md`](connectors-architecture.md).
 
 Everything is wired by `createContainer` (`src/app/container.ts`), the single source used by the API, the MCP server, the CLI, and the tests. Tests use `createTestContainer` (`tests/helpers/container.ts`), with an explicit `:memory:` database, simulated clock, and fake provider.
 
@@ -85,6 +101,7 @@ flowchart TD
   PL --> AU[auditor]
   AU -- revise with fewer than 2 revisions --> PL
   AU -- approve or revisions exhausted --> SUP
+  GT -- shadow mode --> RP
   GT -- approval pending --> END1(("END: awaiting_approval"))
   GT -- nothing pending and actions ready --> EX
   GT -- nothing executable --> ESC
@@ -120,6 +137,7 @@ No route to `escalation` comes from the LLM: `SupervisorDecisionSchema` has no s
 | `remediation_planner` | `escalation` set | `escalation`; otherwise `auditor` |
 | `auditor` | final verdict `revise` and `planRevision < limits.maxPlanRevisions` | `remediation_planner` |
 | `auditor` | otherwise | `supervisor` |
+| `gate` | `origin.mode === "shadow"` (live incident, spec 008) | `reporter` (advisory report, nothing executes) |
 | `gate` | a `pending` approval exists | `END` |
 | `gate` | a `ready` action exists | `executor` |
 | `gate` | otherwise | `escalation` (`no_executable_actions`) |
@@ -134,10 +152,11 @@ The incident status is derived from the blackboard and the approvals by a pure f
 
 1. `escalation` present → `escalated`;
 2. final post-mortem → `resolved`;
-3. approval with effective status `pending` → `awaiting_approval`;
-4. execution, verification, or resume phase → `mitigating`;
-5. phase `new` → `open`;
-6. otherwise → `investigating`.
+3. advisory report (shadow mode) → `advised`;
+4. approval with effective status `pending` → `awaiting_approval`;
+5. execution, verification, or resume phase → `mitigating`;
+6. phase `new` → `open`;
+7. otherwise → `investigating`.
 
 ## Approval state machine
 

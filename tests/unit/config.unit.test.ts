@@ -14,6 +14,11 @@ test("defaults", () => {
   assert.equal(c.actionRateLimitPerMin, 5); assert.equal(c.actionRepeatWindowMin, 10);
   assert.equal(c.circuitFailureThreshold, 3); assert.equal(c.circuitCooldownSec, 300);
   assert.equal(c.clock, "system"); assert.equal(c.logLevel, "info");
+  assert.equal(c.copilotConfigPath, null);
+});
+test("COPILOT_CONFIG is a path; blank means scenario mode only", () => {
+  assert.equal(loadConfig({ COPILOT_CONFIG: "./copilot.yaml" }).copilotConfigPath, "./copilot.yaml");
+  assert.equal(loadConfig({ COPILOT_CONFIG: "   " }).copilotConfigPath, null);
 });
 test("autodetects openrouter when a key exists and LLM_PROVIDER is unset", () => {
   assert.equal(loadConfig({ OPENROUTER_API_KEY: "sk-or-v1-abc", OPENROUTER_MODEL: "m" }).llmProvider, "openrouter");

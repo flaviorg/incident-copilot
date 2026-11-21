@@ -2,10 +2,10 @@
 // No step of the loop is a graph superstep, so 12 steps do not consume the recursionLimit (reason for not using a subgraph).
 // A tool error becomes an ok: false observation and the loop continues (221517); an LLM failure becomes llm_unavailable escalation.
 import type { Diagnosis, Evidence, Limits, ReadToolName } from "../../contracts/index.ts";
-import type { ScenarioRepository } from "../../infra/scenarios/scenario-loader.ts";
 import type { Clock } from "../../infra/clock.ts";
 import type { LlmProvider } from "../../llm/provider.ts";
 import type { ToolRegistry } from "../../tools/registry.ts";
+import type { IncidentContextResolver, ToolContext } from "../../tools/context.ts";
 import { telemetryReactPrompt } from "../../prompts/v1/index.ts";
 import type { TelemetryReactInput } from "../../prompts/v1/index.ts";
 import { clip, llmInfoOf } from "../../app/trace-sink.ts";
@@ -22,9 +22,11 @@ const SOURCE_BY_TOOL: Record<ReadToolName, Evidence["source"]> = {
   query_logs: "logs",
   list_deploys: "deploys",
   audit_cloud_inventory: "inventory",
+  query_errors: "errors",
+  query_external: "external",
 };
 
-export type TelemetryDeps = { llm: LlmProvider; tools: ToolRegistry; scenarios: ScenarioRepository; trace: TraceSink; clock: Clock; limits: Limits };
+export type TelemetryDeps = { llm: LlmProvider; tools: ToolRegistry; context: IncidentContextResolver; trace: TraceSink; clock: Clock; limits: Limits };
 
 function diagnosisHeadline(d: Pick<Diagnosis, "category" | "confidence" | "evidence">): string {
   return `diagnosis ${d.category} (${CATEGORY_LABELS[d.category]}, ${CONFIDENCE_LABELS[d.confidence]} confidence, ${d.evidence.length} ${d.evidence.length === 1 ? "piece" : "pieces"} of evidence)`;
@@ -33,7 +35,9 @@ function diagnosisHeadline(d: Pick<Diagnosis, "category" | "confidence" | "evide
 export function createTelemetryNode(d: TelemetryDeps): NodeFn {
   return async (state, config) => {
     const ctx = runContextOf(state, config);
-    const scenario = d.scenarios.get(state.scenarioId, { offsetSec: state.timeOffsetSec });
+    const incident = d.context.resolve(state);
+    // One context per node call: the world is the blackboard's, `now` is read again for each tool call.
+    const toolCtx = (): ToolContext => ({ incident, world: state.world, now: d.clock.now(), signal: ctx.signal });
     const run = state.telemetryRuns + 1;
     const brief = lastBriefFor(state, "telemetry_analyst") || DEFAULT_BRIEF;
     const maxSteps = d.limits.reactMaxSteps;
@@ -46,8 +50,10 @@ export function createTelemetryNode(d: TelemetryDeps): NodeFn {
       return { diagnosis, telemetryRuns: run, phase: "investigating" as const };
     };
 
+    // The description depends only on the context (scenario: frozen text; live: the sources), so it is built once.
+    const toolsDescription = await d.tools.describeForPrompt(toolCtx());
     for (let step = 1; step <= maxSteps; step++) {
-      const input: TelemetryReactInput = { alert: state.alert, brief, run, step, maxSteps, toolsDescription: d.tools.describeForPrompt(), history: [...history] };
+      const input: TelemetryReactInput = { alert: state.alert, ...(state.origin ? { externalAlert: true } : {}), brief, run, step, maxSteps, toolsDescription, history: [...history] };
       const r = await d.llm.generate(telemetryReactPrompt, input, ctx);
       if (!r.success) {
         return { escalation: { reason: "llm_unavailable" as const, detail: clip(`telemetry analyst, step ${step}: ${r.error.kind} (${r.error.message})`, 400) } };
@@ -58,7 +64,7 @@ export function createTelemetryNode(d: TelemetryDeps): NodeFn {
         return finish({ ...out.diagnosis, capReached: false }, `round ${run} completed in ${step} step${step === 1 ? "" : "s"}`);
       }
       d.trace.emit(ctx, "telemetry_analyst", { type: "action", payload: { tool: out.tool, args: out.args, tier: 1 } });
-      const res = d.tools.run(out.tool, out.args, { scenario, world: state.world, now: d.clock.now() });
+      const res = await d.tools.run(out.tool, out.args, toolCtx());
       d.clock.tick(TOOL_TICK_SEC);
       d.trace.emit(ctx, "telemetry_analyst", { type: "observation", payload: { tool: out.tool, ok: res.ok, summary: res.summary, evidenceRef: res.evidenceRef } });
       history.push({ thought: out.thought, tool: out.tool, args: out.args, ok: res.ok, observation: res.summary });
@@ -72,7 +78,7 @@ export function createTelemetryNode(d: TelemetryDeps): NodeFn {
       summary: clip(o.summary, 300),
     }));
     if (evidence.length === 0) {
-      const scope = state.alert.service ?? state.alert.account ?? "unknown";
+      const scope = incident.kind === "scenario" ? (incident.scenario.file.service ?? incident.scenario.file.account ?? "unknown") : (state.alert.service ?? incident.origin.connectorId);
       evidence.push({ source: "metrics", ref: `metrics:${scope}:${state.alert.signal}@alert`, summary: clip(`alert: ${state.alert.rule}`, 300) });
     }
     const diagnosis: Diagnosis = {

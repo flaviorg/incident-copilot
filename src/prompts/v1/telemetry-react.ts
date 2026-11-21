@@ -4,10 +4,12 @@ import * as z from "zod";
 import { AlertSchema, ReactStepSchema } from "../../contracts/index.ts";
 import type { ReactStep } from "../../contracts/index.ts";
 import type { PromptDef } from "../../llm/provider.ts";
-import { jsonOf, neutralizeDelimiters } from "./shared.ts";
+import { alertSection, neutralizeDelimiters } from "./shared.ts";
 
 export const TelemetryReactInputSchema = z.object({
   alert: AlertSchema,
+  /** Live incident: the alert comes from an external system and is shown as untrusted data. Absent in scenarios. */
+  externalAlert: z.boolean().optional(),
   brief: z.string(),
   run: z.number().int().min(1),
   step: z.number().int().min(1),
@@ -62,7 +64,7 @@ export const telemetryReactPrompt: PromptDef<TelemetryReactInput, ReactStep> = {
   buildUser: (input) => {
     const i = TelemetryReactInputSchema.parse(input);
     return [
-      `Alert (JSON):\n${jsonOf(AlertSchema, i.alert)}`,
+      alertSection(AlertSchema, i.alert, i.externalAlert),
       `Supervisor instruction: ${i.brief}`,
       `Run ${i.run}, step ${i.step} of ${i.maxSteps}.`,
       `Available read tools:\n${i.toolsDescription}`,

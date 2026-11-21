@@ -7,6 +7,7 @@ const MITIGATING_PHASES: readonly Blackboard["phase"][] = ["executing", "verifyi
 export function deriveIncidentStatus(bb: Blackboard, effectiveApprovalStatuses: ApprovalStatus[]): IncidentStatus {
   if (bb.escalation !== null) return "escalated";
   if (bb.postmortem?.status === "final") return "resolved";
+  if (bb.postmortem?.status === "advisory") return "advised";
   if (effectiveApprovalStatuses.includes("pending")) return "awaiting_approval";
   if (MITIGATING_PHASES.includes(bb.phase)) return "mitigating";
   if (bb.phase === "new") return "open";

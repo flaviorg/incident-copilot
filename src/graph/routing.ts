@@ -58,8 +58,12 @@ export function afterAuditor(bb: Blackboard, limits: Limits): "remediation_plann
   return bb.audit?.verdict === "revise" && bb.planRevision < limits.maxPlanRevisions ? "remediation_planner" : "supervisor";
 }
 
-/** A pending approval ends the invocation; a ready action goes to the executor; nothing executable escalates. */
-export function afterGate(bb: Blackboard, pendingApprovals: number): "executor" | "escalation" | typeof END_ROUTE {
+/**
+ * Shadow mode (live incidents, spec 008) goes straight to the reporter: nothing executes. Otherwise a pending approval
+ * ends the invocation; a ready action goes to the executor; nothing executable escalates.
+ */
+export function afterGate(bb: Blackboard, pendingApprovals: number): "executor" | "escalation" | "reporter" | typeof END_ROUTE {
+  if (bb.origin?.mode === "shadow") return "reporter";
   if (pendingApprovals > 0) return END_ROUTE;
   if (bb.actions.some((a) => a.status === "ready")) return "executor";
   return "escalation";

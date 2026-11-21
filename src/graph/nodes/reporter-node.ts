@@ -4,7 +4,8 @@
 import type {
   Approval, Blackboard, GatedAction, IncidentMetrics, LlmCallRecord, PostmortemDoc, PostmortemNarrative, TraceEvent,
 } from "../../contracts/index.ts";
-import type { ScenarioRepository, LoadedScenario } from "../../infra/scenarios/scenario-loader.ts";
+import type { LoadedScenario } from "../../infra/scenarios/scenario-loader.ts";
+import type { IncidentContextResolver } from "../../tools/context.ts";
 import type { Clock } from "../../infra/clock.ts";
 import type { LlmProvider } from "../../llm/provider.ts";
 import { postmortemPrompt } from "../../prompts/v1/index.ts";
@@ -31,7 +32,7 @@ export type ReporterDeps = {
   providerName: "fake" | "openrouter";
   trace: TraceSink;
   clock: Clock;
-  scenarios: ScenarioRepository;
+  context: IncidentContextResolver;
   assumptions: BusinessAssumptions;
   read: ReporterReadModel;
   savingsFor: (a: GatedAction, bb: Blackboard) => number;
@@ -52,7 +53,7 @@ function resolvedAtOf(events: TraceEvent[], now: Date): string {
 /** Deterministic timeline: only code-generated text (no LLM brief), from the trace and the approvals. */
 function buildTimeline(bb: Blackboard, events: TraceEvent[], approvals: Approval[], impactStartedAt: string): { ts: string; text: string }[] {
   const items: { ts: string; text: string }[] = [
-    { ts: impactStartedAt, text: "impact start: first sample above the alert threshold" },
+    { ts: impactStartedAt, text: bb.origin ? "impact start: the alert started at the provider" : "impact start: first sample above the alert threshold" },
     { ts: bb.alert.detectedAt, text: `alert fired: ${bb.alert.rule}` },
   ];
   for (const e of events) {
@@ -99,7 +100,9 @@ function factsOf(m: IncidentMetrics, peak: number | null): string[] {
 export function createReporterNode(d: ReporterDeps): NodeFn {
   return async (state, config) => {
     const ctx = runContextOf(state, config);
-    const scenario = d.scenarios.get(state.scenarioId, { offsetSec: state.timeOffsetSec });
+    const incident = d.context.resolve(state);
+    // A live incident has no recorded series: no peak, and the category comes from the diagnosis.
+    const scenario = incident.kind === "scenario" ? incident.scenario : null;
     const events = d.read.trace(state.incidentId);
     const approvals = d.read.approvals(state.incidentId);
     const now = d.clock.now();
@@ -111,11 +114,11 @@ export function createReporterNode(d: ReporterDeps): NodeFn {
       .sort()[0] ?? null;
     const metricsInput = {
       alert: state.alert,
-      series: scenario.series,
+      series: scenario?.series ?? {},
       resolvedAt,
       approvals,
       actions: state.actions,
-      category: scenario.file.expectedCategory,
+      category: scenario?.file.expectedCategory ?? state.diagnosis?.category ?? "unknown",
       firstMitigationAt,
       executedSavingsUsd: state.actions.filter((a) => a.status === "succeeded").map((a) => d.savingsFor(a, state)),
       llmCalls: d.read.llmCalls(state.incidentId),
@@ -124,13 +127,15 @@ export function createReporterNode(d: ReporterDeps): NodeFn {
     // Metrics for the narrative facts and the numeric guard; the LLM ones are recalculated after the post-mortem call.
     let metrics = computeIncidentMetrics(metricsInput);
     const timeline = buildTimeline(state, events, approvals, metrics.impactStartedAt);
-    const peak = peakErrorRate(scenario, metrics.impactStartedAt, resolvedAt ?? now.toISOString());
+    const peak = scenario === null ? null : peakErrorRate(scenario, metrics.impactStartedAt, resolvedAt ?? now.toISOString());
     const pmActions: PostmortemDoc["actions"] = state.actions.map((a) => {
       const ap = a.approvalId ? approvals.find((x) => x.id === a.approvalId) : undefined;
       const decidedBy = ap?.decisionSource === "expiry" ? "expiry" : (ap?.approver ?? null);
       return { actionType: a.actionType, tier: a.tier, status: a.status, decidedBy };
     });
-    const status: PostmortemDoc["status"] = resolved ? "final" : "partial";
+    // Shadow mode (spec 008, AC-49): an advisory report from the template, with no LLM call; an escalation stays partial.
+    const advisory = state.origin?.mode === "shadow" && state.escalation === null;
+    const status: PostmortemDoc["status"] = resolved ? "final" : advisory ? "advisory" : "partial";
     const template = () => renderTemplateNarrative({ title: state.alert.title, status, metrics, diagnosis: state.diagnosis, actions: pmActions, escalation: state.escalation });
 
     let narrative: PostmortemNarrative;

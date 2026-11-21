@@ -1,0 +1,19 @@
+{
+  "account": { "id": "5f1c2a3b4d5e6f7a8b9c0d1e", "name": "Example Shop", "url": "https://app.bugsnag.com/example-shop" },
+  "project": { "id": "5f1c2a3b4d5e6f7a8b9c0d2f", "name": "checkout-api", "url": "https://app.bugsnag.com/example-shop/checkout-api" },
+  "trigger": { "type": "firstException", "message": "First occurrence of a new error in checkout-api" },
+  "error": {
+    "id": "6a0b1c2d3e4f5a6b7c8d9e11",
+    "errorId": "6a0b1c2d3e4f5a6b7c8d9e10",
+    "exceptionClass": "TypeError",
+    "message": "Cannot read properties of undefined (reading 'currency')",
+    "context": "GET /api/cart",
+    "firstReceived": "2026-10-04T09:50:00.000Z",
+    "receivedAt": "2026-10-04T09:50:00.000Z",
+    "url": "https://app.bugsnag.com/example-shop/checkout-api/errors/6a0b1c2d3e4f5a6b7c8d9e10?event_id=6a0b1c2d3e4f5a6b7c8d9e11",
+    "severity": "warning",
+    "status": "open",
+    "unhandled": false,
+    "app": { "releaseStage": "production", "version": "2026.10.4-1" }
+  }
+}

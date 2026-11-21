@@ -330,7 +330,7 @@ test("POST /incidents/:id/resume retries a failed resume and refuses other phase
   });
   const { createExecutorNode } = await import("../../src/graph/nodes/executor-node.ts");
   realExecutor = createExecutorNode({
-    infra: c.infra, scenarios: c.scenarios, guards: c.guards, trace: c.trace, clock: c.clock,
+    infra: c.infra, context: c.context, guards: c.guards, trace: c.trace, clock: c.clock,
     persist: { action: (a) => c.store.upsertAction(a), approval: (a) => c.store.createApproval(a), audit: (e) => c.store.appendAudit(e) },
   });
   const a = buildServer(c);

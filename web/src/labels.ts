@@ -93,6 +93,7 @@ export const INCIDENT_STATUS_LABELS: Record<IncidentStatus, string> = {
   mitigating: "mitigating",
   resolved: "resolved",
   escalated: "escalated",
+  advised: "advised",
 };
 
 export const SOURCE_LABELS = { measured: "measured", assumption: "assumption", derived: "derived" } as const;

@@ -1,0 +1,26 @@
+[
+  {
+    "id": "6a0b1c2d3e4f5a6b7c8d9e00",
+    "error_class": "PaymentGatewayTimeout",
+    "message": "Upstream payment gateway did not answer within 5000 ms",
+    "context": "POST /api/checkout",
+    "severity": "error",
+    "status": "open",
+    "events": 1240,
+    "users": 312,
+    "first_seen": "2026-10-04T09:41:12.000Z",
+    "last_seen": "2026-10-04T09:58:41.000Z"
+  },
+  {
+    "id": "6a0b1c2d3e4f5a6b7c8d9e10",
+    "error_class": "TypeError",
+    "message": "Cannot read properties of undefined (reading 'currency')",
+    "context": "GET /api/cart",
+    "severity": "warning",
+    "status": "open",
+    "events": 37,
+    "users": 21,
+    "first_seen": "2026-10-04T09:50:00.000Z",
+    "last_seen": "2026-10-04T09:57:03.000Z"
+  }
+]

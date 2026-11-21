@@ -3,19 +3,20 @@
 import type { DatabaseSync, StatementSync } from "node:sqlite";
 import {
   ApprovalSchema, AuditEntrySchema, BlackboardSchema, GatedActionSchema, IncidentSchema, IncidentSummarySchema,
-  LlmCallRecordSchema, RunRecordSchema, TraceEventSchema,
+  IngestedAlertRecordSchema, LlmCallRecordSchema, NormalizedAlertSchema, RunRecordSchema, TraceEventSchema,
 } from "../../contracts/index.ts";
 import type {
   AgentId, Approval, ApprovalStatus, AuditEntry, AuditEvent, Blackboard, EscalationReason, GatedAction, Incident,
-  IncidentStatus, IncidentSummary, LlmCallRecord, LlmCallRecordInput, NewIncident, RunRecord, Tier, TraceEvent, TraceType,
+  IncidentStatus, IncidentSummary, IngestedAlertRecord, IngestOutcome, LlmCallRecord, LlmCallRecordInput, NewIncident, NormalizedAlert,
+  RunRecord, Tier, TraceEvent, TraceType,
 } from "../../contracts/index.ts";
 import { canonicalJson } from "../../domain/canonical-json.ts";
 import { ConflictError, NotFoundError } from "../../domain/errors.ts";
 import { sha256Hex } from "../crypto.ts";
-import { redactSecrets } from "../redact.ts";
+import { redactSecrets, redactThenClip } from "../redact.ts";
 import { padId } from "../ids.ts";
 
-export type SequenceName = "incident" | "approval" | "action" | "run" | "audit";
+export type SequenceName = "incident" | "approval" | "action" | "run" | "audit" | "alert";
 
 export type NewAuditEntry = { incidentId: string; actor: string; event: AuditEvent; tier: Tier | null; details: Record<string, unknown> };
 
@@ -43,6 +44,20 @@ type LlmCallRow = {
   attempts: number; used_fallback: number; usage_estimated: number;
 };
 type RunRow = { id: string; incident_id: string; started_at: string; ended_at: string | null; outcome: string | null };
+type IngestedAlertRow = {
+  id: string; connector_id: string; received_at: string; request_id: string | null; outcome: string; incident_id: string | null;
+  detail: string | null; json: string;
+};
+
+export type NewIngestedAlert = { connectorId: string; alert: NormalizedAlert; receivedAt: string; requestId: string | null };
+export type IngestedAlertPatch = { outcome: IngestOutcome; incidentId?: string | null; detail?: string | null };
+export type LiveIncidentRow = { incidentId: string; connectorId: string; fingerprint: string; openedAt: string };
+
+const toIngestedAlert = (r: IngestedAlertRow): IngestedAlertRecord =>
+  IngestedAlertRecordSchema.parse({
+    id: r.id, connectorId: r.connector_id, alert: JSON.parse(r.json), receivedAt: r.received_at, requestId: r.request_id,
+    outcome: r.outcome, incidentId: r.incident_id, detail: r.detail,
+  });
 
 const toIncident = (r: IncidentRow): Incident =>
   IncidentSchema.parse({
@@ -144,6 +159,24 @@ export class SqliteIncidentStore {
            ended_at = excluded.ended_at, outcome = excluded.outcome`,
       ),
       listRuns: p("SELECT * FROM runs WHERE incident_id = ? ORDER BY started_at, id"),
+      // live ingest (spec 008)
+      findIngestedAlert: p("SELECT id FROM ingested_alerts WHERE connector_id = ? AND external_id = ?"),
+      insertIngestedAlert: p(
+        `INSERT INTO ingested_alerts (id, connector_id, source, external_id, fingerprint, status, received_at, request_id, outcome, incident_id, detail, json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', NULL, NULL, ?)
+         ON CONFLICT (connector_id, external_id) DO NOTHING`,
+      ),
+      updateIngestedAlert: p("UPDATE ingested_alerts SET outcome = ?, incident_id = ?, detail = ? WHERE id = ?"),
+      getIngestedAlert: p("SELECT * FROM ingested_alerts WHERE id = ?"),
+      listIngestedAlerts: p(
+        `SELECT * FROM ingested_alerts WHERE ($connector IS NULL OR connector_id = $connector)
+         ORDER BY received_at DESC, rowid DESC LIMIT $limit`,
+      ),
+      listQueuedAlerts: p("SELECT * FROM ingested_alerts WHERE outcome = 'queued' ORDER BY received_at, rowid"),
+      findOpenLive: p("SELECT incident_id, opened_at FROM live_incidents WHERE connector_id = ? AND fingerprint = ? AND closed_at IS NULL"),
+      insertLive: p("INSERT INTO live_incidents (incident_id, connector_id, fingerprint, opened_at, closed_at) VALUES (?, ?, ?, ?, NULL)"),
+      closeLive: p("UPDATE live_incidents SET closed_at = ? WHERE incident_id = ? AND closed_at IS NULL"),
+      setResolved: p("UPDATE incidents SET status = 'resolved', resolved_at = ? WHERE id = ?"),
     };
   }
 
@@ -376,5 +409,75 @@ export class SqliteIncidentStore {
     return (this.s("listRuns").all(incidentId) as RunRow[]).map((r) =>
       RunRecordSchema.parse({ id: r.id, incidentId: r.incident_id, startedAt: r.started_at, endedAt: r.ended_at, outcome: r.outcome }),
     );
+  }
+
+  // ---------- live ingest (spec 008) ----------
+
+  /**
+   * Idempotent on (connectorId, externalId): a repeat returns the existing id with inserted false. The id is only
+   * allocated for a new row, so duplicates do not consume the ALR sequence (`newId`, normally Ids.alert). The stored JSON is redacted.
+   */
+  recordIngestedAlert(r: NewIngestedAlert, newId: () => string = () => padId("ALR", this.nextSequence("alert"))): { inserted: boolean; id: string } {
+    return this.transaction(() => {
+      const alert = NormalizedAlertSchema.parse(redactSecrets(r.alert, this.secrets));
+      const existing = this.s("findIngestedAlert").get(r.connectorId, alert.externalId) as { id: string } | undefined;
+      if (existing) return { inserted: false, id: existing.id };
+      const id = newId();
+      const requestId = r.requestId === null ? null : redactSecrets(r.requestId, this.secrets);
+      this.s("insertIngestedAlert").run(
+        id, r.connectorId, alert.source, alert.externalId, alert.fingerprint, alert.status, r.receivedAt, requestId, JSON.stringify(alert),
+      );
+      return { inserted: true, id };
+    });
+  }
+
+  hasIngestedAlert(connectorId: string, externalId: string): boolean {
+    return this.s("findIngestedAlert").get(connectorId, externalId) !== undefined;
+  }
+
+  /** Fields missing from the patch stay as they are; the detail is redacted and clipped to 300 characters. */
+  updateIngestedAlert(id: string, patch: IngestedAlertPatch): void {
+    this.transaction(() => {
+      const current = this.getIngestedAlert(id);
+      if (!current) throw new NotFoundError("not_found", `ingested alert not found: ${id}`);
+      const incidentId = patch.incidentId !== undefined ? patch.incidentId : current.incidentId;
+      const detail = patch.detail !== undefined ? (patch.detail === null ? null : redactThenClip(patch.detail, 300, this.secrets)) : current.detail;
+      IngestedAlertRecordSchema.parse({ ...current, outcome: patch.outcome, incidentId, detail });
+      this.s("updateIngestedAlert").run(patch.outcome, incidentId, detail, id);
+    });
+  }
+
+  getIngestedAlert(id: string): IngestedAlertRecord | null {
+    const row = this.s("getIngestedAlert").get(id) as IngestedAlertRow | undefined;
+    return row ? toIngestedAlert(row) : null;
+  }
+
+  /** Newest first. */
+  listIngestedAlerts(f: { limit: number; connectorId?: string }): IngestedAlertRecord[] {
+    return (this.s("listIngestedAlerts").all({ connector: f.connectorId ?? null, limit: f.limit }) as IngestedAlertRow[]).map(toIngestedAlert);
+  }
+
+  /** Rows still waiting for the queue (recovered on start), oldest first. */
+  listQueuedAlerts(): IngestedAlertRecord[] {
+    return (this.s("listQueuedAlerts").all() as IngestedAlertRow[]).map(toIngestedAlert);
+  }
+
+  findOpenLiveIncident(connectorId: string, fingerprint: string): { incidentId: string; openedAt: string } | null {
+    const row = this.s("findOpenLive").get(connectorId, fingerprint) as { incident_id: string; opened_at: string } | undefined;
+    return row ? { incidentId: row.incident_id, openedAt: row.opened_at } : null;
+  }
+
+  openLiveIncident(r: LiveIncidentRow): void {
+    this.s("insertLive").run(r.incidentId, r.connectorId, r.fingerprint, r.openedAt);
+  }
+
+  closeLiveIncident(incidentId: string, closedAt: string): void {
+    this.s("closeLive").run(closedAt, incidentId);
+  }
+
+  /** Status resolved with the provider's time; escalation and MTTR stay as they are. */
+  setIncidentResolved(incidentId: string, resolvedAt: string): void {
+    const result = this.s("setResolved").run(resolvedAt, incidentId);
+    if (Number(result.changes) !== 1) throw new NotFoundError("not_found", `incident not found: ${incidentId}`);
   }
 }

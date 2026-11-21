@@ -49,7 +49,7 @@ export function buildIncidentGraph(nodes: GraphNodes, d: GraphDeps): CompiledInc
   graph.addConditionalEdges(id.runbook_retriever, (s: Blackboard) => afterSpecialist(s), pathMap(["supervisor", "escalation"]));
   graph.addConditionalEdges(id.remediation_planner, (s: Blackboard) => afterPlanner(s), pathMap(["auditor", "escalation"]));
   graph.addConditionalEdges(id.auditor, (s: Blackboard) => afterAuditor(s, d.limits), pathMap(["remediation_planner", "supervisor"]));
-  graph.addConditionalEdges(id.gate, (s: Blackboard) => afterGate(s, d.pendingApprovals(s.incidentId)), pathMap(["executor", "escalation", END_ROUTE]));
+  graph.addConditionalEdges(id.gate, (s: Blackboard) => afterGate(s, d.pendingApprovals(s.incidentId)), pathMap(["executor", "escalation", "reporter", END_ROUTE]));
   graph.addConditionalEdges(id.executor, (s: Blackboard) => afterExecutor(s, d.isMitigating), pathMap(["verifier", "escalation"]));
   graph.addConditionalEdges(id.verifier, (s: Blackboard) => afterVerifier(s), pathMap(["supervisor", "escalation"]));
   graph.addEdge(id.escalation, id.reporter);

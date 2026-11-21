@@ -134,3 +134,14 @@ export class ApprovalTransitionError {
     this.code = code;
   }
 }
+
+/** Invalid copilot.yaml (spec 008, AC-51): each problem is a path and a fixed rule, never a value. */
+export class CopilotConfigError extends Error {
+  readonly code = "copilot_config_invalid";
+  readonly problems: { path: string; rule: string }[];
+  constructor(problems: { path: string; rule: string }[]) {
+    super(`invalid copilot config: ${problems.map((p) => `${p.path || "(file)"} (${p.rule})`).join("; ")}`);
+    this.name = "CopilotConfigError";
+    this.problems = problems;
+  }
+}

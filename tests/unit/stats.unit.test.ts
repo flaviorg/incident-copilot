@@ -48,9 +48,9 @@ test("empty database: zeros, exhaustive keys and null percentiles", () => {
   assert.equal(s.window, "24h");
   assert.deepEqual(s.mttrMin, { p50: null, p95: null });
   assert.equal(s.incidents.total, 0);
-  assert.deepEqual(Object.values(s.incidents.byStatus), [0, 0, 0, 0, 0, 0]);
+  assert.deepEqual(Object.values(s.incidents.byStatus), [0, 0, 0, 0, 0, 0, 0]); // 0.4 adds advised
   assert.deepEqual(s.actions.byTier, { "1": 0, "2": 0, "3": 0, "4": 0 });
-  assert.equal(Object.keys(s.actions.byStatus).length, 16);
+  assert.equal(Object.keys(s.actions.byStatus).length, 17); // 0.4 adds recommended
   assert.deepEqual(s.approvals, { pending: 0, approved: 0, rejected: 0, expired: 0 });
   assert.deepEqual(s.llm, { calls: 0, errors: 0, promptTokens: 0, completionTokens: 0, estimatedCostUsd: 0 });
 });

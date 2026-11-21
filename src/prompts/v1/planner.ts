@@ -4,10 +4,12 @@ import * as z from "zod";
 import { AlertSchema, DiagnosisSchema, RemediationPlanSchema } from "../../contracts/index.ts";
 import type { RemediationPlan } from "../../contracts/index.ts";
 import type { PromptDef } from "../../llm/provider.ts";
-import { jsonOf, neutralizeDelimiters } from "./shared.ts";
+import { alertSection, jsonOf, neutralizeDelimiters } from "./shared.ts";
 
 export const PlannerInputSchema = z.object({
   alert: AlertSchema,
+  /** Live incident: the alert comes from an external system and is shown as untrusted data. Absent in scenarios. */
+  externalAlert: z.boolean().optional(),
   diagnosis: DiagnosisSchema,
   runbookExcerpts: z.array(z.object({ ref: z.string(), excerpt: z.string() })),
   catalogText: z.string(),
@@ -41,7 +43,7 @@ export const plannerPrompt: PromptDef<PlannerInput, RemediationPlan> = {
       : i.runbookExcerpts.map((r) => `<<<RUNBOOK EXCERPT ref=${neutralizeDelimiters(r.ref)}>>>\n${neutralizeDelimiters(r.excerpt)}\n<<<END OF EXCERPT>>>`).join("\n");
     return [
       `Plan revision: ${i.revision}`,
-      `Alert (JSON):\n${jsonOf(AlertSchema, i.alert)}`,
+      alertSection(AlertSchema, i.alert, i.externalAlert),
       `Diagnosis (JSON):\n${jsonOf(DiagnosisSchema, i.diagnosis)}`,
       `Runbook excerpts:\n${excerpts}`,
       `Action catalog:\n${i.catalogText}`,

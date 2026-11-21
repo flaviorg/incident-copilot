@@ -1,0 +1,23 @@
+{
+  "version": "4",
+  "groupKey": "{}/{team=\"payments\"}:{alertname=\"HighErrorRate\", service=\"checkout\"}",
+  "truncatedAlerts": 0,
+  "status": "resolved",
+  "receiver": "incident-copilot",
+  "groupLabels": { "alertname": "HighErrorRate", "service": "checkout" },
+  "commonLabels": { "alertname": "HighErrorRate", "service": "checkout", "severity": "critical", "team": "payments", "instance": "checkout-7d9f:8080" },
+  "commonAnnotations": { "summary": "Checkout 5xx rate above 5% for 2 minutes" },
+  "externalURL": "https://alertmanager.example.com",
+  "notification_reason": "resolved",
+  "alerts": [
+    {
+      "status": "resolved",
+      "labels": { "alertname": "HighErrorRate", "service": "checkout", "severity": "critical", "team": "payments", "instance": "checkout-7d9f:8080" },
+      "annotations": { "summary": "Checkout 5xx rate above 5% for 2 minutes" },
+      "startsAt": "2026-10-04T09:41:30.123456789Z",
+      "endsAt": "2026-10-04T10:12:00Z",
+      "generatorURL": "https://prometheus.example.com/graph?g0.expr=job%3Ahttp_5xx%3Arate5m%7Bservice%3D%22checkout%22%7D+%3E+0.05",
+      "fingerprint": "6f1a2b3c4d5e6f70"
+    }
+  ]
+}

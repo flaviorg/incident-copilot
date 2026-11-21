@@ -15,7 +15,7 @@ export function createListDeploysTool(): Tool<z.infer<typeof Params>> {
     name: "list_deploys",
     description: "Use to correlate the onset of a problem with recent deploys of the service and to learn the previous version.",
     paramsSchema: Params,
-    run({ service, sinceMinutes = 10080 }, { scenario, world, now }) {
+    async run({ service, sinceMinutes = 10080 }, { scenario, world, now }) {
       const ofService = scenario.deploys.filter((d) => d.service === service);
       const running = world.deployments[service];
       if (ofService.length === 0 && !running) return { ok: false, summary: `${NO_DATA}: ${service}`, evidenceRef: null };

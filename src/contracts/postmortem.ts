@@ -6,7 +6,7 @@ import { IncidentMetricsSchema } from "./metrics.ts";
 export const PostmortemDocSchema = z.object({
   incidentId: z.string(),
   title: z.string(),
-  status: z.enum(["final", "partial"]),
+  status: z.enum(["final", "partial", "advisory"]),
   summary: z.string(),
   impact: z.object({ service: z.string(), durationMin: z.number().nullable(), peakErrorRate: z.number().nullable(), monthlySavingsUsd: z.number() }),
   timeline: z.array(z.object({ ts: z.string(), text: z.string() })), // deterministic

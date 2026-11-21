@@ -1,12 +1,12 @@
 import * as z from "zod";
 import { EscalationReasonSchema, IncidentStatusSchema, LlmErrorKindSchema, SeveritySchema } from "./enums.ts";
-import { MetricNameSchema } from "./scenario.ts";
+import { AlertSignalSchema } from "./ingest.ts";
 
 export const AlertSchema = z.object({
   title: z.string(),
   service: z.string().nullable(),
   account: z.string().nullable(),
-  signal: MetricNameSchema,
+  signal: AlertSignalSchema,
   threshold: z.number().nullable(),
   rule: z.string(),
   detectedAt: z.string(),

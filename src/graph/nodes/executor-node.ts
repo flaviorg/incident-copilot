@@ -3,7 +3,7 @@
 // duration and is audited. With no mitigating action executed, returns an escalation (the next edge diverts).
 import type { EscalationReason, GatedAction } from "../../contracts/index.ts";
 import type { SimulatedInfra } from "../../infra/simulated-infra.ts";
-import type { ScenarioRepository } from "../../infra/scenarios/scenario-loader.ts";
+import type { IncidentContextResolver } from "../../tools/context.ts";
 import type { Clock } from "../../infra/clock.ts";
 import type { CircuitBreaker } from "../../domain/guards/circuit-breaker.ts";
 import type { ActionRateLimiter } from "../../domain/guards/action-rate-limiter.ts";
@@ -21,7 +21,7 @@ export type ExecutionGuards = { breaker: CircuitBreaker; limiter: ActionRateLimi
 
 export type ExecutionDeps = {
   infra: SimulatedInfra;
-  scenarios: ScenarioRepository;
+  context: IncidentContextResolver;
   guards: ExecutionGuards;
   trace: TraceSink;
   clock: Clock;
@@ -47,7 +47,9 @@ function escalationDetail(actions: GatedAction[]): string {
 export function createExecutorNode(d: ExecutionDeps): NodeFn {
   return async (state, config) => {
     const ctx = runContextOf(state, config);
-    const scenario = d.scenarios.get(state.scenarioId, { offsetSec: state.timeOffsetSec });
+    const incident = d.context.resolve(state);
+    if (incident.kind === "live") throw new Error("executor reached for a live incident; shadow mode routes the gate to the reporter");
+    const scenario = incident.scenario;
 
     if (state.phase === "resume") {
       const decided = state.actions.filter((a) => a.approvalId !== null);
