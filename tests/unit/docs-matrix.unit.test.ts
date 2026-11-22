@@ -12,4 +12,7 @@ test("the matrix shows the 4 tiers, every action, the context rules and the gene
   for (const t of [...Object.keys(EXECUTABLE_ACTIONS), ...FORBIDDEN_ACTIONS, "query_metrics", "audit_cloud_inventory"]) assert.ok(md.includes(`\`${t}\``), t);
   assert.match(md, /target outside the incident scope/);
   assert.match(md, /generated.*do not edit by hand/i);
+  assert.match(md, /## Reserved proposers/);
+  assert.match(md, /reserved for another proposer \(tier 4\)/);
+  assert.match(md, /`open_draft_pull_request`: `code_fixer`/);
 });

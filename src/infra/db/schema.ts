@@ -1,11 +1,11 @@
 // Database SQL. The enum CHECKs are generated from the Zod schemas, so the two never diverge (AC-40).
 import type { DatabaseSync } from "node:sqlite";
 import {
-  ActionStatusSchema, AgentIdSchema, ApprovalStatusSchema, AuditEventSchema, EscalationReasonSchema,
+  ActionStatusSchema, AgentIdSchema, ApprovalStatusSchema, AuditEventSchema, CodeFixStatusSchema, EscalationReasonSchema,
   IncidentStatusSchema, IngestOutcomeSchema, LlmErrorKindSchema, SeveritySchema, TierSchema, TraceTypeSchema,
 } from "../../contracts/index.ts";
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 const quoted = (values: readonly string[]) => values.map((v) => `'${v.replaceAll("'", "''")}'`).join(", ");
 const tiers = TierSchema.options.map((o) => o.value).join(", ");
@@ -62,6 +62,22 @@ function actionsTableSql(name: string): string {
 );`;
 }
 
+/** Since version 5 (spec 009) rebuilt like the other enum-checked tables, keeping rows and the (incident_id, seq) uniqueness. */
+function traceEventsTableSql(name: string): string {
+  return `CREATE TABLE IF NOT EXISTS ${name} (
+  id TEXT PRIMARY KEY,
+  incident_id TEXT NOT NULL REFERENCES incidents (id),
+  run_id TEXT NOT NULL,
+  request_id TEXT,
+  seq INTEGER NOT NULL,
+  ts TEXT NOT NULL,
+  agent TEXT NOT NULL CHECK (agent IN (${quoted(AgentIdSchema.options)})),
+  type TEXT NOT NULL CHECK (type IN (${quoted(TraceTypeSchema.options)})),
+  json TEXT NOT NULL,
+  UNIQUE (incident_id, seq)
+);`;
+}
+
 export function buildSchemaSql(): string {
   return `
 CREATE TABLE IF NOT EXISTS sequences (
@@ -80,18 +96,7 @@ CREATE TABLE IF NOT EXISTS blackboards (
   version INTEGER NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS trace_events (
-  id TEXT PRIMARY KEY,
-  incident_id TEXT NOT NULL REFERENCES incidents (id),
-  run_id TEXT NOT NULL,
-  request_id TEXT,
-  seq INTEGER NOT NULL,
-  ts TEXT NOT NULL,
-  agent TEXT NOT NULL CHECK (agent IN (${quoted(AgentIdSchema.options)})),
-  type TEXT NOT NULL CHECK (type IN (${quoted(TraceTypeSchema.options)})),
-  json TEXT NOT NULL,
-  UNIQUE (incident_id, seq)
-);
+${traceEventsTableSql("trace_events")}
 CREATE INDEX IF NOT EXISTS trace_events_ts_idx ON trace_events (ts);
 
 ${actionsTableSql("actions")}
@@ -177,6 +182,39 @@ CREATE TABLE IF NOT EXISTS live_incidents (
   closed_at TEXT
 );
 CREATE UNIQUE INDEX IF NOT EXISTS live_incidents_open_idx ON live_incidents (connector_id, fingerprint) WHERE closed_at IS NULL;
+
+-- Version 5 (spec 009): code-fix attempts. At most one attempt per error group holds the key (decision 16).
+CREATE TABLE IF NOT EXISTS code_fix_attempts (
+  id TEXT PRIMARY KEY,
+  incident_id TEXT NOT NULL REFERENCES incidents (id),
+  repo TEXT NOT NULL,
+  error_group_id TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN (${quoted(CodeFixStatusSchema.options)})),
+  key_held INTEGER NOT NULL DEFAULT 0 CHECK (key_held IN (0, 1)),
+  created_at TEXT NOT NULL,
+  finished_at TEXT,
+  version INTEGER NOT NULL,
+  json TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS code_fix_attempts_key_idx ON code_fix_attempts (repo, error_group_id) WHERE key_held = 1;
+CREATE INDEX IF NOT EXISTS code_fix_attempts_incident_idx ON code_fix_attempts (incident_id);
+
+-- Code-fix approvals live apart from the action approvals, so no consumer of approvals can see them (decision 14).
+CREATE TABLE IF NOT EXISTS code_fix_approvals (
+  id TEXT PRIMARY KEY,
+  incident_id TEXT NOT NULL REFERENCES incidents (id),
+  action_id TEXT NOT NULL,
+  attempt_id TEXT NOT NULL REFERENCES code_fix_attempts (id),
+  status TEXT NOT NULL CHECK (status IN (${quoted(ApprovalStatusSchema.options)})),
+  requested_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  decided_at TEXT,
+  version INTEGER NOT NULL,
+  json TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS code_fix_approvals_incident_idx ON code_fix_approvals (incident_id);
+CREATE INDEX IF NOT EXISTS code_fix_approvals_attempt_idx ON code_fix_approvals (attempt_id);
+CREATE INDEX IF NOT EXISTS code_fix_approvals_status_idx ON code_fix_approvals (status);
 `;
 }
 
@@ -221,15 +259,16 @@ const ENUM_CHECKED_TABLES: readonly { name: string; sql: (name: string) => strin
   { name: "incidents", sql: incidentsTableSql, enums: [IncidentStatusSchema.options, SeveritySchema.options, EscalationReasonSchema.options], orderBy: null },
   { name: "actions", sql: actionsTableSql, enums: [ActionStatusSchema.options], orderBy: null },
   { name: "audit_log", sql: auditLogTableSql, enums: [AuditEventSchema.options], orderBy: "seq" },
+  { name: "trace_events", sql: traceEventsTableSql, enums: [AgentIdSchema.options, TraceTypeSchema.options], orderBy: "seq" },
 ];
 
 const columnsOf = (db: DatabaseSync, table: string): string[] =>
   (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name);
 
 /**
- * Version 3 → 4: a CHECK constraint cannot be altered, so a table whose stored SQL lacks any current enum literal is
+ * Version 3 → 4 and 4 → 5: a CHECK constraint cannot be altered, so a table whose stored SQL lacks any current enum literal is
  * rebuilt following https://www.sqlite.org/lang_altertable.html#otheralter: foreign keys off (outside the transaction),
- * create <name>_v4 with the current SQL, copy the common columns (audit_log in seq order, keeping seq and so the hash chain),
+ * create <name>_v<SCHEMA_VERSION> with the current SQL, copy the common columns (audit_log in seq order, keeping seq and so the hash chain),
  * drop the old table, rename, check foreign keys, commit. DROP TABLE does not fire the DELETE triggers; indexes and the
  * append-only triggers come back through buildSchemaSql.
  */
@@ -246,7 +285,7 @@ export function rebuildStaleCheckTables(db: DatabaseSync): void {
     db.exec("BEGIN IMMEDIATE");
     try {
       for (const t of stale) {
-        const tmp = `${t.name}_v4`;
+        const tmp = `${t.name}_v${SCHEMA_VERSION}`;
         db.exec(`DROP TABLE IF EXISTS ${tmp}`);
         db.exec(t.sql(tmp));
         const target = columnsOf(db, tmp);

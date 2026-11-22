@@ -8,7 +8,7 @@ import { join } from "node:path";
 import * as z from "zod";
 import { assertLiveSafe, loadCopilotConfigFile, parseCopilotConfig } from "../../src/infra/copilot-config/load.ts";
 import { defineConnector } from "../../src/connectors/types.ts";
-import { defineNotifier } from "../../src/notifiers/types.ts";
+import { DEFAULT_NOTIFICATION_EVENTS, NOTIFICATION_KINDS, defineNotifier } from "../../src/notifiers/types.ts";
 import { webhookAuthSchema } from "../../src/connectors/shared/auth.ts";
 import { CopilotConfigError } from "../../src/domain/errors.ts";
 import { loadConfig } from "../../src/config.ts";
@@ -215,4 +215,207 @@ connectors:
   const withIngest = parseCopilotConfig(text.replace("    query:", '    ingest: { auth: { type: bearer, token: "${HOOK_TOKEN}" } }\n    query:'), opts());
   assert.ok(withIngest.ok, JSON.stringify(!withIngest.ok && withIngest.problems));
   assert.throws(() => assertLiveSafe(fake, withIngest.config), CopilotConfigError);
+});
+
+// ---- codeFix (spec 009, decisions 7, 10, 16, 19 and 20; AC-84 and AC-52) ----
+
+const FIX_TOKEN = "ghp-" + "f".repeat(36);
+const fixEnv = { ...env, GITHUB_FIX_TOKEN: FIX_TOKEN };
+const errorsConnector = defineConnector({
+  type: "sentry", displayName: "Sentry (test)", capabilities: ["query"],
+  configSchema: () => z.strictObject({}),
+  create: (_c, d) => ({ id: d.id, type: "sentry", ingest: null, query: {} }),
+});
+const fixOpts = (o: Partial<Parameters<typeof parseCopilotConfig>[1]> = {}) => opts({ env: fixEnv, connectors: [pinger, reader, errorsConnector], ...o });
+
+const repoEntry = (over: Record<string, unknown> = {}) => ({
+  repo: "acme/checkout-web", service: "checkout-web", connector: "errors", baseBranch: "main",
+  pathPrefixes: ["/app/", "app:///", "webpack:///./"], sourceGlobs: ["src/**/*.{js,ts}"], testGlobs: ["tests/**/*.test.{js,ts}"],
+  testFiles: ["tests/**/*.test.js"], ...over,
+});
+const fixDoc = (codeFix: Record<string, unknown> | undefined, extra: Record<string, unknown> = {}) => JSON.stringify({
+  version: 1,
+  services: [{ name: "checkout-web" }, { name: "billing-api" }],
+  connectors: [{ id: "errors", type: "sentry" }, { id: "data", type: "reader" }],
+  ...(codeFix === undefined ? {} : { codeFix }),
+  ...extra,
+});
+const parseFix = (codeFix: Record<string, unknown> | undefined, o = fixOpts({ format: "json" })) => parseCopilotConfig(fixDoc(codeFix), o);
+const fixProblems = (codeFix: Record<string, unknown>) => {
+  const r = parseFix(codeFix);
+  assert.equal(r.ok, false, "expected problems");
+  const problems = r.ok ? [] : r.problems;
+  const t = JSON.stringify(problems);
+  assert.ok(!t.includes(FIX_TOKEN), `the token leaked into the problems: ${t}`);
+  return problems;
+};
+
+test("codeFix: absent gives null; a minimal block parses with every default", () => {
+  const none = parseFix(undefined);
+  assert.ok(none.ok, JSON.stringify(!none.ok && none.problems));
+  assert.equal(none.config.codeFix, null);
+  const r = parseFix({ repositories: [repoEntry()] });
+  assert.ok(r.ok, JSON.stringify(!r.ok && r.problems));
+  const c = r.config.codeFix!;
+  assert.equal(c.enabled, true);
+  assert.equal(c.mode, "shadow");
+  assert.equal(c.approvalTtlHours, 72);
+  assert.deepEqual(c.sandbox, { network: "isolated" });
+  assert.deepEqual(c.github, { apiUrl: "https://api.github.com", token: null });
+  assert.deepEqual(c.commitAuthor, { name: "incident-copilot", email: "incident-copilot@example.invalid" });
+  assert.deepEqual(c.limits, {
+    maxConcurrent: 1, maxFiles: 3, maxSourceLines: 20, maxTotalLines: 50, maxTestLines: 40, maxEdits: 2, maxAuthorAttempts: 2,
+    maxLlmCalls: 6, maxTokens: 60_000, attemptTimeoutMin: 15, testTimeoutSec: 120, maxOutputBytes: 65_536, maxAttemptsPerDay: 5, maxAttemptsPerGroup: 3,
+  });
+  assert.deepEqual(c.fixableExceptionTypes, ["TypeError", "RangeError", "ReferenceError"]);
+  assert.deepEqual(c.repositories, [{ ...repoEntry(), deniedPaths: [] }]);
+  assert.deepEqual(r.config.secrets, []);
+});
+
+test("codeFix: the full YAML block from the spec parses; the token is a secret joined to the redaction list", () => {
+  const text = `
+version: 1
+services: [{ name: checkout-web }]
+connectors: [{ id: sentry, type: sentry }]
+codeFix:
+  enabled: true
+  mode: draft_pr
+  approvalTtlHours: 168
+  sandbox: { network: best_effort }
+  github:
+    apiUrl: https://api.github.com
+    token: \${GITHUB_FIX_TOKEN}
+  commitAuthor: { name: incident-copilot, email: incident-copilot@example.invalid }
+  limits: { maxConcurrent: 2, maxFiles: 2 }
+  fixableExceptionTypes: [TypeError]
+  repositories:
+    - repo: acme/checkout-web
+      service: checkout-web
+      connector: sentry
+      baseBranch: release/2026.11
+      pathPrefixes: ["/app/"]
+      sourceGlobs: ["src/**/*.{js,ts}"]
+      testGlobs: ["tests/**/*.test.{js,ts}"]
+      testFiles: ["tests/**/*.test.js"]
+      deniedPaths: ["src/pricing/**"]
+`;
+  const r = parseCopilotConfig(text, fixOpts());
+  assert.ok(r.ok, JSON.stringify(!r.ok && r.problems));
+  const c = r.config.codeFix!;
+  assert.equal(c.mode, "draft_pr");
+  assert.equal(c.sandbox.network, "best_effort");
+  assert.equal(c.github.token, FIX_TOKEN);
+  assert.equal(c.limits.maxConcurrent, 2);
+  assert.equal(c.limits.maxFiles, 2);
+  assert.equal(c.limits.maxSourceLines, 20);
+  assert.equal(c.repositories[0]!.baseBranch, "release/2026.11");
+  assert.ok(r.config.secrets.includes(FIX_TOKEN));
+});
+
+test("codeFix: each limit at its ceiling passes, one above fails, one below its floor fails", async () => {
+  const { CODE_FIX_CEILINGS, CODE_FIX_FLOORS } = await import("../../src/domain/code-fix/limits.ts");
+  for (const [key, ceiling] of Object.entries(CODE_FIX_CEILINGS)) {
+    const at = parseFix({ limits: { [key]: ceiling }, repositories: [repoEntry()] });
+    assert.ok(at.ok, `${key} at ${ceiling}: ${JSON.stringify(!at.ok && at.problems)}`);
+    assert.equal((at.config.codeFix!.limits as Record<string, number>)[key], ceiling);
+    assert.deepEqual(fixProblems({ limits: { [key]: ceiling + 1 }, repositories: [repoEntry()] }), [{ path: `codeFix.limits.${key}`, rule: "out of range" }], key);
+    const floor = (CODE_FIX_FLOORS as Record<string, number>)[key]!;
+    assert.deepEqual(fixProblems({ limits: { [key]: floor - 1 }, repositories: [repoEntry()] }), [{ path: `codeFix.limits.${key}`, rule: "out of range" }], key);
+  }
+  assert.deepEqual(fixProblems({ limits: { maxFiles: 2.5 }, repositories: [repoEntry()] }).map((p) => p.path), ["codeFix.limits.maxFiles"]);
+  assert.deepEqual(fixProblems({ limits: { maxRetries: 1 }, repositories: [repoEntry()] }), [{ path: "codeFix.limits", rule: "unknown key maxRetries" }]);
+  assert.deepEqual(fixProblems({ approvalTtlHours: 169, repositories: [repoEntry()] }), [{ path: "codeFix.approvalTtlHours", rule: "out of range" }]);
+});
+
+test("codeFix: strict objects, enums and the sandbox network default", () => {
+  assert.deepEqual(fixProblems({ color: "blue", repositories: [repoEntry()] }), [{ path: "codeFix", rule: "unknown key color" }]);
+  assert.deepEqual(fixProblems({ repositories: [repoEntry({ extra: 1 })] }), [{ path: "codeFix.repositories[0]", rule: "unknown key extra" }]);
+  assert.deepEqual(fixProblems({ mode: "auto_merge", repositories: [repoEntry()] }), [{ path: "codeFix.mode", rule: "must be one of: shadow, draft_pr" }]);
+  assert.deepEqual(fixProblems({ sandbox: { network: "open" }, repositories: [repoEntry()] }), [{ path: "codeFix.sandbox.network", rule: "must be one of: isolated, best_effort" }]);
+  const empty = parseFix({ sandbox: {}, repositories: [repoEntry()] });
+  assert.ok(empty.ok);
+  assert.equal(empty.config.codeFix!.sandbox.network, "isolated");
+  assert.deepEqual(fixProblems({ github: { apiUrl: "http://api.github.com" }, repositories: [repoEntry()] }), [{ path: "codeFix.github.apiUrl", rule: "must be an https URL (http only for loopback hosts)" }]);
+  assert.deepEqual(fixProblems({ repositories: [] }), [{ path: "codeFix.repositories", rule: "out of range" }]);
+  assert.deepEqual(fixProblems({ repositories: Array.from({ length: 21 }, (_, i) => repoEntry({ repo: `acme/r${i}` })) }).map((p) => p.path), ["codeFix.repositories"]);
+  assert.deepEqual(fixProblems({ fixableExceptionTypes: ["Type Error"], repositories: [repoEntry()] }).map((p) => p.path), ["codeFix.fixableExceptionTypes[0]"]);
+});
+
+test("codeFix: testFiles is required and non-empty", () => {
+  const { testFiles: _omit, ...withoutTestFiles } = repoEntry();
+  assert.deepEqual(fixProblems({ repositories: [withoutTestFiles] }), [{ path: "codeFix.repositories[0].testFiles", rule: "must be array" }]);
+  assert.deepEqual(fixProblems({ repositories: [repoEntry({ testFiles: [] })] }), [{ path: "codeFix.repositories[0].testFiles", rule: "out of range" }]);
+});
+
+test("codeFix: the token must be a whole ${GITHUB_FIX_TOKEN} reference and is never echoed", () => {
+  assert.deepEqual(fixProblems({ github: { token: FIX_TOKEN }, repositories: [repoEntry()] }), [{ path: "codeFix.github.token", rule: "secrets must be a whole ${VAR} reference" }]);
+  assert.deepEqual(fixProblems({ github: { token: "Bearer ${GITHUB_FIX_TOKEN}" }, repositories: [repoEntry()] }), [{ path: "codeFix.github.token", rule: "secrets must be a whole ${VAR} reference" }]);
+  const unset = parseFix({ github: { token: "${GITHUB_FIX_TOKEN}" }, repositories: [repoEntry()] }, fixOpts({ format: "json", env }));
+  assert.deepEqual(!unset.ok && unset.problems, [{ path: "codeFix.github.token", rule: "environment variable GITHUB_FIX_TOKEN is not set" }]);
+  const ok = parseFix({ github: { token: "${GITHUB_FIX_TOKEN}" }, repositories: [repoEntry()] });
+  assert.ok(ok.ok);
+  assert.deepEqual(ok.config.secrets, [FIX_TOKEN]);
+});
+
+test("codeFix cross-checks: services, connectors, repositories, ref names, globs and the draft_pr token", () => {
+  const one = (r: Record<string, unknown>) => fixProblems({ repositories: [repoEntry(r)] });
+  assert.deepEqual(one({ service: "nope" }), [{ path: "codeFix.repositories[0].service", rule: "unknown service; must be a services[].name" }]);
+  assert.deepEqual(fixProblems({ repositories: [repoEntry(), repoEntry({ repo: "acme/other" })] }), [{ path: "codeFix.repositories[1].service", rule: "duplicate service; one repository per service" }]);
+  assert.deepEqual(one({ connector: "nope" }), [{ path: "codeFix.repositories[0].connector", rule: "unknown connector id" }]);
+  assert.deepEqual(one({ connector: "data" }), [{ path: "codeFix.repositories[0].connector", rule: "must be a connector of type sentry" }]);
+  assert.deepEqual(fixProblems({ repositories: [repoEntry(), repoEntry({ repo: "ACME/checkout-web", service: "billing-api" })] }), [{ path: "codeFix.repositories[1].repo", rule: "duplicate repository" }]);
+  for (const repo of ["acme", "acme/a/b", "acme/a b", "/acme", "acme/", `acme/${"x".repeat(101)}`, "acme/$(id)"]) {
+    assert.deepEqual(one({ repo }), [{ path: "codeFix.repositories[0].repo", rule: "must be owner/name (letters, digits, '_', '.' or '-', at most 100 each)" }], repo);
+  }
+  for (const baseBranch of ["-main", "main..x", "main.lock", "a//b", "main/", "/main", "ma in", "main@{1}", "ma~in", "ma:in", "main.", ".main", "ma\\in", "x".repeat(201)]) {
+    assert.deepEqual(one({ baseBranch }), [{ path: "codeFix.repositories[0].baseBranch", rule: "must be a valid branch name" }], baseBranch);
+  }
+  const GLOB_RULE = "globs may use only letters, digits and _ . / * { } , -, with no leading '-' or '/' and no '..'";
+  for (const field of ["sourceGlobs", "testGlobs", "testFiles", "deniedPaths"]) {
+    for (const glob of ["-x/**", "/etc/**", "../x/*.js", "src/../x.js", "src/**/*.js;rm", "src/[a].js", "src/ x.js"]) {
+      assert.deepEqual(one({ [field]: [glob] }), [{ path: `codeFix.repositories[0].${field}[0]`, rule: GLOB_RULE }], `${field}: ${glob}`);
+    }
+  }
+  assert.deepEqual(fixProblems({ mode: "draft_pr", repositories: [repoEntry()] }), [{ path: "codeFix.github.token", rule: "required when mode is draft_pr" }]);
+  assert.ok(parseFix({ mode: "draft_pr", github: { token: "${GITHUB_FIX_TOKEN}" }, repositories: [repoEntry()] }).ok);
+  // Every problem is collected at once.
+  assert.equal(fixProblems({ mode: "draft_pr", repositories: [repoEntry({ service: "nope", connector: "nope" })] }).length, 3);
+});
+
+test("assertLiveSafe refuses codeFix draft_pr without APPROVAL_TOKEN or a GitHub token, with any provider", () => {
+  const live = loadConfig({ LLM_PROVIDER: "openrouter", OPENROUTER_API_KEY: "sk-or-v1-" + "a".repeat(40), OPENROUTER_MODEL: "m/x" });
+  const withApproval = { ...live, approvalToken: "appr-" + "z".repeat(30) };
+  const draft = parseFix({ mode: "draft_pr", github: { token: "${GITHUB_FIX_TOKEN}" }, repositories: [repoEntry()] });
+  assert.ok(draft.ok);
+  assert.throws(() => assertLiveSafe({ ...live, approvalToken: null }, draft.config), (e) =>
+    e instanceof CopilotConfigError && e.problems.some((p) => p.path === "codeFix.mode" && p.rule.includes("APPROVAL_TOKEN")));
+  assert.doesNotThrow(() => assertLiveSafe(withApproval, draft.config));
+  const noToken = { ...draft.config, codeFix: { ...draft.config.codeFix!, github: { ...draft.config.codeFix!.github, token: null } } };
+  assert.throws(() => assertLiveSafe(withApproval, noToken), (e) => e instanceof CopilotConfigError && e.problems.some((p) => p.path === "codeFix.github.token"));
+  const disabled = { ...draft.config, codeFix: { ...draft.config.codeFix!, enabled: false } };
+  assert.doesNotThrow(() => assertLiveSafe({ ...live, approvalToken: null }, disabled));
+  const shadow = parseFix({ repositories: [repoEntry()] });
+  assert.ok(shadow.ok);
+  assert.doesNotThrow(() => assertLiveSafe({ ...live, approvalToken: null }, shadow.config));
+  const fake = loadConfig({ LLM_PROVIDER: "fake" });
+  assert.throws(() => assertLiveSafe({ ...fake, approvalToken: null }, draft.config), CopilotConfigError);
+});
+
+test("notifier events: the default stays the four 0.4 kinds; the two code-fix kinds are opt-in (AC-83)", () => {
+  const parse = (events: unknown) => parseCopilotConfig(JSON.stringify({ version: 1, notifiers: [{ id: "team", type: "chat", webhookUrl: "${HOOK_URL}", ...(events === undefined ? {} : { events }) }] }), opts({ format: "json" }));
+  const def = parse(undefined);
+  assert.ok(def.ok);
+  assert.deepEqual(def.config.notifiers[0]!.events, ["incident_opened", "analysis_ready", "run_failed", "incident_resolved"]);
+  assert.deepEqual([...DEFAULT_NOTIFICATION_EVENTS], ["incident_opened", "analysis_ready", "run_failed", "incident_resolved"]);
+  const opted = parse(["code_fix_ready", "code_fix_pr_opened"]);
+  assert.ok(opted.ok, JSON.stringify(!opted.ok && opted.problems));
+  assert.deepEqual(opted.config.notifiers[0]!.events, ["code_fix_ready", "code_fix_pr_opened"]);
+  const all = parse([...NOTIFICATION_KINDS]);
+  assert.ok(all.ok, JSON.stringify(!all.ok && all.problems));
+  assert.equal(all.config.notifiers[0]!.events.length, 6);
+  const tooMany = parse([...NOTIFICATION_KINDS, "analysis_ready"]);
+  assert.equal(tooMany.ok, false);
+  assert.ok(!tooMany.ok && tooMany.problems.some((p) => p.path === "notifiers[0].events"));
+  const unknown = parse(["code_fix_merged"]);
+  assert.ok(!unknown.ok && unknown.problems.some((p) => p.path === "notifiers[0].events[0]"));
 });

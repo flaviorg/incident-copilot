@@ -4,7 +4,7 @@ import * as z from "zod";
 export const SeveritySchema = z.enum(["sev1", "sev2", "sev3"]);
 export const IncidentStatusSchema = z.enum(["open", "investigating", "awaiting_approval", "mitigating", "resolved", "escalated", "advised"]);
 export const PhaseSchema = z.enum(["new", "investigating", "planning", "gating", "awaiting_approval", "resume", "executing", "verifying", "reporting", "done"]);
-export const AgentIdSchema = z.enum(["supervisor", "telemetry_analyst", "runbook_retriever", "remediation_planner", "auditor", "gate", "executor", "verifier", "reporter", "human", "system", "mcp_client"]);
+export const AgentIdSchema = z.enum(["supervisor", "telemetry_analyst", "runbook_retriever", "remediation_planner", "auditor", "gate", "executor", "verifier", "reporter", "human", "system", "mcp_client", "code_fixer"]);
 export const TierSchema = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]);
 export const RootCauseCategorySchema = z.enum(["bad_deploy", "resource_leak", "capacity", "cost_anomaly", "vulnerability", "dependency_failure", "config_error", "unknown"]);
 export const ConfidenceSchema = z.enum(["low", "medium", "high"]);

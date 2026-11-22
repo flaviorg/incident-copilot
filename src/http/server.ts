@@ -16,6 +16,7 @@ import { registerApprovalRoutes } from "./routes/approvals.ts";
 import { registerStatsRoutes } from "./routes/stats.ts";
 import { registerIngestRoutes } from "./routes/ingest.ts";
 import { registerConnectorRoutes } from "./routes/connectors.ts";
+import { registerCodeFixRoutes } from "./routes/code-fix.ts";
 
 /** Maximum HTTP body (spec 6.2). */
 const BODY_LIMIT_BYTES = 65_536;
@@ -100,6 +101,7 @@ export function buildServer(c: Container): FastifyInstance {
   registerHealthRoutes(app, c);
   registerScenarioRoutes(app, c);
   registerIncidentRoutes(app, c, { maxConcurrentRuns: c.config.maxConcurrentRuns });
+  registerCodeFixRoutes(app, c);
   registerApprovalRoutes(app, c);
   registerStatsRoutes(app, c);
   registerConnectorRoutes(app, c);

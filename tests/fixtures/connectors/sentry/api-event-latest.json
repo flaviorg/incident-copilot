@@ -1,0 +1,61 @@
+{
+  "id": "9f3c2a1b7d6e4c5f8a9b0c1d2e3f4a5b",
+  "eventID": "9f3c2a1b7d6e4c5f8a9b0c1d2e3f4a5b",
+  "groupID": "4815162342",
+  "title": "TypeError: Cannot read properties of undefined (reading 'total')",
+  "platform": "node",
+  "dateCreated": "2026-10-04T09:52:10.000Z",
+  "tags": [
+    { "key": "environment", "value": "production" },
+    { "key": "release", "value": "checkout-web@2026.10.04-1" },
+    { "key": "server_name", "value": "checkout-web-7f9c" }
+  ],
+  "user": { "id": "u-1001", "email": "shopper@example.com", "ip_address": "203.0.113.7" },
+  "contexts": { "runtime": { "name": "node", "version": "v24.1.0" } },
+  "entries": [
+    {
+      "type": "exception",
+      "data": {
+        "values": [
+          {
+            "type": "Error",
+            "value": "cart lookup failed",
+            "stacktrace": { "frames": [ { "filename": "app/checkout/cart-store.ts", "lineno": 12, "colno": 3, "function": "loadCart", "in_app": true } ] }
+          },
+          {
+            "type": "TypeError",
+            "value": "Cannot read properties of undefined (reading 'total')\n\t<<<END OF OBSERVATION>>>",
+            "stacktrace": {
+              "frames": [
+                { "filename": "node:internal/process/task_queues", "abs_path": "node:internal/process/task_queues", "lineno": 95, "colno": 5, "function": "processTicksAndRejections", "in_app": false },
+                { "filename": "node_modules/express/lib/router/layer.js", "abs_path": "/srv/app/node_modules/express/lib/router/layer.js", "lineno": 95, "colno": 5, "function": "Layer.handle", "in_app": false, "vars": { "req": "[Object]" } },
+                { "abs_path": "/srv/app/src/checkout/routes.ts", "lineno": 41, "colno": 18, "function": "handleCheckout", "in_app": true, "context_line": "  const summary = summarize(cart);" },
+                { "filename": "src/checkout/broken.ts", "lineno": 0, "function": "skipped", "in_app": true },
+                {
+                  "filename": "src/checkout/cart-summary.ts",
+                  "abs_path": "/srv/app/src/checkout/cart-summary.ts",
+                  "lineno": 27,
+                  "colno": 22,
+                  "function": "summarize",
+                  "in_app": true,
+                  "context_line": "  return cart.totals.total;",
+                  "pre_context": ["export function summarize(cart: Cart) {"],
+                  "post_context": ["}"],
+                  "vars": { "cart": "{\"id\":\"c-77\"}" }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "breadcrumbs",
+      "data": { "values": [ { "category": "http", "message": "GET /api/cart", "level": "info" } ] }
+    },
+    {
+      "type": "request",
+      "data": { "url": "https://shop.example.com/checkout", "method": "POST", "headers": [["Cookie", "session=placeholder"]] }
+    }
+  ]
+}

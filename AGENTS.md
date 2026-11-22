@@ -26,8 +26,10 @@ The War Room needs `npm run web:install` once, before `typecheck:web`, `web:test
 | `src/contracts` | Zod schemas and types shared with the War Room. No logic, no I/O |
 | `src/domain` | Pure rules: tiers, approval, auditor, guards, canary, metrics, BM25 |
 | `src/infra` | SQLite, scenarios, runbooks, simulated world, clock, ids, logger, redaction |
+| `src/infra/code-fix` | Code fixer adapters: `GitCliWorkspace` (hardened shallow fetch), `ProcessSandboxRunner` and its argv builder, the startup self-test, and `kit/` (the sandbox preload, reporter and probe; `node:*` imports only) |
 | `src/infra/copilot-config` | `copilot.yaml` loader: YAML or JSON, `${VAR}` interpolation, zod schema built from the registered definitions, `assertLiveSafe` |
 | `src/connectors` | Connector port (`types.ts`), registry, shared kit (`shared/`: HTTP over injected `fetch`, webhook auth, config helpers, errors) and one folder per provider; `index.ts` is the only list of types |
+| `src/codehost` | Code host clients for the code fixer; `github/` has the REST reader, the writer that can only open a draft pull request, URL builders and `CodeHostError` kinds |
 | `src/notifiers` | Notifier port (`types.ts`), `slack/`, `outbound-webhook/`; `index.ts` is the only list of types |
 | `src/tools`, `src/tools/live` | The analyst's tier 1 tools: scenario tools, and the live tools that call the connectors' query capabilities |
 | `src/llm`, `src/prompts/v1` | Providers (fake and OpenRouter), resilience, versioned prompts |
@@ -55,6 +57,29 @@ The War Room needs `npm run web:install` once, before `typecheck:web`, `web:test
 - **A new dependency needs a justification** and an exact version.
 - **Publish nothing.** No `git push`, `npm publish`, remote repository or Pages trigger without the owner's approval. Do not run `npm run setup:hooks` while the folder is inside another Git repository.
 - **A real failure becomes a note.** Record it in `docs/incidents/notes.md`, with date, symptom and cause. Never invent one.
+
+## How the code fixer works
+
+Spec: `specs/009-code-fixer/spec.md`; operator guide: `docs/code-fixer.md`. It is a post-incident job, not a graph node, and it is off unless `copilot.yaml` has a `codeFix` block.
+
+Where it lives:
+
+- `src/contracts/code-fix.ts`: attempt, view, statuses, stages, reasons and the three proposal schemas (none has a tier, approval, command, repository or publish field).
+- `src/domain/code-fix/`: the pure rules (eligibility, frames, paths and `BUILT_IN_DENIED`, limits and ceilings, test and patch guards, `checkDiff`, reproduction classifier, budget, injection scan, pull request body, reason groups) and the ports (`ports.ts`).
+- `src/graph/code-fix/`: its own `StateGraph`, pure routes in `routing.ts`, one node per file in `nodes/`, every node id prefixed `fix_`.
+- `src/app/code-fix-service.ts`, `code-fix-queue.ts`, `code-fix-publisher.ts`: the job, its queue and the only code that writes to GitHub.
+- `src/infra/code-fix/`: workspace, sandbox runner, self-test and kit. `src/codehost/github/`: the REST client.
+- `src/prompts/v1/`: `fix-test.v1`, `fix-patch.v1` and `fix-review.v1`, in `FIX_PROMPTS`.
+
+Rules:
+
+- **The fixer never gets a writer.** The graph's nodes receive a `CodeHostReader`, the workspace, the sandbox runner and the LLM only. `CodeFixPublisher` (no LLM) is the only holder of a `CodeHostWriter`, and the container builds none in shadow mode. Never add a write method to the reader or hand a writer to a node; the writer type has no merge, review, label, PUT, PATCH or DELETE method, and none may be added.
+- **The guards are pure.** Everything in `src/domain/code-fix/` follows the domain rule (no `node:*`, no outer layer). Guards collect every violation and return `{ ok, violations }`; they never throw and never read LLM output for a decision. Limits come from `effectiveLimits()`, which can only lower the ceilings in `limits.ts`.
+- **Code decides, the model writes.** Repository, path, line, commit, tier and publication come from config, connector data and git, never from model text or from untrusted repository text. `open_draft_pull_request` is classified with `proposer: "code_fixer"` and must be exactly tier 3.
+- **The fixer never writes the incident.** It reads the blackboard once and writes only `code_fix_attempts` and `code_fix_approvals` (optimistic `version`). Give-ups are values with a reason from `CodeFixReasonSchema`; nothing throws into the queue.
+- **FIX_PROMPTS and rehash.** The `fix-*` prompts stay out of `ALL_PROMPTS`, so scenario fixtures, recordings and goldens do not change. Changed a `fix-*` `system`? Run `npm run fixtures:rehash`: it hashes `[...ALL_PROMPTS, ...FIX_PROMPTS]` but writes a `fix-*` hash only into a fixture that has a turn of that prompt (or already lists its hash). Review the diff and keep only the files you meant to change.
+- **Real processes are tested in `tests/e2e`.** Unit tests use the ports with doubles. Anything that spawns git or `node --test` lives in `tests/e2e/code-fix*.e2e.test.ts`: real git over a local bare repository (`allowFileProtocol`, test-only), the real `ProcessSandboxRunner` with `tests/setup/no-network.ts` as an extra import, the fixture repository in `tests/fixtures/repos/tiny-cart`, and a fake GitHub over the injected `fetch`. A case that needs Linux `unshare` skips with a reason where user namespaces are unavailable. GitHub tokens in tests are built at run time (`"github_pat_" + ...`).
+- **Untrusted text stays fenced and redacted.** Repository files, stack traces and test output reach prompts only inside the `<<<UNTRUSTED ...>>>` blocks through `neutralizeDelimiters`, and every text the fixer sends out goes through `redactSecrets`.
 
 ## How to add an action to the catalog
 

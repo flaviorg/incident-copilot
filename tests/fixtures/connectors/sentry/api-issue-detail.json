@@ -1,0 +1,16 @@
+{
+  "id": "4815162342",
+  "shortId": "CHECKOUT-WEB-2F",
+  "title": "TypeError: Cannot read properties of undefined (reading 'total')",
+  "culprit": "CartSummary(app/checkout/cart-summary)",
+  "permalink": "https://acme.sentry.io/issues/4815162342/",
+  "level": "error",
+  "status": "unresolved",
+  "count": "1523",
+  "userCount": 311,
+  "firstSeen": "2026-10-04T09:41:30.000Z",
+  "lastSeen": "2026-10-04T09:52:10.000Z",
+  "firstRelease": { "version": "checkout-web@2026.10.04-1" },
+  "lastRelease": { "version": "checkout-web@2026.10.04-1" },
+  "project": { "id": "6502112", "name": "Checkout Web", "slug": "checkout-web" }
+}

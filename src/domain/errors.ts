@@ -13,7 +13,7 @@ export class ValidationError extends Error {
   }
 }
 
-export type NotFoundCode = "not_found" | "scenario_not_found";
+export type NotFoundCode = "not_found" | "scenario_not_found" | "incident_not_found" | "code_fix_not_found";
 export class NotFoundError extends Error {
   readonly code: NotFoundCode;
   constructor(code: NotFoundCode, message: string) {
@@ -23,7 +23,9 @@ export class NotFoundError extends Error {
   }
 }
 
-export type ConflictCode = "version_conflict" | "approval_not_pending" | "approval_expired" | "postmortem_not_ready" | "incident_not_accepting";
+export type ConflictCode =
+  | "version_conflict" | "approval_not_pending" | "approval_expired" | "postmortem_not_ready" | "incident_not_accepting"
+  | "already_attempted" | "code_fix_not_awaiting_approval";
 export class ConflictError extends Error {
   readonly code: ConflictCode;
   constructor(code: ConflictCode, message: string) {

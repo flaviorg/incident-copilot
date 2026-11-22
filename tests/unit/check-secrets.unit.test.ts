@@ -71,3 +71,22 @@ test("an API_TOKEN assignment with a value is a secret", () => {
   assert.equal(scanText("API_TOKEN" + "=abcdefgh123", "x").length, 1);
   assert.deepEqual(scanText("API_TOKEN=", "x"), []);
 });
+
+// Spec 009 (AC-79): GitHub tokens. Built at run time, so this file does not match in the repository scan.
+test("a classic GitHub token (ghp_ + 36) is a secret", () => {
+  const value = "ghp" + "_" + "A1b2".repeat(9);
+  const found = scanText(`token: ${value}`, "x");
+  assert.deepEqual(found.map((f) => f.pattern), ["GitHub token"]);
+  assert.ok(!JSON.stringify(found).includes(value));
+  assert.deepEqual(scanText("ghp" + "_" + "a".repeat(35), "x"), []);
+});
+
+test("a fine-grained GitHub token (github_pat_ + 60 or more) is a secret", () => {
+  const value = "github" + "_pat_" + "11ABCDEFG0" + "a_b".repeat(25);
+  const found = scanText(`GITHUB_FIX_TOKEN=${value}`, "x");
+  assert.deepEqual(found.map((f) => f.pattern), ["GitHub fine-grained token"]);
+  assert.ok(!JSON.stringify(found).includes(value));
+  assert.equal(scanText("github" + "_pat_" + "a".repeat(70), "x").length, 1);
+  assert.deepEqual(scanText("github" + "_pat_" + "a".repeat(59), "x"), []);
+  assert.deepEqual(scanText("GITHUB_FIX_TOKEN=${GITHUB_FIX_TOKEN} github_pat_ placeholder", "x"), []);
+});

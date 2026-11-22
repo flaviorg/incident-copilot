@@ -18,6 +18,7 @@ export const AGENT_NAMES: Record<AgentId, string> = {
   human: "Human",
   system: "Escalation",
   mcp_client: "MCP client",
+  code_fixer: "Code fixer",
 };
 
 /** Who holds the authority behind an event: the thesis of the War Room, shown as the strip holder colour. */
@@ -44,6 +45,7 @@ export const AGENT_ROLES: Record<AgentId, string> = {
   human: "human · decides",
   system: "code · escalates",
   mcp_client: "external client",
+  code_fixer: "model + code · proposes a fix",
 };
 
 const AGENT_AUTHORITY: Record<AgentId, Authority> = {
@@ -59,6 +61,7 @@ const AGENT_AUTHORITY: Record<AgentId, Authority> = {
   human: "human",
   system: "code",
   mcp_client: "system",
+  code_fixer: "model",
 };
 
 /** Deterministic critics (guards, gate, canary) are code even when another agent emits them. */

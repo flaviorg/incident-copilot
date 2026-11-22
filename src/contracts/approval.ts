@@ -13,4 +13,8 @@ export const ApprovalSchema = z.object({
   comment: z.string().nullable(), // the comment goes through redaction
   decisionSource: z.enum(["structured", "text", "expiry"]).nullable(),
   version: z.number().int().nonnegative(),
+  // Spec 009: set only on code-fix approvals (actionId then holds the attempt id). No defaults, so action approvals
+  // parse to the same bytes as before.
+  subject: z.enum(["code_fix"]).optional(),
+  patchSha256: z.string().regex(/^[0-9a-f]{64}$/).optional(),
 });

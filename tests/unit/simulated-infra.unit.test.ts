@@ -132,3 +132,15 @@ test("fault injection makes execute fail without changing the world", () => {
   const again = infra.execute(moved, rollback, deploy);
   assert.deepEqual([again.result.ok, again.result.summary], [false, "deployment/orders-api already runs v3.7.2"]);
 });
+
+test("open_draft_pull_request has a registry stub whose check always refuses (spec 009, decision 13)", () => {
+  const step: ValidatedStep = { actionType: "open_draft_pull_request", target: "repository/orders-api", params: { attemptId: "fix_abcd1234", patchSha256: "a".repeat(64) } };
+  const reason = "executed by the code-fix publisher, not the simulated world";
+  for (const w of [w0, costWorld]) {
+    const r = infra.dryRun(w, step);
+    assert.deepEqual([r.ok, r.failureReason, r.changes], [false, reason, []]);
+    assert.deepEqual(infra.execute(w, step, deploy), { world: w, result: { ok: false, summary: reason } });
+    assert.throws(() => infra.apply(w, step), new RegExp(reason));
+  }
+  assert.equal(infra.revert(w0, gated(step, "succeeded")).result.ok, false);
+});

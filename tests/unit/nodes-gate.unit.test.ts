@@ -147,3 +147,14 @@ test("shadow mode keeps invalid params and dependency cancellation", async () =>
   assert.equal(out.phase, "reporting");
   assert.deepEqual(c.store.listAudit(bb.incidentId).map((e) => e.event).slice(1), ["action_recommended", "action_rejected_invalid_params", "action_cancelled"]);
 });
+
+test("a planner step with the reserved open_draft_pull_request is blocked as forbidden and audited (AC-73)", async () => {
+  const { c, bb } = await stateAtGate("deploy-5xx-rollback", {
+    extraStep: { actionType: "open_draft_pull_request", target: "repository/orders-api", params: { attemptId: "fix_abcd1234", patchSha256: "a".repeat(64) } },
+  });
+  const a = (await createGateNode(gd(c))(bb)).actions!.find((x) => x.actionType === "open_draft_pull_request")!;
+  assert.deepEqual([a.status, a.tier, a.dryRun, a.approvalId], ["blocked_forbidden", 4, null, null]);
+  assert.ok(a.classificationReasons.includes("reserved for another proposer (tier 4)"));
+  assert.ok(c.store.listAudit(bb.incidentId).some((e) => e.event === "action_blocked_forbidden" && e.tier === 4));
+  assert.equal(c.store.listApprovals({ incidentId: bb.incidentId }).length, 1);
+});

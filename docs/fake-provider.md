@@ -73,6 +73,11 @@ Turn fields:
 | `planner.v1` | `revision` | `{ "revision": 1 }` |
 | `auditor.v1` | `revision` | `{ "revision": 0 }` |
 | `postmortem.v1` | `kind` (`final`) | `{ "kind": "final" }` |
+| `fix-test.v1` | `repo`, `attempt` (1 to 3) | `{ "repo": "acme/orders-api", "attempt": 1 }` |
+| `fix-patch.v1` | `repo`, `attempt` (1 to 3) | `{ "repo": "acme/orders-api", "attempt": 2 }` |
+| `fix-review.v1` | `repo` | `{ "repo": "acme/orders-api" }` |
+
+The three `fix-*` prompts belong to the code fixer (spec 009) and live in `FIX_PROMPTS`, not in `ALL_PROMPTS`. `npm run fixtures:rehash` writes a `fix-*` hash only into a fixture that has a turn of that prompt (or already lists its hash), so the scenario fixtures do not change. `tests/unit/contracts.unit.test.ts` checks every fixture against both lists.
 
 The keys are deliberately small and stable: the full prompt text can change without breaking matching. The hash from rule 1 protects `system`.
 

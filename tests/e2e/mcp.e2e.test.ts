@@ -138,6 +138,29 @@ test("forbidden and unknown types are short isError results and are audited", as
   }
 });
 
+test("open_draft_pull_request is reserved for the code fixer: refused with action_reserved and audited (AC-73)", async () => {
+  const { c, m } = await setup();
+  try {
+    const pr = { actionType: "open_draft_pull_request", target: "repository/orders-api", params: { attemptId: "fix_abcd1234", patchSha256: "a".repeat(64) }, rationale: "x" };
+    const r = await m.client.callTool(propose(pr));
+    assert.equal(r.isError, true);
+    assert.equal((r.content as { text: string }[])[0]!.text, "action refused: open_draft_pull_request is reserved for the code fixer (tier 4)");
+    const blocked = c.store.listActions("INC-0001").filter((a) => a.proposedBy === "mcp_client");
+    assert.deepEqual(blocked.map((a) => [a.actionType, a.status, a.tier]), [["open_draft_pull_request", "blocked_forbidden", 4]]);
+    assert.ok(blocked[0]!.classificationReasons.includes("reserved for another proposer (tier 4)"));
+    assert.ok(c.store.listAudit("INC-0001").some((e) => e.event === "action_blocked_forbidden" && e.actor.startsWith("mcp_client:")));
+    assert.deepEqual(c.store.listApprovals({ incidentId: "INC-0001" }).map((a) => a.id), ["APR-0001"]);
+    // The service refusal carries the code; the MCP result carries only its message.
+    assert.throws(
+      () => c.incidents.proposeExternalAction({ incidentId: "INC-0001", runbookRef: "orders-5xx-after-deploy#Mitigation", ...pr }, "mcp_client:direct"),
+      (e: unknown) => (e as { code?: unknown }).code === "action_reserved",
+    );
+  } finally {
+    await m.close();
+    c.close();
+  }
+});
+
 test("oversized fields are refused before anything is stored or traced", async () => {
   // Final review: a 50,000-character target became tier 3 with a pending approval and went into the trace in full.
   const { c, m } = await setup();
