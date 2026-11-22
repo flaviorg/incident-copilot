@@ -136,6 +136,11 @@ export type CodeFixServiceDeps = {
   nodesFor: (x: AttemptNodeContext) => CodeFixGraphNodes;
   /** The sandbox self-test (decision 7); run once, at start. */
   selfTest: () => Promise<SandboxSelfTestOutcome>;
+  /**
+   * Removes attempt directories a previous process left behind (crash, kill) and returns how many; run once, at start,
+   * before the self-test and before any attempt of this process exists.
+   */
+  sweepWorkspaces?: () => Promise<number>;
   /** The publisher's entry point for an approved or publishing attempt (T18); absent until a writer exists. */
   publish?: (attemptId: string) => Promise<void>;
   /**
@@ -182,10 +187,14 @@ export class CodeFixService {
     return redactSecrets(text, this.d.secrets);
   }
 
-  /** Runs the sandbox self-test once; a failure or a throw leaves the fixer disabled (every eligible incident skipped). */
+  /**
+   * Sweeps stale attempt directories, then runs the sandbox self-test once; a self-test failure or throw leaves the
+   * fixer disabled (every eligible incident skipped). Every attempt waits for this, so none is running during the sweep.
+   */
   start(): Promise<void> {
     if (this.started) return this.started;
     this.started = (async () => {
+      await this.sweepWorkspaces();
       try {
         const r = await this.d.selfTest();
         this.sandboxAvailable = r.ok === true;
@@ -200,6 +209,17 @@ export class CodeFixService {
       }
     })();
     return this.started;
+  }
+
+  /** Never throws: a failed sweep is logged and retried at the next start. */
+  private async sweepWorkspaces(): Promise<void> {
+    if (!this.d.sweepWorkspaces) return;
+    try {
+      const removed = await this.d.sweepWorkspaces();
+      if (removed > 0) this.log.info("stale code-fix attempt directories removed", { event: "code_fix_workspaces_swept", removed });
+    } catch (e) {
+      this.log.warn("could not sweep stale code-fix attempt directories", { event: "code_fix_workspace_sweep_failed", error: (e as Error)?.name ?? "Error" });
+    }
   }
 
   /** Aborts running attempts (shutdown); they end as interrupted. */

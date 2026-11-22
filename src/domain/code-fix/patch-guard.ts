@@ -11,6 +11,7 @@ import type { GuardResult } from "./test-guard.ts";
 import { countChangedLines, diffLines, findOccurrences, lineCount, normalizeEol } from "./edits.ts";
 import { stripPathPrefix } from "./frames.ts";
 import { injectionScan } from "./injection-scan.ts";
+import { codeBanHits } from "./code-ban.ts";
 import { isDenied, matchesAnyGlob, toSafeRelPath } from "./paths.ts";
 
 export const PATCH_GUARD_CODES = [
@@ -32,7 +33,7 @@ const MESSAGES: Record<PatchGuardCode, string> = {
   too_many_total_lines: "The change is larger than the allowed total number of lines (the new test included).",
   too_many_edits: "The patch has more edits than allowed.",
   new_import: "The patch must not add an import, require or dynamic import.",
-  dangerous_call: "The patch adds a process, console, environment, network, eval, filesystem or runtime call.",
+  dangerous_call: "The patch adds a process, console, global object, environment, network, eval, filesystem or runtime call, a computed key built from strings, an escape sequence or a non-ASCII character in code.",
   assert_removed: "The patch must not remove or change an assertion.",
   injection_text: "The patch or its rationale contains text that addresses the reviewer or the model; remove it.",
   delete_file: "The change must not delete a file.",
@@ -52,16 +53,12 @@ const IMPORT_PATTERNS: readonly RegExp[] = Object.freeze([
   /\bexport\b[^\n]*\bfrom\s*["'`]/,
 ]);
 
+/** Patch-only patterns; the shared identifier ban (`codeBanHits`, the same list the test guard uses) runs as well. */
 export const DANGEROUS_PATTERNS: readonly RegExp[] = Object.freeze([
   /child_process/,
-  /\bprocess\s*(?:\.|\?\.|\[)/,
   /\bfetch\s*\(/,
-  /\beval\s*\(/,
-  /\bnew\s+Function\b/,
-  /\bFunction\s*\(/,
-  /\bglobalThis\s*(?:\[|\?\.\[)/,
-  /\bconsole\s*(?:\.|\?\.|\[)/,
   /\bnode:(?:net|http|https|http2|tls|dgram|dns|fs|vm|worker_threads|child_process)\b/,
+  /["'`](?:node:)?fs(?:\/promises)?["'`]/,
   /\bDeno\s*\./,
   /\bBun\s*\./,
 ]);
@@ -154,6 +151,7 @@ export function checkPatch(edits: readonly PatchEdit[], ctx: PatchGuardContext):
     const d = diffLines(edit.search, edit.replace);
     if (d.added.some((l) => IMPORT_PATTERNS.some((re) => re.test(l)))) found.add("new_import");
     if (d.added.some((l) => DANGEROUS_PATTERNS.some((re) => re.test(l)))) found.add("dangerous_call");
+    if (codeBanHits(d.added.join("\n")).length > 0) found.add("dangerous_call");
     const kept = new Set(d.added.map((l) => l.trim()));
     if (d.removed.some((l) => ASSERTION.test(l) && !kept.has(l.trim()))) found.add("assert_removed");
     if (injectionScan(edit.replace).hit) found.add("injection_text");

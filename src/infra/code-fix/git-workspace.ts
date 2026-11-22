@@ -42,6 +42,12 @@ export const GIT_SAFE_CONFIG: readonly string[] = [
   "protocol.allow=never",
   "protocol.https.allow=always",
   "submodule.recurse=false",
+  // No attributes or ignore rules from outside the repository, and no line-ending conversion beyond the repository's own
+  // .gitattributes: what is staged is what the post-images (read from the index) contain.
+  "core.attributesFile=/dev/null",
+  "core.excludesFile=/dev/null",
+  "core.autocrlf=false",
+  "core.eol=lf",
 ];
 
 export type GitCliWorkspaceOptions = {
@@ -240,6 +246,19 @@ class GitWorkspace implements Workspace {
     return { patch, changes: buildChanges(raw, numstat, status) };
   }
 
+  async readStaged(path: string): Promise<string | null> {
+    assertPath(path);
+    const { stdout } = await this.#runner.git(["ls-files", "-z", "--stage", "--", path]);
+    for (const record of stdout.split("\0")) {
+      const tab = record.indexOf("\t");
+      if (tab < 0 || record.slice(tab + 1) !== path) continue;
+      const [mode, object, stage] = record.slice(0, tab).split(" ");
+      if ((mode !== "100644" && mode !== "100755") || stage !== "0" || !object || !/^[0-9a-f]{40,64}$/.test(object)) return null;
+      return (await this.#runner.git(["cat-file", "blob", object])).stdout;
+    }
+    return null;
+  }
+
   async dispose(): Promise<void> {
     await rm(this.root, { recursive: true, force: true });
   }
@@ -346,7 +365,8 @@ export class GitCliWorkspace implements GitWorkspacePort {
     const secrets = [...(this.#opts.secrets ?? []), ...(input.token ? [input.token] : [])];
     const flags = [...GIT_SAFE_CONFIG, ...(allowFile ? ["protocol.file.allow=always"] : [])].flatMap((c) => ["-c", c]);
     const repoDir = join(root, "repo");
-    const home = join(root, "tmp");
+    // Not <attempt>/tmp: the sandbox can write there, and git would read $XDG_CONFIG_HOME/git/attributes and ignore.
+    const home = join(root, "git");
     const baseEnv: Record<string, string> = {
       PATH: process.env.PATH ?? "/usr/bin:/bin",
       LC_ALL: "C",

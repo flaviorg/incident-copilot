@@ -188,7 +188,7 @@ const asFile = (f: FakeFile | string): FakeFile => (typeof f === "string" ? { te
 export type FakeWorkspaceCall =
   | { op: "readAt" | "modeAt"; sha: string; path: string }
   | { op: "sameAt"; a: string; b: string; path: string }
-  | { op: "readFile" | "writeFile"; path: string }
+  | { op: "readFile" | "writeFile" | "readStaged"; path: string }
   | { op: "listFiles"; globs: string[] }
   | { op: "stagedDiff" | "dispose" };
 
@@ -257,6 +257,12 @@ export class FakeWorkspace implements Workspace {
       parts.push(`diff --git a/${path} b/${path}\n--- ${before === null ? "/dev/null" : `a/${path}`}\n+++ b/${path}\n`);
     }
     return { patch: parts.join(""), changes };
+  }
+  /** The fake has no index conversion: the staged blob is the work-tree text of a regular file. */
+  async readStaged(path: string): Promise<string | null> {
+    this.calls.push({ op: "readStaged", path });
+    const f = this.tree.get(path);
+    return f !== undefined && (f.mode === "100644" || f.mode === "100755") ? f.text : null;
   }
   async dispose(): Promise<void> {
     this.calls.push({ op: "dispose" });

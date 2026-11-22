@@ -341,6 +341,18 @@ test("codeFix: strict objects, enums and the sandbox network default", () => {
   assert.deepEqual(fixProblems({ fixableExceptionTypes: ["Type Error"], repositories: [repoEntry()] }).map((p) => p.path), ["codeFix.fixableExceptionTypes[0]"]);
 });
 
+// The GitHub client refuses an apiUrl with a query or a fragment at startup, so the loader must refuse it first:
+// a config that `config check` accepts must never crash `npm start`.
+test("codeFix: github.apiUrl with a query or a fragment is refused with a fixed rule", () => {
+  const rule = [{ path: "codeFix.github.apiUrl", rule: "must not have a query or a fragment" }];
+  assert.deepEqual(fixProblems({ github: { apiUrl: "https://ghe.example.com/api/v3?x=1" }, repositories: [repoEntry()] }), rule);
+  assert.deepEqual(fixProblems({ github: { apiUrl: "https://ghe.example.com/api/v3#top" }, repositories: [repoEntry()] }), rule);
+  assert.deepEqual(fixProblems({ github: { apiUrl: "https://ghe.example.com/api/v3?" }, repositories: [repoEntry()] }), rule);
+  const ok = parseFix({ github: { apiUrl: "https://ghe.example.com/api/v3" }, repositories: [repoEntry()] });
+  assert.ok(ok.ok);
+  assert.equal(ok.config.codeFix!.github.apiUrl, "https://ghe.example.com/api/v3");
+});
+
 test("codeFix: testFiles is required and non-empty", () => {
   const { testFiles: _omit, ...withoutTestFiles } = repoEntry();
   assert.deepEqual(fixProblems({ repositories: [withoutTestFiles] }), [{ path: "codeFix.repositories[0].testFiles", rule: "must be array" }]);

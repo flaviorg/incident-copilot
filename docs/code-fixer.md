@@ -193,7 +193,7 @@ group may try again while fewer than `maxAttemptsPerGroup` attempts exist:
 | `base_unprotected` | `GET /branches/{baseBranch}` does not report `protected: true` |
 | `stale_base` | a patched file changed on the base branch since the base commit; nothing is rebased |
 | `ref_conflict` | the fix branch exists and points at something that is not our commit |
-| `codehost_error` *(transient)* | GitHub failed (auth, rate limit, timeout, unavailable, bad response) |
+| `codehost_error` *(transient)* | GitHub failed (auth, rate limit, timeout, unavailable, bad response). While publishing, a timeout, rate limit, unavailable or bad response is retried up to 3 times (honouring `Retry-After`). If retries run out after the commit was saved, the attempt stays `publishing` and keeps the error group's key, so the next try finds the existing branch or pull request instead of opening a second one; with no commit saved yet, the attempt ends `publish_failed` and the key is released |
 
 Statuses: `skipped`, `running`, `gave_up`, `patch_ready`, `awaiting_approval`, `approved`, `rejected`, `expired`,
 `publishing`, `pr_opened`, `publish_failed`. Stages: `eligibility`, `locate`, `workspace`, `baseline`, `author_test`,
@@ -326,8 +326,10 @@ request body, and the self-test does not claim the network checks.
 Results come from our reporter (NDJSON lines on stdout) and are cross-checked with the exit code: an empty report, zero
 tests, a non-zero exit with no failure or a zero exit with a failure are all `error`, never `passed`. But the reporter
 runs **in the same process** as the tests (`--test-isolation=none`), so code that runs there could forge results. That
-is why model-written code is statically banned from touching `process`, `console`, `globalThis`, `Reflect`, `Proxy`,
-`eval`, `Function`, `require` and dynamic import, and why a human reviews the diff before any pull request exists. A
+is why model-written code is statically banned from touching `process`, `console`, `globalThis`, `global`, `self`,
+`getBuiltinModule`, `Reflect`, `Proxy`, `eval`, `Function`, `require` and dynamic import (one list shared by the test and
+patch guards; any `\u` or `\x` escape, a non-ASCII character in code and a computed key built from strings are rejected
+too, since identifiers can be spelled with escapes), and why a human reviews the diff before any pull request exists. A
 pull request is evidence, not proof.
 
 ### Docker and Linux hosts
@@ -428,7 +430,8 @@ curl -s -X POST localhost:3000/approvals/APR-0002/decision \
 
 The decision answers 200 with `{ approval, incident }`, and the incident is unchanged. An approval queues the publish;
 read the outcome again with `GET /incidents/:id/code-fix` (`pr_opened` with `pullRequest.url`, or `publish_failed` with
-its reason). A second decision answers 409 `code_fix_not_awaiting_approval`. An overdue approval answers 409 and the
+its reason). A second decision answers 409 `approval_not_pending`; 409 `code_fix_not_awaiting_approval` means the
+approval is still pending but its attempt no longer awaits it. An overdue approval answers 409 and the
 attempt ends `expired`; it is accepted while the incident is `advised` or `resolved`, because the bug outlives the
 incident. A rejected or permanently failed group is not retried.
 
@@ -443,7 +446,8 @@ not; create it once before enabling the fixer:
 docker compose run --rm --entrypoint sh copilot -c 'mkdir -p /data/code-fix'
 ```
 
-Without it every attempt gives up with `workspace_failed` and the self-test fails. See [Docker and Linux
+Without it the startup self-test fails, the fixer stays off (log event `code_fix_sandbox_unavailable`) and every
+eligible incident is recorded as `skipped` / `sandbox_unavailable`; no attempt starts. See [Docker and Linux
 hosts](#docker-and-linux-hosts) for `unshare` inside a container.
 
 ## Facts and sources

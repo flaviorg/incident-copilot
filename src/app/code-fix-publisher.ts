@@ -3,8 +3,24 @@
 // first request, then checks, in order: the stored patch and post-images against the approved hash, the catalog tier,
 // the base branch protection and the base staleness, and only then asks the writer for the draft pull request (which
 // reuses its own branch or pull request on a retry). The commit is persisted through `onCommit` before the ref exists.
-// Every text that leaves goes through `redactSecrets`. `publish` never throws: a code-host error ends the attempt as
-// publish_failed; any other throw (a crash) leaves it `publishing`, and `CodeFixService.recover()` retries it later.
+// Every text that leaves goes through `redactSecrets`. `publish` never throws.
+//
+// Code-host errors (decision 16, AC-81, AC-82). A transient kind (timeout, network, 5xx, rate limit, malformed response)
+// may hide a write that succeeded, such as a POST /pulls whose response was lost, so it never ends the attempt at once:
+// the run is retried in process up to `retry.maxTries` times with exponential backoff (a rate limit waits at least its
+// `retry-after`), and every retry starts again from the checks and `findPullByHead`, so a pull request created by a lost
+// response is recorded, never duplicated. When the retries run out:
+// - with no commit persisted, no ref or pull request can exist, so it ends publish_failed/codehost_error and releases
+//   the key (decision 16 as written);
+// - with a commit persisted, a branch and maybe a pull request may exist, so the attempt stays `publishing` with the key
+//   held, and `CodeFixService.recover()` retries it idempotently on the next start.
+// Deviation from decision 16 as first written (it listed `codehost_error` as always releasing the key; the spec now
+// carries this rule): a codehost_error that ends an
+// attempt with a commit persisted (a definitive kind such as auth or forbidden) keeps the key, because the branch, or a
+// pull request from an earlier lost response, may already exist and AC-82 forbids a second one for the group.
+// Definitive outcomes (patch_mismatch, catalog_refused, base_unprotected, stale_base, ref_conflict and the 4xx kinds)
+// end the attempt with no retry. Any other throw (a crash) leaves it `publishing` for `recover()`.
+import { setTimeout as delay } from "node:timers/promises";
 import type { CodeFixAttempt, CodeFixReason } from "../contracts/index.ts";
 import { classifyAction } from "../domain/autonomy/catalog.ts";
 import { canonicalPatchPayload } from "../domain/code-fix/patch-payload.ts";
@@ -36,7 +52,19 @@ export type CodeFixPublisherDeps = {
   publicUrl: string | null;
   /** The catalog classifier; tests may replace it. Defaults to `classifyAction`. */
   classify?: typeof classifyAction;
+  /** The bounded in-process retry of transient code-host errors. Defaults to `PUBLISH_RETRY`. */
+  retry?: PublishRetryPolicy;
+  /** Waits between retries; tests replace it. Defaults to a timer. */
+  sleep?: (ms: number) => Promise<void>;
 };
+
+export type PublishRetryPolicy = { maxTries: number; baseDelayMs: number; maxDelayMs: number };
+
+/** Three tries, waiting 1 s then 2 s (a rate limit waits its retry-after, at most 60 s). */
+export const PUBLISH_RETRY: PublishRetryPolicy = Object.freeze({ maxTries: 3, baseDelayMs: 1000, maxDelayMs: 60_000 });
+
+/** Kinds whose request may have reached the code host, or that clear by themselves: retried, never final on their own. */
+const TRANSIENT_KINDS: ReadonlySet<CodeHostErrorKind> = new Set<CodeHostErrorKind>(["timeout", "unavailable", "rate_limited", "bad_response"]);
 
 /** A failure that ends the publish with a typed reason before or without the writer. */
 class PublishRefused extends Error {
@@ -61,15 +89,24 @@ function codeHostKind(e: unknown): CodeHostErrorKind | null {
   return null;
 }
 
+function retryAfterMs(e: unknown): number {
+  const sec = (e as { retryAfterSec?: unknown } | null)?.retryAfterSec;
+  return typeof sec === "number" && Number.isFinite(sec) && sec > 0 ? sec * 1000 : 0;
+}
+
 export class CodeFixPublisher {
   private readonly d: CodeFixPublisherDeps;
   private readonly log: Logger;
   private readonly classify: typeof classifyAction;
+  private readonly retry: PublishRetryPolicy;
+  private readonly sleep: (ms: number) => Promise<void>;
 
   constructor(d: CodeFixPublisherDeps) {
     this.d = d;
     this.log = d.logger.child({ component: "code_fix_publisher" });
     this.classify = d.classify ?? classifyAction;
+    this.retry = d.retry ?? PUBLISH_RETRY;
+    this.sleep = d.sleep ?? ((ms) => delay(ms).then(() => undefined));
   }
 
   private redact(text: string): string {
@@ -100,17 +137,37 @@ export class CodeFixPublisher {
     }
     let cur: CodeFixAttempt = a.status === "approved" ? this.write(a, { ...a, status: "publishing", stage: "publish" }) : a;
 
-    try {
-      const pr = await this.openPullRequest(cur, (commit) => {
-        cur = this.write(cur, { ...cur, commit });
-      });
-      this.finishOpened(cur, pr);
-    } catch (e) {
-      if (e instanceof PublishRefused) return this.finishFailed(cur, e.reason, e.kind);
-      const kind = codeHostKind(e);
-      if (kind === null) throw e; // a crash: the attempt stays publishing
-      // A 409/422 the writer could not reconcile is the branch (or its pull request) pointing elsewhere.
-      return this.finishFailed(cur, kind === "conflict" ? "ref_conflict" : "codehost_error", kind);
+    const maxTries = Math.max(1, Math.floor(this.retry.maxTries));
+    for (let tryNo = 1; ; tryNo++) {
+      try {
+        const pr = await this.openPullRequest(cur, (commit) => {
+          cur = this.write(cur, { ...cur, commit });
+        });
+        return this.finishOpened(cur, pr);
+      } catch (e) {
+        if (e instanceof PublishRefused) return this.finishFailed(cur, e.reason, e.kind);
+        const kind = codeHostKind(e);
+        if (kind === null) throw e; // a crash: the attempt stays publishing
+        // A 409/422 the writer could not reconcile is the branch (or its pull request) pointing elsewhere.
+        if (kind === "conflict") return this.finishFailed(cur, "ref_conflict", kind);
+        if (!TRANSIENT_KINDS.has(kind)) return this.finishFailed(cur, "codehost_error", kind);
+        if (tryNo < maxTries) {
+          const backoff = this.retry.baseDelayMs * 2 ** (tryNo - 1);
+          const wait = Math.min(this.retry.maxDelayMs, Math.max(backoff, retryAfterMs(e)));
+          this.log.warn("code-fix publish hit a transient code-host error; retrying", {
+            event: "code_fix_publish_retry", attemptId, kind, try: tryNo, waitMs: wait,
+          });
+          await this.sleep(wait);
+          continue;
+        }
+        // Out of retries. No commit means no ref or pull request can exist: end it and release the key.
+        if (cur.commit === null) return this.finishFailed(cur, "codehost_error", kind);
+        // A branch, and maybe a pull request from a lost response, may exist: keep it publishing with the key held.
+        this.log.warn("code-fix publish left publishing after transient code-host errors; it is retried on the next start", {
+          event: "code_fix_publish_deferred", incidentId: cur.incidentId, attemptId, kind, tries: tryNo,
+        });
+        return;
+      }
     }
   }
 
@@ -211,7 +268,9 @@ export class CodeFixPublisher {
 
   private finishFailed(a: CodeFixAttempt, reason: CodeFixReason, kind: CodeHostErrorKind | null): void {
     const nowIso = this.d.clock.now().toISOString();
-    const keyHeld = !isTransientReason(reason);
+    // A codehost_error after the commit was persisted keeps the key: the branch, or a pull request from an earlier
+    // lost response, may exist (AC-82; see the deviation note at the top of this file).
+    const keyHeld = !isTransientReason(reason) || (reason === "codehost_error" && a.commit !== null);
     this.d.fixes.transaction(() => {
       this.write(a, { ...a, status: "publish_failed", stage: "publish", reason, finishedAt: nowIso }, { keyHeld });
       this.d.store.appendAudit({

@@ -6,6 +6,7 @@
 // fires, which would skip fix_give_up. Each node reads it as `config.signal`, returns `attempt_timeout` and the attempt
 // ends through fix_give_up without throwing (decision 17, AC-81).
 import { StateGraph, START, END } from "@langchain/langgraph";
+import { CODE_FIX_CEILINGS } from "../../domain/code-fix/limits.ts";
 import type { NodeConfig } from "../run-context.ts";
 import {
   afterAuthorPatch, afterAuthorTest, afterBaseline, afterEligibility, afterFinalize, afterGuardPatch, afterGuardTest, afterLocate,
@@ -15,8 +16,20 @@ import type { FixNodeId, FixRoute, FixRouteLimits } from "./routing.ts";
 import { CodeFixStateSchema } from "./state.ts";
 import type { CodeFixNodeFn, CodeFixState } from "./state.ts";
 
-/** Decision 2: the most supersteps an attempt may take. */
-export const CODE_FIX_RECURSION_LIMIT = 24;
+/**
+ * Decision 2: the most nodes one attempt can visit, with both author loops used to the `maxAuthorAttempts` ceiling
+ * (config can only lower it): eligibility, locate, workspace and baseline (4); author_test, guard_test and repro per
+ * test attempt (3 each); author_patch, guard_patch and verify per patch attempt (3 each); then review, finalize and
+ * fix_give_up (3, a finalize failure being the longest ending). 25 at the ceiling of 3.
+ */
+export const CODE_FIX_LONGEST_PATH = 4 + 3 * CODE_FIX_CEILINGS.maxAuthorAttempts + 3 * CODE_FIX_CEILINGS.maxAuthorAttempts + 3;
+
+/**
+ * Decision 2: the most supersteps an attempt may take. LangGraph raises GraphRecursionError once a run of N nodes meets
+ * `recursionLimit: N`, so the limit must exceed the longest path; 4 more is margin. The routes already bound every loop,
+ * so this is only a backstop, and a legitimate path never ends as `budget_exhausted` through it.
+ */
+export const CODE_FIX_RECURSION_LIMIT = CODE_FIX_LONGEST_PATH + 1 + 4;
 
 export type CodeFixGraphNodes = Record<FixNodeId, CodeFixNodeFn>;
 

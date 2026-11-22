@@ -2,6 +2,7 @@
 // <attempt>/kit/ and loaded with --test-reporter. One prefixed line per test, then one summary line when the event
 // stream ends. The parent reads only these lines and cross-checks them with the exit code (parseReport). Paths stay
 // absolute here; the parent makes them repo-relative and drops every frame outside the work tree.
+import { relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** Must equal SANDBOX_REPORT_PREFIX in sandbox-argv.ts (the kit cannot import it). */
@@ -59,6 +60,8 @@ function errorNameOf(e: ErrorLike): string {
 type TestEventData = {
   name?: unknown;
   file?: unknown;
+  nesting?: unknown;
+  entryFile?: unknown;
   skip?: unknown;
   todo?: unknown;
   details?: { type?: unknown; error?: unknown };
@@ -111,11 +114,23 @@ function record(type: "test:pass" | "test:fail", data: TestEventData): string {
 
 type TestEvent = { type: string; data?: unknown };
 
+/**
+ * Node reports a test file that declares no test as one passing top-level test named after the file. It is not a test
+ * (AC-67 needs at least one), so it is dropped; a file that fails to load stays a failure.
+ */
+function filePseudoPass(type: string, data: TestEventData): boolean {
+  if (type !== "test:pass" || marked(data.skip) || marked(data.todo)) return false;
+  if (data.nesting !== 0 || data.entryFile !== undefined || typeof data.file !== "string" || typeof data.name !== "string") return false;
+  const file = toPath(data.file);
+  return data.name === file || data.name === relative(process.cwd(), file);
+}
+
 export default async function* sandboxReporter(source: AsyncIterable<TestEvent>): AsyncGenerator<string> {
   for await (const event of source) {
     if (event.type !== "test:pass" && event.type !== "test:fail") continue;
     const data = (event.data ?? {}) as TestEventData;
     if (data.details?.type === "suite") continue;
+    if (filePseudoPass(event.type, data)) continue;
     yield record(event.type, data);
   }
   // Written only when the event stream ends normally: a crash, a kill or process.exit leaves no summary line.

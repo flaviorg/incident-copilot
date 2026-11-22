@@ -7,6 +7,7 @@ import { chmod, lstat, mkdir, mkdtemp, readdir, readFile, realpath, rm, stat, sy
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import { applyEdits, countChangedLines, normalizeEol } from "../../src/domain/code-fix/edits.ts";
 import type { PrepareWorkspaceInput, Workspace } from "../../src/domain/code-fix/ports.ts";
 import { anchorChecks, GitCliWorkspace, WorkspaceError } from "../../src/infra/code-fix/git-workspace.ts";
 import type { ExecFileLike } from "../../src/infra/code-fix/git-workspace.ts";
@@ -117,10 +118,12 @@ describe("GitCliWorkspace.prepare", () => {
       assert.equal(c.env.GIT_TERMINAL_PROMPT, "0");
       assert.equal(c.env.GIT_LFS_SKIP_SMUDGE, "1");
       assert.equal(c.env.GIT_CEILING_DIRECTORIES, ws.root);
-      assert.equal(c.env.HOME, ws.tmpDir);
+      assert.equal(c.env.HOME, join(ws.root, "git"), "git's HOME is not the sandbox-writable tmp/");
+      assert.equal(c.env.XDG_CONFIG_HOME, join(ws.root, "git"));
       for (const flag of [
         "core.hooksPath=/dev/null", "core.symlinks=false", "core.fsmonitor=false", "credential.helper=",
         "protocol.allow=never", "protocol.https.allow=always", "submodule.recurse=false",
+        "core.attributesFile=/dev/null", "core.excludesFile=/dev/null", "core.autocrlf=false", "core.eol=lf",
       ]) {
         const i = c.args.indexOf(flag);
         assert.ok(i > 0 && c.args[i - 1] === "-c", `${flag} in ${c.args.join(" ")}`);
@@ -388,6 +391,72 @@ describe("Workspace files and staged diff", () => {
     assert.match(diff.patch, /\+\+\+ b\/tests\/cart-empty\.test\.js/);
     assert.match(diff.patch, /-  for \(let i = 0; i < cart\.items\.length; i\+\+\) \{/);
     assert.equal(diff.patch.includes("\u001b["), false, "no color");
+  });
+
+  test("attributes, ignore rules and config planted in the sandbox-writable tmp/ have no effect on git", async () => {
+    const repo = await fixture();
+    const calls: Call[] = [];
+    const ws = await prepared(repo, { calls });
+    // What a sandboxed test run could leave behind in <attempt>/tmp (its HOME and TMPDIR).
+    for (const dir of [join(ws.tmpDir, "git"), join(ws.tmpDir, ".config", "git")]) {
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, "attributes"), "*.js ident\n");
+      await writeFile(join(dir, "ignore"), "tests/*.test.js\n");
+    }
+    await writeFile(join(ws.tmpDir, ".gitattributes"), "*.js ident\n");
+    await writeFile(join(ws.tmpDir, ".gitconfig"), "[core]\n\tattributesFile = ~/.gitattributes\n");
+
+    const hidden = 'const b = "$Id:" + hidden() + "$";\n';
+    const src = (await ws.readFile("src/cart.js"))! + hidden;
+    await ws.writeFile("src/cart.js", src);
+    await ws.writeFile("tests/planted.test.js", "// new test\n");
+    const diff = await ws.stagedDiff();
+    assert.ok(diff.patch.includes('+const b = "$Id:" + hidden() + "$";'), "ident did not collapse the staged line");
+    assert.deepEqual(diff.changes.map((c) => c.path), ["src/cart.js", "tests/planted.test.js"], "the ignore rule did not hide the test");
+    assert.equal(await ws.readStaged("src/cart.js"), src);
+
+    const gitHome = join(ws.root, "git");
+    for (const c of calls) {
+      assert.equal(c.env.HOME, gitHome, `HOME of ${c.args.join(" ")}`);
+      assert.equal(c.env.XDG_CONFIG_HOME, gitHome);
+      for (const flag of ["core.attributesFile=/dev/null", "core.excludesFile=/dev/null", "core.autocrlf=false", "core.eol=lf"]) {
+        const i = c.args.indexOf(flag);
+        assert.ok(i > 0 && c.args[i - 1] === "-c", `${flag} in ${c.args.join(" ")}`);
+      }
+    }
+  });
+
+  test("with .gitattributes eol=crlf, the staged post-image is the index blob the numstat describes", async () => {
+    const repo = await fixture({ ".gitattributes": "* text eol=crlf\n" });
+    const ws = await prepared(repo);
+    const work = (await ws.readFile("src/cart.js"))!;
+    assert.ok(work.includes("\r\n"), "checkout wrote CRLF");
+    const edited = applyEdits(work, [{ search: "i < cart.items.length", replace: "i < (cart.items?.length ?? 0)" }]);
+    assert.ok(edited.ok);
+    await ws.writeFile("src/cart.js", edited.text);
+
+    const diff = await ws.stagedDiff();
+    const change = diff.changes.find((c) => c.path === "src/cart.js");
+    assert.deepEqual(change && [change.added, change.removed], [1, 1]);
+    const staged = await ws.readStaged("src/cart.js");
+    assert.equal(staged, normalizeEol(edited.text), "the index holds LF");
+    assert.equal(staged, (await gitIn(ws.repoDir, ["cat-file", "blob", ":src/cart.js"])).stdout + "\n");
+    assert.equal(countChangedLines((await ws.readAt(ws.baseHead, "src/cart.js"))!, staged!).added, 1);
+    assert.equal(await ws.readStaged("src/missing.js"), null);
+    await assert.rejects(ws.readStaged("../etc/passwd"), WorkspaceError);
+  });
+
+  test("a one-line edit to a mixed-EOL file is a one-line change in git's numstat", async () => {
+    const body = Array.from({ length: 30 }, (_, i) => `export const v${i} = ${i};${i === 7 ? "\r\n" : "\n"}`).join("");
+    const repo = await fixture({ "src/mixed.js": body });
+    const ws = await prepared(repo);
+    const before = (await ws.readFile("src/mixed.js"))!;
+    assert.equal(before, body);
+    const edited = applyEdits(before, [{ search: "export const v20 = 20;", replace: "export const v20 = 21;" }]);
+    assert.ok(edited.ok);
+    await ws.writeFile("src/mixed.js", edited.text);
+    const change = (await ws.stagedDiff()).changes.find((c) => c.path === "src/mixed.js");
+    assert.deepEqual(change && [change.added, change.removed], [1, 1]);
   });
 
   test("dispose removes the attempt directory", async () => {

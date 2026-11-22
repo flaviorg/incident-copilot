@@ -43,7 +43,7 @@ notifiers:
   - id: incidents-channel
     type: slack
     webhookUrl: "${SLACK_WEBHOOK_URL}"       # a whole ${VAR} reference; a literal URL is refused
-    events: [incident_opened, analysis_ready, run_failed, incident_resolved]   # default: all four
+    events: [incident_opened, analysis_ready, run_failed, incident_resolved]   # the default; add code_fix_ready, code_fix_pr_opened to opt in
     # allowedHosts: [hooks.slack-gov.example]   # only for a Slack deployment on another host, see below
 ```
 
@@ -51,7 +51,7 @@ notifiers:
 |---|---|
 | `webhookUrl` | Required. `${VAR}` naming a variable of at least 30 characters. The value must start with `https://hooks.slack.com/services/`, or be an `https` URL whose host is in `allowedHosts`. |
 | `allowedHosts` | Optional list of host names (no scheme, no port, at most 10). For Slack deployments that do not use `hooks.slack.com`, such as GovSlack: **check the incoming-webhook host of your workspace** (this guide did not verify it). |
-| `events` | Optional. Any of `incident_opened`, `analysis_ready`, `run_failed`, `incident_resolved`. Defaults to all four. |
+| `events` | Optional. Any of `incident_opened`, `analysis_ready`, `run_failed`, `incident_resolved`, plus the opt-in code-fixer kinds `code_fix_ready` and `code_fix_pr_opened` (see [the code fixer](../code-fixer.md)). Defaults to the first four; the code-fix kinds are sent only when listed. |
 
 Unknown keys are refused (there is no `channel` key on purpose). Check the file with `npm run cli -- config check`;
 a problem is reported by path and rule and never shows the URL.

@@ -19,10 +19,15 @@ export function summaryOfRun(r: SandboxRunResult): TestRunSummary {
   };
 }
 
-/** Green: passed, at least one test, nothing failed or cancelled. */
+/**
+ * Green: passed, at least one test, nothing failed or cancelled. The runner reports a suite that ran and exited 0
+ * without a single test as `error` (decision 7); for the baseline that is a red suite (AC-67), a permanent
+ * `baseline_not_green`, not a sandbox fault. A spawn failure (no exit code) or a report that contradicts its exit code
+ * stays `sandbox_error`.
+ */
 export function baselineFailure(r: TestRunSummary): CodeFixReason | null {
   if (r.outcome === "timeout") return "baseline_timeout";
-  if (r.outcome === "error") return "sandbox_error";
+  if (r.outcome === "error") return r.exitCode === 0 && r.total === 0 ? "baseline_not_green" : "sandbox_error";
   if (r.outcome !== "passed" || r.total <= 0 || r.failed > 0 || r.cancelled > 0) return "baseline_not_green";
   return null;
 }

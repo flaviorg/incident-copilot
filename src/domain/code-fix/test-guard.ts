@@ -5,6 +5,7 @@
 import type { CodeFixLimits } from "./limits.ts";
 import { effectiveLimits } from "./limits.ts";
 import { injectionScan } from "./injection-scan.ts";
+import { BANNED_CODE_TOKENS, codeBanHits } from "./code-ban.ts";
 import { lineCount } from "./edits.ts";
 import { isDenied, matchesAnyGlob, toSafeRelPath } from "./paths.ts";
 
@@ -34,20 +35,17 @@ const MESSAGES: Record<TestGuardCode, string> = {
 
 const ALLOWED_BUILTINS: readonly string[] = Object.freeze(["node:test", "node:assert", "node:assert/strict"]);
 
-/** Banned in model-written test code: in-process results can be forged by code that reaches these (decision 7). */
+/**
+ * Banned in model-written test code: in-process results can be forged by code that reaches these (decision 7). The
+ * shared list (also used by the patch guard) plus two tokens only a test has no use for. `codeBanHits` adds the
+ * escape, non-ASCII and computed-key rules.
+ */
 export const BANNED_TEST_TOKENS: readonly (readonly [string, RegExp])[] = Object.freeze([
-  ["process", /\bprocess\b/],
-  ["console", /\bconsole\b/],
-  ["globalThis", /\bglobalThis\b/],
-  ["getBuiltinModule", /getBuiltinModule/],
-  ["import(", /\bimport\s*\(/],
-  ["require(", /\brequire\b/],
-  ["eval", /\beval\b/],
-  ["Function", /\bFunction\b/],
-  ["Reflect", /\bReflect\b/],
+  ...BANNED_CODE_TOKENS,
   ["Proxy", /\bProxy\b/],
   ["setInterval", /\bsetInterval\b/],
 ] as const);
+const TEST_ONLY_TOKENS = BANNED_TEST_TOKENS.slice(BANNED_CODE_TOKENS.length);
 
 const SKIP_MARKERS: readonly RegExp[] = Object.freeze([
   /\.\s*(?:skip|only|todo)\b/,
@@ -114,7 +112,8 @@ export function checkTestFile(proposal: TestFileProposal, ctx: TestGuardContext)
   }
   if (!importsAnchor) found.add("test_not_importing_anchor");
 
-  for (const [token, re] of BANNED_TEST_TOKENS) if (re.test(content)) bannedHits.push(token);
+  bannedHits.push(...codeBanHits(content));
+  for (const [token, re] of TEST_ONLY_TOKENS) if (re.test(content)) bannedHits.push(token);
   if (bannedHits.length > 0) found.add("test_banned_token");
 
   if (SKIP_MARKERS.some((re) => re.test(content))) found.add("skip_marker");

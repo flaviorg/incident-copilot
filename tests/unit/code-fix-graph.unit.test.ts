@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import type { TestFailure } from "../../src/contracts/index.ts";
 import type { EligibilityInput } from "../../src/domain/code-fix/eligibility.ts";
-import { CODE_FIX_DEFAULT_LIMITS } from "../../src/domain/code-fix/limits.ts";
+import { CODE_FIX_CEILINGS, CODE_FIX_DEFAULT_LIMITS } from "../../src/domain/code-fix/limits.ts";
 import type { CodeFixLimits } from "../../src/domain/code-fix/limits.ts";
 import type { SandboxRunInput, SandboxRunner, SandboxRunResult } from "../../src/domain/code-fix/ports.ts";
 import { anchorChecks } from "../../src/infra/code-fix/git-workspace.ts";
@@ -268,7 +268,20 @@ describe("buildCodeFixGraph", () => {
       assert.match(id, /^fix_/);
       assert.equal(keys.includes(id), false);
     }
-    assert.equal(CODE_FIX_RECURSION_LIMIT, 24);
+  });
+
+  test("a run of N nodes needs recursionLimit above N, which the limit's derivation relies on", async () => {
+    // The happy path visits 12 nodes.
+    const runs = () => [baselineRun(), reproRun(), reproRun(), fixPass(), fixPass(), suitePass()];
+    await assert.rejects(run(harness({ runs: runs() }), 12), /recursion/i);
+    const r = await run(harness({ runs: runs() }), 13);
+    assertEnd(r, "patch_ready", null, "finalize");
+  });
+
+  test("the limit exceeds the longest path the ceilings allow (decision 2)", () => {
+    // Setup (4), both author loops at the maxAuthorAttempts ceiling (3 nodes each, 3 times), review, finalize, give-up.
+    const longest = 4 + 2 * 3 * CODE_FIX_CEILINGS.maxAuthorAttempts + 3;
+    assert.ok(CODE_FIX_RECURSION_LIMIT > longest, `${CODE_FIX_RECURSION_LIMIT} > ${longest}`);
   });
 
   test("a missing node is refused at build time", () => {
@@ -398,6 +411,53 @@ describe("code fixer graph end to end", () => {
     assert.equal(h.llm.calls()[2]!.matchKeys.attempt, 2);
     assert.equal(h.ws.workTreeText(ANCHOR_PATH), ANCHOR_ORIGINAL.replace(SEARCH, REPLACE));
     assertNoSourceWriteBeforeRepro(h);
+    h.llm.assertAllConsumed();
+  });
+
+  /** Both authors use every attempt the ceiling allows; the third test and the third patch are the good ones. */
+  function everyAttempt(review: unknown) {
+    const fixture = patchFixture(BASE, {
+      insertBefore: {
+        t1: [turn("t0a", 1, testOutput(), { prompt: "fix-test.v1" }), turn("t0b", 2, testOutput(), { prompt: "fix-test.v1" })],
+        p1: [turn("p0a", 1, patchOutput(), { prompt: "fix-patch.v1" }), turn("p0b", 2, patchOutput(), { prompt: "fix-patch.v1" })],
+      },
+      replace: { t1: { when: { ...repoKey, attempt: 3 } }, p1: { when: { ...repoKey, attempt: 3 } }, r1: { output: review } },
+    });
+    const wrong = () => failingRun([wrongFailure()]);
+    const notFixed = () => failingRun([rightFailure()]);
+    return harness({
+      fixture,
+      limits: { maxAuthorAttempts: CODE_FIX_CEILINGS.maxAuthorAttempts, maxLlmCalls: CODE_FIX_CEILINGS.maxLlmCalls },
+      runs: [
+        baselineRun(), wrong(), wrong(), wrong(), wrong(), reproRun(), reproRun(),
+        notFixed(), notFixed(), notFixed(), notFixed(), fixPass(), fixPass(), suitePass(),
+      ],
+    });
+  }
+  const LOOP_TEST = ["author_test", "guard_test", "repro"];
+  const LOOP_PATCH = ["author_patch", "guard_patch", "verify"];
+  const EVERY_ATTEMPT_STAGES = [
+    "eligibility", "locate", "workspace", "baseline", ...LOOP_TEST, ...LOOP_TEST, ...LOOP_TEST, ...LOOP_PATCH, ...LOOP_PATCH, ...LOOP_PATCH, "review",
+  ];
+
+  test("both authors at the attempt ceiling, the last attempt of each succeeding: patch_ready within the recursion limit", async () => {
+    const h = everyAttempt({ verdict: "approve", concerns: [] });
+    const r = await run(h);
+    assertEnd(r, "patch_ready", null, "finalize");
+    assert.deepEqual(r.stages, [...EVERY_ATTEMPT_STAGES, "finalize"]);
+    assert.equal(r.s.authorTestCalls, 3);
+    assert.equal(r.s.authorPatchCalls, 3);
+    assert.equal(r.s.llm.calls, 7);
+    assert.equal(h.sandbox.remaining, 0);
+    assertNoSourceWriteBeforeRepro(h);
+    h.llm.assertAllConsumed();
+  });
+
+  test("both authors at the attempt ceiling, then a rejecting reviewer: reviewer_rejected, not budget_exhausted", async () => {
+    const h = everyAttempt({ verdict: "reject", concerns: ["hides the error"] });
+    const r = await run(h);
+    assertEnd(r, "gave_up", "reviewer_rejected", "review");
+    assert.deepEqual(r.stages, EVERY_ATTEMPT_STAGES);
     h.llm.assertAllConsumed();
   });
 

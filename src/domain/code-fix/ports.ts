@@ -57,6 +57,11 @@ export interface Workspace {
   listFiles(globs: readonly string[]): Promise<string[]>;
   /** `git add -A` then the staged diff (no ext diff, no color, binary, find renames). */
   stagedDiff(): Promise<StagedDiff>;
+  /**
+   * The staged (index) blob of a path, after `stagedDiff`: the bytes the patch and numstat describe, which can differ
+   * from the work tree when `.gitattributes` converts on checkout or add. Null when the path has no regular-file entry.
+   */
+  readStaged(path: string): Promise<string | null>;
   dispose(): Promise<void>;
 }
 

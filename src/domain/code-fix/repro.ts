@@ -86,6 +86,11 @@ export function classifyReproduction(
   return first.every((f) => rightReason(f, exception, anchor, testPath)) ? "right_reason" : "wrong_reason";
 }
 
+function sameCounts(a: TestRunSummary, b: TestRunSummary): boolean {
+  return a.total === b.total && a.passed === b.passed && a.failed === b.failed && a.skipped === b.skipped
+    && a.todo === b.todo && a.cancelled === b.cancelled;
+}
+
 function runPassed(r: TestRunSummary): boolean {
   return r.outcome === "passed" && r.failed === 0 && r.cancelled === 0 && r.total > 0;
 }
@@ -103,6 +108,8 @@ export function verifyOutcome(
   const passedRuns = fixRuns.filter(runPassed).length;
   if (passedRuns === 0) return "fix_not_passing";
   if (passedRuns < 2 || passedRuns !== fixRuns.length) return "fix_flaky";
+  // Defense in depth against a report forged in-process: both passing runs must report the same counts.
+  if (fixRuns.some((r) => !sameCounts(r, fixRuns[0]!))) return "fix_flaky";
   if (suiteAfter === null || !runPassed(suiteAfter)) return "suite_regressed";
   if (suiteAfter.total !== baseline.total + newTests) return "test_count_dropped";
   if (suiteAfter.skipped > baseline.skipped || suiteAfter.todo > baseline.todo) return "test_count_dropped";

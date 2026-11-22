@@ -2,7 +2,8 @@
 // test twice and then the full suite, and judges the runs with `verifyOutcome`. The diff comes from the staged work
 // tree, never from model text: `checkDiff` re-runs the size, path and file-kind rules on it, any other changed path is
 // `unexpected_file`, and a patch that redaction would change is `patch_contains_secret`. The artifact is the patch plus
-// the post-image of every changed file and its SHA-256 (from the injected `sha256`: the graph cannot use node:crypto).
+// the staged post-image of every changed file and its SHA-256 (from the injected `sha256`: the graph cannot use
+// node:crypto).
 // When it fails after writing, the source files are restored, so a patch retry starts from the base head's text.
 import type { CodeFixFile, CodeFixReason, TestRunSummary } from "../../../contracts/index.ts";
 import { applyEditsToFiles } from "../../../domain/code-fix/edits.ts";
@@ -135,12 +136,13 @@ export function createFixVerifyNode(d: FixVerifyDeps): CodeFixNodeFn {
     }
     if (diff.patch.length > MAX_PATCH_CHARS) return fail("patch_too_large", { evidence: evidence() });
 
-    // 4. Post-images of every changed file, read back from the work tree.
+    // 4. Post-images of every changed file, read from the index: the exact bytes the patch and numstat describe (the
+    // work tree can differ when the repository's .gitattributes converts line endings or expands `ident`).
     const contents: { path: string; text: string }[] = [];
     for (const c of diff.changes) {
       let text: string | null;
       try {
-        text = await ws.readFile(c.path);
+        text = await ws.readStaged(c.path);
       } catch {
         return fail(timedOut("workspace_failed"), { evidence: evidence() });
       }

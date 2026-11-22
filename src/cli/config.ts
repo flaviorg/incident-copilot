@@ -3,7 +3,7 @@
 // resolved secrets join the redaction list before anything is printed.
 import { parseArgs } from "node:util";
 import { resolve } from "node:path";
-import { loadCopilotConfigFile } from "../infra/copilot-config/load.ts";
+import { draftPrProblems, loadCopilotConfigFile } from "../infra/copilot-config/load.ts";
 import { CONNECTOR_DEFINITIONS } from "../connectors/index.ts";
 import { NOTIFIER_DEFINITIONS } from "../notifiers/index.ts";
 import { createConnectorRegistry } from "../connectors/registry.ts";
@@ -31,9 +31,11 @@ export async function runConfigCommand(argv: string[], io: CliIO): Promise<numbe
   const file = parsed.values.file ?? (fromEnv ? fromEnv : DEFAULT_FILE);
 
   const r = loadCopilotConfigFile(resolve(file), { env: io.env, connectors: CONNECTOR_DEFINITIONS, notifiers: NOTIFIER_DEFINITIONS });
-  if (!r.ok) {
-    io.err(`copilot config invalid: ${r.problems.length} problem(s) in ${file}`);
-    for (const p of r.problems) io.err(`- ${p.path || "(file)"}: ${p.rule}`);
+  // The rule npm start applies (assertLiveSafe): a draft_pr code fixer needs APPROVAL_TOKEN.
+  const problems = r.ok ? draftPrProblems(io.env.APPROVAL_TOKEN, r.config) : r.problems;
+  if (!r.ok || problems.length > 0) {
+    io.err(`copilot config invalid: ${problems.length} problem(s) in ${file}`);
+    for (const p of problems) io.err(`- ${p.path || "(file)"}: ${p.rule}`);
     return 1;
   }
   const c = r.config;
@@ -59,6 +61,8 @@ export async function runConfigCommand(argv: string[], io: CliIO): Promise<numbe
     io.out(`notifiers: ${c.notifiers.length}`);
     for (const n of c.notifiers) io.out(`  - ${n.id} (${n.type}): events ${n.events.join(", ")}`);
     io.out(`services: ${c.services.length}`);
+    const fix = c.codeFix;
+    io.out(`codeFix: ${fix === null ? "none" : !fix.enabled ? "disabled" : `${fix.mode}; repositories ${fix.repositories.length}`}`);
     return 0;
   } finally {
     await registry.close();

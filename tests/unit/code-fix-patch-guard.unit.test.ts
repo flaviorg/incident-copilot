@@ -161,6 +161,9 @@ for (const line of IMPORT_CASES) {
   });
 }
 
+/** A backslash and "u", built so that no tool or editor turns an escape in this file into its character. */
+const U = "\\" + "u";
+
 const DANGEROUS_CASES = [
   'const cp = "child_process";',
   "process.exit(1);",
@@ -179,6 +182,30 @@ const DANGEROUS_CASES = [
   'const w = "node:worker_threads";',
   "Deno.exit(1);",
   "Bun.spawn([]);",
+  // Aliases and destructuring of the process object (no member access on the name itself).
+  "const P = process;",
+  "const { env, stdout } = process;",
+  "const g = global;",
+  'const p = global["pro" + "cess"];',
+  "const s = self;",
+  "const r = Reflect;",
+  "const m = getBuiltinModule;",
+  "const f = Function;",
+  "const e = eval;",
+  "const c = console;",
+  "const t = globalThis;",
+  // The escaped-identifier forgery and other escapes.
+  `return ${U}0070rocess.getBuiltinModule("fs") ? 0 : 0;`,
+  String.raw`const p = \u{70}rocess;`,
+  String.raw`const k = "\x70";`,
+  // A non-ASCII identifier character in code.
+  `const ${String.fromCharCode(0x440)}rocess = 1;`,
+  // A computed key built from strings.
+  'const F = item["constr" + "uctor"];',
+  // Bare and prefixed fs specifiers.
+  'const f = "fs";',
+  "const f = 'fs/promises';",
+  'const f = "node:fs/promises";',
 ];
 for (const line of DANGEROUS_CASES) {
   test(`checkPatch dangerous_call: ${line}`, () => {
@@ -186,6 +213,22 @@ for (const line of DANGEROUS_CASES) {
     assert.ok(codes([edit]).includes("dangerous_call"), codes([edit]).join(","));
   });
 }
+
+test("dangerous_call: non-ASCII text in an added string or comment, and a literal computed key, are fine", () => {
+  const edit = { path: "src/cart.js", search: ANCHOR_TEXT, replace: `  const unit = { eur: "${String.fromCharCode(0x20ac)}" }["eur"]; // caf${String.fromCharCode(0xe9)}\n  return (item.price?.amount ?? 0) * item.qty;` };
+  assert.deepEqual(codes([edit]), []);
+});
+
+test("the test guard and the patch guard ban the same identifier list", async () => {
+  const { BANNED_CODE_TOKENS } = await import("../../src/domain/code-fix/code-ban.ts");
+  const { BANNED_TEST_TOKENS } = await import("../../src/domain/code-fix/test-guard.ts");
+  for (const [token, re] of BANNED_CODE_TOKENS) {
+    assert.ok(BANNED_TEST_TOKENS.some(([t, r]) => t === token && r === re), `${token} in the test guard`);
+    const sample = token.endsWith("(") ? `${token}"x")` : token;
+    const edit = { path: "src/cart.js", search: ANCHOR_TEXT, replace: `  const z = ${sample};\n${ANCHOR_TEXT}` };
+    assert.ok(codes([edit]).includes("dangerous_call"), `${token} in the patch guard`);
+  }
+});
 
 test("dangerous_call: only added lines count, an existing call kept as is does not", () => {
   const original = cartSource().replace("const l31 = 31;", "console.log(l31);");

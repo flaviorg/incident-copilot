@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import type { TestFailure } from "../../src/contracts/index.ts";
 import { classifyAction } from "../../src/domain/autonomy/catalog.ts";
+import { normalizeEol } from "../../src/domain/code-fix/edits.ts";
 import type { CodeHostWriter } from "../../src/domain/code-fix/ports.ts";
 import { CODE_FIX_DEFAULT_LIMITS } from "../../src/domain/code-fix/limits.ts";
 import { canonicalPatchPayload } from "../../src/domain/code-fix/patch-payload.ts";
@@ -18,6 +19,7 @@ import { fixPatchPrompt, fixReviewPrompt, fixTestPrompt } from "../../src/prompt
 import { createFixAuthorPatchNode } from "../../src/graph/code-fix/nodes/fix-author-patch-node.ts";
 import type { FixAuthorPatchDeps } from "../../src/graph/code-fix/nodes/fix-author-patch-node.ts";
 import { createFixAuthorTestNode } from "../../src/graph/code-fix/nodes/fix-author-test-node.ts";
+import { baselineFailure, createFixBaselineNode } from "../../src/graph/code-fix/nodes/fix-baseline-node.ts";
 import type { FixAuthorTestDeps } from "../../src/graph/code-fix/nodes/fix-author-test-node.ts";
 import { createFixFinalizeNode } from "../../src/graph/code-fix/nodes/fix-finalize-node.ts";
 import type { FixFinalizeDeps } from "../../src/graph/code-fix/nodes/fix-finalize-node.ts";
@@ -32,10 +34,11 @@ import type { FixReviewDeps } from "../../src/graph/code-fix/nodes/fix-review-no
 import { createFixVerifyNode } from "../../src/graph/code-fix/nodes/fix-verify-node.ts";
 import type { FixVerifyDeps } from "../../src/graph/code-fix/nodes/fix-verify-node.ts";
 import { afterAuthorTest, afterGuardPatch, afterGuardTest, afterRepro, afterReview, afterVerify } from "../../src/graph/code-fix/routing.ts";
+import { createCodeFixSession } from "../../src/graph/code-fix/state.ts";
 import type { CodeFixSession, CodeFixState, FixConventions } from "../../src/graph/code-fix/state.ts";
 import {
   ANCHOR_LINE, ANCHOR_PATH, failingRun, FakeSandboxRunner, FakeWorkspace, frame, locatedState, runSummary, SAMPLE_REPO,
-  sampleRepoTree, SHA_HEAD, SHA_RELEASE, summaryOf,
+  sampleRepoTree, sampleWorkspace, SHA_HEAD, SHA_RELEASE, summaryOf,
 } from "../helpers/code-fix-fakes.ts";
 
 const limits = { ...CODE_FIX_DEFAULT_LIMITS };
@@ -131,6 +134,31 @@ const fakeLlm = (...turns: FixtureTurn[]) => new FakeLlmProvider({ fixtures: [fi
 const repoKey = { repo: SAMPLE_REPO.repo };
 
 // =====================================================================================================================
+
+// ---------- baseline: zero tests (AC-67) ----------
+
+describe("fix_baseline with zero tests (AC-67)", () => {
+  // The real runner never reports `passed` with zero tests: a suite that ran and exited 0 without a single test is
+  // `error`, total 0, exit 0 (tests/e2e/code-fix-sandbox.e2e.test.ts). That is a red baseline, not a broken sandbox.
+  const zeroTests = () => runSummary({ outcome: "error", exitCode: 0, total: 0, passed: 0 });
+
+  test("a suite that ran and exited 0 with no test gives up with baseline_not_green", async () => {
+    assert.equal(baselineFailure(summaryOf(zeroTests())), "baseline_not_green");
+    const session = createCodeFixSession();
+    session.workspace = sampleWorkspace();
+    session.sandbox = new FakeSandboxRunner([zeroTests()]);
+    const s = locatedState({ stage: "workspace", baseCommitSha: SHA_HEAD });
+    const u = await createFixBaselineNode({ session, limits })(s);
+    assert.equal(u.failure, "baseline_not_green");
+    assert.equal(u.evidence?.baseline?.total, 0);
+  });
+
+  test("a spawn failure (no exit code) or a report that contradicts its exit code stays sandbox_error", () => {
+    assert.equal(baselineFailure(summaryOf(runSummary({ outcome: "error", exitCode: null, total: 0, passed: 0 }))), "sandbox_error");
+    assert.equal(baselineFailure(summaryOf(runSummary({ outcome: "error", exitCode: 1, total: 0, passed: 0 }))), "sandbox_error");
+    assert.equal(baselineFailure(summaryOf(runSummary({ outcome: "error", exitCode: 0, total: 2, passed: 1, failed: 1 }))), "sandbox_error");
+  });
+});
 
 describe("fix_author_test", () => {
   test("an LLM failure gives author_unavailable and still counts the call (AC-81)", async () => {
@@ -437,6 +465,32 @@ describe("fix_verify", () => {
     assert.equal(contents.get(TEST_PATH), TEST_CONTENT);
     assert.equal(contents.get(ANCHOR_PATH), after);
     assert.equal(afterVerify(apply(s, u), limits), "fix_review");
+  });
+
+  test("the stored post-images are the staged index blobs, not the work-tree bytes (eol=crlf checkout)", async () => {
+    /** Like git with `* text eol=crlf`: the work tree holds CRLF, the index (and so the diff) holds LF. */
+    class CrlfCheckout extends FakeWorkspace {
+      override async readFile(path: string): Promise<string | null> {
+        const t = await super.readFile(path);
+        return t === null ? null : normalizeEol(t).replace(/\n/g, "\r\n");
+      }
+      override async readStaged(path: string): Promise<string | null> {
+        const t = this.workTreeText(path);
+        return t === null ? null : normalizeEol(t);
+      }
+    }
+    const ws = new CrlfCheckout({ commits: { [SHA_RELEASE]: sampleRepoTree(), [SHA_HEAD]: sampleRepoTree() } });
+    await ws.writeFile(TEST_PATH, TEST_CONTENT.replace(/\n/g, "\r\n"));
+    const { u } = await verify({ ws });
+    assert.equal(u.failure, null);
+    const after = ANCHOR_ORIGINAL.replace(SEARCH, REPLACE);
+    assert.equal(ws.workTreeText(ANCHOR_PATH), after.replace(/\n/g, "\r\n"), "the work tree is CRLF");
+    const contents = new Map(u.contents!.map((c) => [c.path, c.text]));
+    assert.equal(contents.get(ANCHOR_PATH), after);
+    assert.equal(contents.get(TEST_PATH), TEST_CONTENT);
+    const byPath = new Map(u.files!.map((f) => [f.path, f]));
+    assert.equal(byPath.get(ANCHOR_PATH)?.afterSha256, sha256(after));
+    assert.equal(byPath.get(TEST_PATH)?.afterSha256, sha256(TEST_CONTENT));
   });
 
   test("the fix passing once is fix_flaky, not retried, and the source is restored", async () => {

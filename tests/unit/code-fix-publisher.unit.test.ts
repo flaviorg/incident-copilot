@@ -42,6 +42,14 @@ type FakeGitHubOptions = {
   foreignRef?: boolean;
   /** The first POST /pulls fails at the transport. */
   failPullsOnce?: boolean;
+  /** The first POST /pulls creates the pull request, then its response is lost at the transport. */
+  losePullsResponseOnce?: boolean;
+  /** The first N POST /pulls answer 503 and create nothing. */
+  pullsFailures?: number;
+  /** Every POST /pulls answers this status and creates nothing. */
+  pullsStatus?: number;
+  /** The next GET /branches/main calls answer these, in order, before the normal answer. */
+  branchFails?: { status: number; headers?: Record<string, string> }[];
   onRequest?: (c: GhCall) => void;
 };
 
@@ -59,6 +67,9 @@ function fakeGitHub(o: FakeGitHubOptions = {}) {
   }
   if (o.existingPull) pulls.push({ number: 3, html_url: "https://github.com/acme/checkout-web/pull/3", draft: true, head: { ref: BRANCH, sha: OTHER_COMMIT } });
   let pullsFailed = false;
+  let pullsLost = false;
+  let pullsFailuresLeft = o.pullsFailures ?? 0;
+  const branchFails = [...(o.branchFails ?? [])];
   const h = (s: string) => createHash("sha1").update(s).digest("hex");
   const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
@@ -74,6 +85,8 @@ function fakeGitHub(o: FakeGitHubOptions = {}) {
     const p = url.pathname.slice(REPO_PATH.length);
     const body = raw === null ? null : (JSON.parse(raw) as Record<string, unknown>);
     if (method === "GET" && p === "/branches/main") {
+      const fail = branchFails.shift();
+      if (fail) return new Response(JSON.stringify({ message: "failed" }), { status: fail.status, headers: { "content-type": "application/json", ...fail.headers } });
       if (o.branchStatus) return json(o.branchStatus, { message: "unavailable" });
       return json(200, { name: "main", protected: o.protected ?? true, commit: { sha: SHA_HEAD } });
     }
@@ -113,9 +126,19 @@ function fakeGitHub(o: FakeGitHubOptions = {}) {
         pullsFailed = true;
         throw new TypeError("fetch failed");
       }
+      if (o.pullsStatus) return json(o.pullsStatus, { message: "refused" });
+      if (pullsFailuresLeft > 0) {
+        pullsFailuresLeft -= 1;
+        return json(503, { message: "unavailable" });
+      }
       const head = String(body!.head);
+      if (pulls.some((x) => x.head.ref === head)) return json(422, { message: "A pull request already exists" });
       const pr = { number: 7, html_url: PR_URL, draft: body!.draft === true, head: { ref: head, sha: refs.get(head)! } };
       pulls.push(pr);
+      if (o.losePullsResponseOnce && !pullsLost) {
+        pullsLost = true;
+        throw new TypeError("fetch failed");
+      }
       return json(201, pr);
     }
     throw new Error(`unexpected request: ${method} ${url.href}`);
@@ -137,7 +160,11 @@ function artifact(o: { exceptionType?: string } = {}) {
   return { contents, files, patch, patchSha256: sha256Hex(canonicalPatchPayload(patch, files)), exceptionType: o.exceptionType ?? "TypeError" };
 }
 
-type Harness = { c: TestContainer; fixes: SqliteCodeFixStore; publisher: CodeFixPublisher; gh: ReturnType<typeof fakeGitHub>; attempt: CodeFixAttempt; approval: Approval };
+type Harness = {
+  c: TestContainer; fixes: SqliteCodeFixStore; publisher: CodeFixPublisher; gh: ReturnType<typeof fakeGitHub>; attempt: CodeFixAttempt; approval: Approval;
+  /** Every backoff delay the publisher asked for, in ms (the injected sleep returns at once). */
+  sleeps: number[];
+};
 
 function harness(o: FakeGitHubOptions & {
   status?: CodeFixAttempt["status"];
@@ -175,12 +202,16 @@ function harness(o: FakeGitHubOptions & {
   const cfg = { apiUrl: API, token: TOKEN, repositories: [SAMPLE_REPO.repo] };
   const reader = createGitHubReader(cfg, { fetch: gh.fetch, logger: c.logger });
   const realWriter = createGitHubWriter(cfg, { fetch: gh.fetch, logger: c.logger });
+  const sleeps: number[] = [];
   const publisher = new CodeFixPublisher({
     store: c.store, fixes, config: { repositories: [{ ...SAMPLE_REPO }], commitAuthor: { name: "incident-copilot", email: "incident-copilot@example.invalid" } },
     reader, writer: o.writer ? o.writer(realWriter) : realWriter, clock: c.clock, logger: c.logger, secrets: [TOKEN, SECRET], publicUrl: PUBLIC_URL,
     ...(o.classify ? { classify: o.classify } : {}),
+    sleep: async (ms: number) => {
+      sleeps.push(ms);
+    },
   });
-  return { c, fixes, publisher, gh, attempt: fixes.getAttempt(ATTEMPT_ID)!, approval };
+  return { c, fixes, publisher, gh, attempt: fixes.getAttempt(ATTEMPT_ID)!, approval, sleeps };
 }
 
 const seq = (calls: readonly GhCall[]) => calls.map((x) => `${x.method} ${x.path.replace(REPO_PATH, "")}`);
@@ -384,11 +415,82 @@ describe("CodeFixPublisher.publish (AC-77)", () => {
     assertFailed(h, "ref_conflict", { kind: "conflict", keyHeld: true });
   });
 
-  test("a code-host error gives publish_failed/codehost_error with its kind and releases the key", async () => {
+  test("a transient code-host error before any write is retried with backoff, then gives codehost_error and releases the key", async () => {
     const h = harness({ branchStatus: 503 });
     await h.publisher.publish(ATTEMPT_ID);
+    assert.deepEqual(seq(h.gh.calls), ["GET /branches/main", "GET /branches/main", "GET /branches/main"], "a bounded retry");
+    assert.deepEqual(h.sleeps, [1000, 2000], "exponential backoff");
     assertFailed(h, "codehost_error", { kind: "unavailable", keyHeld: false });
     assertNoTokenAnywhere(h);
+  });
+
+  test("a transient code-host error before any write that clears on a retry opens the pull request", async () => {
+    const h = harness({ branchFails: [{ status: 502 }] });
+    await h.publisher.publish(ATTEMPT_ID);
+    assert.equal(h.fixes.getAttempt(ATTEMPT_ID)!.status, "pr_opened");
+    assert.deepEqual(h.sleeps, [1000]);
+    assert.deepEqual(publishAudits(h).map((e) => e.event), ["code_fix_pr_opened"]);
+  });
+
+  test("a rate limit waits for its retry-after before the retry", async () => {
+    const h = harness({ branchFails: [{ status: 429, headers: { "retry-after": "7" } }] });
+    await h.publisher.publish(ATTEMPT_ID);
+    assert.equal(h.fixes.getAttempt(ATTEMPT_ID)!.status, "pr_opened");
+    assert.deepEqual(h.sleeps, [7000]);
+  });
+
+  test("a lost POST /pulls response (the PR was created) is retried in process: findPullByHead records it, no second PR (AC-82)", async () => {
+    const h = harness({ losePullsResponseOnce: true });
+    await h.publisher.publish(ATTEMPT_ID);
+    const a = h.fixes.getAttempt(ATTEMPT_ID)!;
+    assert.equal(a.status, "pr_opened");
+    assert.deepEqual(a.pullRequest, { number: 7, url: PR_URL, branch: BRANCH });
+    assert.ok(a.commit);
+    assert.equal(h.gh.pulls.length, 1, "one pull request for the error group");
+    assert.equal(posts(h.gh.calls).filter((x) => x.path.endsWith("/pulls")).length, 1, "the retry never posts the pull request again");
+    const afterLost = seq(h.gh.calls).slice(seq(h.gh.calls).indexOf("POST /pulls") + 1);
+    assert.ok(afterLost.includes("GET /pulls"), "the retry looks the pull request up by head first");
+    assert.deepEqual(h.sleeps, [1000]);
+    assert.equal(h.fixes.holdsKey(a.repo, a.errorGroupId), true);
+    assert.deepEqual(publishAudits(h).map((e) => e.event), ["code_fix_pr_opened"]);
+    assertNoTokenAnywhere(h);
+  });
+
+  test("transient errors after the commit that outlast the retries leave the attempt publishing with the key held; a later publish opens one PR", async () => {
+    const h = harness({ pullsFailures: 3 });
+    await h.publisher.publish(ATTEMPT_ID);
+    const mid = h.fixes.getAttempt(ATTEMPT_ID)!;
+    assert.equal(mid.status, "publishing", "the attempt is not ended: recover() retries it");
+    assert.equal(mid.reason, null);
+    assert.equal(mid.finishedAt, null);
+    assert.ok(mid.commit);
+    assert.equal(h.fixes.holdsKey(mid.repo, mid.errorGroupId), true, "the key is not released while a branch or PR may exist");
+    assert.deepEqual(h.sleeps, [1000, 2000]);
+    assert.equal(posts(h.gh.calls).filter((x) => x.path.endsWith("/pulls")).length, 3);
+    assert.equal(publishAudits(h).length, 0);
+
+    await h.publisher.publish(ATTEMPT_ID);
+    const a = h.fixes.getAttempt(ATTEMPT_ID)!;
+    assert.equal(a.status, "pr_opened");
+    assert.deepEqual(a.commit, mid.commit);
+    assert.equal(h.gh.pulls.length, 1);
+    assert.deepEqual(publishAudits(h).map((e) => e.event), ["code_fix_pr_opened"]);
+  });
+
+  test("a definitive 4xx after the commit ends the attempt with no retry and keeps the key (a branch exists)", async () => {
+    const h = harness({ pullsStatus: 401 });
+    await h.publisher.publish(ATTEMPT_ID);
+    assert.deepEqual(h.sleeps, []);
+    assert.equal(posts(h.gh.calls).filter((x) => x.path.endsWith("/pulls")).length, 1);
+    assertFailed(h, "codehost_error", { kind: "auth", keyHeld: true });
+  });
+
+  test("a definitive 4xx before any write ends the attempt with no retry and releases the key", async () => {
+    const h = harness({ branchStatus: 401 });
+    await h.publisher.publish(ATTEMPT_ID);
+    assert.deepEqual(h.sleeps, []);
+    assert.deepEqual(seq(h.gh.calls), ["GET /branches/main"]);
+    assertFailed(h, "codehost_error", { kind: "auth", keyHeld: false });
   });
 
   test("an attempt that is not approved or publishing is left alone", async () => {

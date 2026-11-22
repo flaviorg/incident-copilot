@@ -60,6 +60,32 @@ test("applyEdits: the trailing newline state of the original is kept", () => {
   assert.deepEqual(applyEdits("a\r\nb\r\n", [{ search: "b\n", replace: "B" }]), { ok: true, text: "a\r\nB\r\n" });
 });
 
+test("applyEdits: a mixed-EOL file keeps each line's ending, so only the edited lines change", () => {
+  const original = Array.from({ length: 20 }, (_, i) => `line ${i}${i === 5 ? "\r\n" : "\n"}`).join("");
+  // An LF line: nothing else in the file changes, the CRLF line included.
+  const lf = applyEdits(original, [{ search: "line 10\n", replace: "LINE 10\n" }]);
+  assert.deepEqual(lf, { ok: true, text: original.replace("line 10\n", "LINE 10\n") });
+  assert.ok(lf.ok && lf.text.split("\r\n").length === 2, "still exactly one CRLF");
+  // A match across the CRLF line keeps its CRLF.
+  assert.deepEqual(applyEdits(original, [{ search: "line 5\nline 6", replace: "LINE 5\nLINE 6" }]), {
+    ok: true, text: original.replace("line 5\r\nline 6", "LINE 5\r\nLINE 6"),
+  });
+  // Inserted lines take the ending of the matched line.
+  assert.deepEqual(applyEdits(original, [{ search: "line 5\n", replace: "line 5\nextra\n" }]), {
+    ok: true, text: original.replace("line 5\r\n", "line 5\r\nextra\r\n"),
+  });
+  assert.deepEqual(applyEdits(original, [{ search: "line 9", replace: "line 9\nextra" }]), {
+    ok: true, text: original.replace("line 9\n", "line 9\nextra\n"),
+  });
+  // Edits in order, each on the previous result, with the endings still kept.
+  assert.deepEqual(applyEdits(original, [{ search: "line 4", replace: "L4" }, { search: "L4\nline 5", replace: "L4\nL5" }]), {
+    ok: true, text: original.replace("line 4\nline 5\r\n", "L4\nL5\r\n"),
+  });
+  // A whole-CRLF file and a whole-LF file still use their own ending for new lines.
+  assert.deepEqual(applyEdits("a\r\nb\r\n", [{ search: "b", replace: "b\nc" }]), { ok: true, text: "a\r\nb\r\nc\r\n" });
+  assert.deepEqual(applyEdits("a\r\nb", [{ search: "b", replace: "b\nc\n" }]), { ok: true, text: "a\r\nb\r\nc" });
+});
+
 test("applyEditsToFiles: groups edits by path and reports a missing file as edit_not_applicable", () => {
   const ok = applyEditsToFiles({ "src/a.js": "x = 1;\n", "src/b.js": "y = 2;\n" }, [
     { path: "src/a.js", search: "x = 1", replace: "x = 10" },

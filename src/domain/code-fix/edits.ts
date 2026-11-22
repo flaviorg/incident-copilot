@@ -35,26 +35,53 @@ export function findOccurrences(text: string, search: string, limit = Number.POS
   return out;
 }
 
+/** Original offset of every offset of `normalizeEol(text)` (one more entry than its length). */
+function normalizedOffsets(text: string): number[] {
+  const map: number[] = [];
+  for (let i = 0; i < text.length; i++) {
+    map.push(i);
+    if (text[i] === "\r" && text[i + 1] === "\n") i++; // the pair is one "\n", mapped to its "\r"
+  }
+  map.push(text.length);
+  return map;
+}
+
+/** The line ending of the line that holds offset `at` (the next one), else the previous one, else `fallback`. */
+function eolNear(text: string, at: number, fallback: string): string {
+  const next = text.indexOf("\n", at);
+  if (next >= 0) return next > 0 && text[next - 1] === "\r" ? "\r\n" : "\n";
+  const prev = text.lastIndexOf("\n", at - 1);
+  if (prev >= 0) return prev > 0 && text[prev - 1] === "\r" ? "\r\n" : "\n";
+  return fallback;
+}
+
 /**
- * Applies edits in order, each on the result of the previous one. Matching ignores CRLF versus LF; the result keeps
- * the original's line endings (CRLF when the original has any) and its trailing-newline state. An empty search, or one
- * that matches zero or several times, gives `edit_not_applicable` with the edit index and the match count.
+ * Applies edits in order, each on the result of the previous one. Matching ignores CRLF versus LF, and every line
+ * keeps its own ending: the k-th newline of a replacement takes the k-th ending of the text it replaces, and extra
+ * newlines take the last of those (or the ending of the line around the match), so a mixed-EOL file changes only on
+ * the edited lines. The trailing-newline state is kept. An empty search, or one that matches zero or several times,
+ * gives `edit_not_applicable` with the edit index and the match count.
  */
 export function applyEdits(original: string, edits: readonly SearchReplace[]): ApplyEditsResult {
-  const crlf = original.includes("\r\n");
   const endsWithNewline = original.endsWith("\n");
-  let text = normalizeEol(original);
+  const fileEol = original.includes("\r\n") && !/(^|[^\r])\n/.test(original) ? "\r\n" : "\n";
+  let text = original;
   for (let index = 0; index < edits.length; index++) {
     const search = normalizeEol(edits[index]!.search);
     const replace = normalizeEol(edits[index]!.replace);
-    const hits = findOccurrences(text, search);
+    const hits = findOccurrences(normalizeEol(text), search);
     if (hits.length !== 1) return { ok: false, reason: "edit_not_applicable", index, matches: hits.length };
-    const at = hits[0]!;
-    text = text.slice(0, at) + replace + text.slice(at + search.length);
+    const map = normalizedOffsets(text);
+    const start = map[hits[0]!]!;
+    const end = map[hits[0]! + search.length]!;
+    const endings = text.slice(start, end).match(/\r?\n/g) ?? [];
+    const near = endings.length > 0 ? endings[endings.length - 1]! : eolNear(text, end, fileEol);
+    let k = 0;
+    const rewritten = replace.replace(/\n/g, () => endings[k++] ?? near);
+    text = text.slice(0, start) + rewritten + text.slice(end);
   }
-  if (endsWithNewline && !text.endsWith("\n")) text += "\n";
-  if (!endsWithNewline) text = text.replace(/\n+$/, "");
-  if (crlf) text = text.replace(/\n/g, "\r\n");
+  if (endsWithNewline && !text.endsWith("\n")) text += original.endsWith("\r\n") ? "\r\n" : "\n";
+  if (!endsWithNewline) text = text.replace(/(\r?\n)+$/, "");
   return { ok: true, text };
 }
 

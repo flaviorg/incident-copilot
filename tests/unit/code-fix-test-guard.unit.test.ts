@@ -144,6 +144,52 @@ test("test_banned_token: each token is reported", () => {
   }
 });
 
+/** A backslash and "u", built so that no tool or editor turns an escape in this file into its character. */
+const U = "\\" + "u";
+
+function bannedMessage(lines: string[]): string | undefined {
+  const r = checkTestFile({ path: PATH, content: body(['  assert.equal(cartTotal([{ qty: 1 }]), 0);', ...lines]) }, ctx);
+  return r.violations.find((x) => x.code === "test_banned_token")?.message;
+}
+
+test("test_banned_token: the escaped-identifier forgery is rejected (\\u and \\x escapes)", () => {
+  // The reviewer's forgery: an escaped `process` alias that rewrites the reporter's stdout and the exit code.
+  const forgery = [
+    `  const P = ${U}0070rocess;`,
+    "  const w = P.stdout.write.bind(P.stdout);",
+    `  P.stdout.write = (s) => w(String(s).replace(/"status":"failed"/g, '"status":"passed"'));`,
+    '  P.on("exit", () => { P.exitCode = 0; });',
+  ];
+  const m = bannedMessage(forgery);
+  assert.ok(m, "the forgery is rejected");
+  assert.ok(m.includes(`${U} escape`), m);
+  for (const line of [`  const f = getBuilt${U}0069nModule;`, String.raw`  const p = \u{70}rocess;`, String.raw`  const s = "\x70";`]) {
+    assert.ok(bannedMessage([line]), line);
+  }
+});
+
+test("test_banned_token: global, self and aliases through them are rejected", () => {
+  for (const line of ["  const P = global;", '  const p = global["pro" + "cess"];', "  const g = self;", "  const c = getBuiltinModule;"]) {
+    assert.ok(bannedMessage([line]), line);
+  }
+});
+
+test("test_banned_token: a computed member key built from strings is rejected", () => {
+  for (const line of ['  const F = cartTotal["constr" + "uctor"];', "  const F = cartTotal[`constr${1}`];"]) {
+    assert.ok(bannedMessage([line]), line);
+  }
+  assert.equal(bannedMessage(['  const row = { a: 1 }["a"];', "  const first = [1, 2][0];"]), undefined, "a literal key is fine");
+});
+
+test("test_banned_token: a non-ASCII character in code is rejected, in a string or comment it is not", () => {
+  // U+0440 (Cyrillic er) looks like "p".
+  const E_ACUTE = String.fromCharCode(0xe9);
+  const EURO = String.fromCharCode(0x20ac);
+  const m = bannedMessage([`  const ${String.fromCharCode(0x440)}rocess = 1;`]);
+  assert.ok(m?.includes("non-ASCII"), m);
+  assert.equal(bannedMessage([`  // caf${E_ACUTE} total`, `  assert.equal(String(cartTotal([])) + "${EURO}", "0${EURO}");`, `  const t = \`${E_ACUTE}\${1}\`;`]), undefined);
+});
+
 test("skip_marker: each form is reported", () => {
   const forms = [
     'test.skip("x", () => { assert.ok(cartTotal([]) === 0); });',

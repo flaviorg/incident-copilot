@@ -213,20 +213,28 @@ export function loadCopilotConfigFile(path: string, o: Omit<CopilotConfigOptions
 }
 
 /**
+ * Spec 009, decision 19: a draft_pr code fixer needs APPROVAL_TOKEN and the GitHub token. Shared by `npm start`
+ * (assertLiveSafe) and `config check`, so both refuse the same config.
+ */
+export function draftPrProblems(approvalToken: string | null | undefined, copilot: CopilotConfig): ConfigProblem[] {
+  const fix = copilot.codeFix;
+  if (!fix || !fix.enabled || fix.mode !== "draft_pr") return [];
+  const problems: ConfigProblem[] = [];
+  if (approvalToken === null || approvalToken === undefined || approvalToken === "") {
+    problems.push({ path: "codeFix.mode", rule: "draft_pr requires APPROVAL_TOKEN; a human approves every pull request" });
+  }
+  if (fix.github.token === null) problems.push({ path: "codeFix.github.token", rule: "required when mode is draft_pr" });
+  return problems;
+}
+
+/**
  * npm start only. AC-55: the fake provider replays scripts, so it must never answer a real alert. Spec 009, decision 19:
  * a draft_pr code fixer needs APPROVAL_TOKEN (a human approves every pull request) and the GitHub token, with any provider.
  */
 export function assertLiveSafe(config: Pick<Config, "llmProvider" | "approvalToken">, copilot: CopilotConfig | null): void {
   if (copilot === null) return;
-  const fix = copilot.codeFix;
-  if (fix && fix.enabled && fix.mode === "draft_pr") {
-    const problems: { path: string; rule: string }[] = [];
-    if (config.approvalToken === null || config.approvalToken === "") {
-      problems.push({ path: "codeFix.mode", rule: "draft_pr requires APPROVAL_TOKEN; a human approves every pull request" });
-    }
-    if (fix.github.token === null) problems.push({ path: "codeFix.github.token", rule: "required when mode is draft_pr" });
-    if (problems.length > 0) throw new CopilotConfigError(problems);
-  }
+  const problems = draftPrProblems(config.approvalToken, copilot);
+  if (problems.length > 0) throw new CopilotConfigError(problems);
   if (config.llmProvider !== "fake") return;
   // The entry decides, not its definition: a Sentry entry with only `query` receives nothing and is safe with the fake.
   const hasIngest = (c: CopilotConfig["connectors"][number]) => isRecord(c.config) && c.config.ingest !== undefined && c.config.ingest !== null;

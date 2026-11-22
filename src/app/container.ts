@@ -71,12 +71,14 @@ import { createVerifierNode } from "../graph/nodes/verifier-node.ts";
 import { CircuitBreaker } from "../domain/guards/circuit-breaker.ts";
 import { ActionRateLimiter } from "../domain/guards/action-rate-limiter.ts";
 import type { GatePersist } from "../graph/nodes/gate-node.ts";
+import { tmpdir } from "node:os";
 import { resolve as resolvePath } from "node:path";
 import { SqliteCodeFixStore } from "../infra/db/code-fix-store.ts";
 import { effectiveLimits } from "../domain/code-fix/limits.ts";
 import type { CodeHostReader, GitWorkspacePort, SandboxRunner, Workspace } from "../domain/code-fix/ports.ts";
 import type { CodeFixGraphNodes } from "../graph/code-fix/graph.ts";
 import { GitCliWorkspace } from "../infra/code-fix/git-workspace.ts";
+import { sweepStaleWorkspaces } from "../infra/code-fix/workspace-sweep.ts";
 import { ProcessSandboxRunner } from "../infra/code-fix/process-sandbox.ts";
 import { runSandboxSelfTest } from "../infra/code-fix/sandbox-self-test.ts";
 import { createGitHubReader, createGitHubWriter } from "../codehost/github/client.ts";
@@ -170,6 +172,11 @@ export type CodeFixPorts = {
   reader?: CodeHostReader;
   selfTest?: () => Promise<SandboxSelfTestOutcome>;
   publish?: (attemptId: string) => Promise<void>;
+  /**
+   * Test only: the parent of the attempt directories that start() sweeps. Default: os.tmpdir() with the default
+   * workspace, nothing when `workspace` is overridden (its directories are not the container's to remove).
+   */
+  workspaceRoot?: string;
 };
 
 /** Settings used when there is no copilot config: no connector, so every /ingest call is 404. */
@@ -356,6 +363,10 @@ function buildCodeFix(x: {
   const fixes = new SqliteCodeFixStore(x.store);
   const logger = x.logger.child({ component: "code_fixer" });
   const git = ports.workspace ?? new GitCliWorkspace({ secrets });
+  // Attempt directories of a previous process (crash, kill) are removed on start; ours are all created after now.
+  const workspaceRoot = ports.workspaceRoot ?? (ports.workspace ? undefined : tmpdir());
+  const createdBefore = Date.now();
+  const sweepWorkspaces = workspaceRoot === undefined ? undefined : () => sweepStaleWorkspaces({ root: workspaceRoot, createdBefore });
   const sandboxFor = ports.sandbox ?? ((ws: Workspace) => new ProcessSandboxRunner({ attemptDir: ws.root, network, maxOutputBytes: limits.maxOutputBytes, secrets }));
   const reader = ports.reader ?? createGitHubReader(
     { apiUrl: cfg.github.apiUrl, token: cfg.github.token, repositories: cfg.repositories.map((r) => r.repo) },
@@ -399,6 +410,7 @@ function buildCodeFix(x: {
     },
     nodesFor: (ctx) => ({ ...createCodeFixNodes(nodeDeps, ctx), ...o.codeFixNodes }),
     selfTest,
+    ...(sweepWorkspaces ? { sweepWorkspaces } : {}),
     ...(publish ? { publish } : {}),
     // Opt-in notifications (AC-83): the attempt as stored, read only; the service sends nothing when no notifier lists the kind.
     notify: (kind, attemptId) => {

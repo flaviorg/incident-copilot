@@ -308,6 +308,7 @@ export function spyWorkspace(inner: GitWorkspacePort): { port: GitWorkspacePort;
         },
         listFiles: (globs) => ws.listFiles(globs),
         stagedDiff: () => ws.stagedDiff(),
+        readStaged: (path) => ws.readStaged(path),
         async dispose() {
           rec.anchorAtDispose = await ws.readFile(ANCHOR_FILE);
           rec.testAtDispose = await ws.readFile(NEW_TEST);

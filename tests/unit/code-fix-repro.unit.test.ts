@@ -158,6 +158,12 @@ test("verifyOutcome: fix_flaky when only one fix run passes", () => {
   assert.equal(verifyOutcome(BASELINE, [passing()], passing({ total: 11 }), 1), "fix_flaky");
 });
 
+test("verifyOutcome: fix_flaky when the two passing fix runs report different results", () => {
+  // Defense in depth against an in-process forgery that rewrites the report differently per run.
+  assert.equal(verifyOutcome(BASELINE, [passing(), passing({ total: 2, passed: 2 })], passing({ total: 11, passed: 11 }), 1), "fix_flaky");
+  assert.equal(verifyOutcome(BASELINE, [passing(), passing({ total: 2, passed: 1, skipped: 1 })], passing({ total: 11, passed: 11 }), 1), "fix_flaky");
+});
+
 test("verifyOutcome: a timeout or error fix run does not pass", () => {
   assert.equal(verifyOutcome(BASELINE, [passing({ outcome: "timeout" }), passing({ outcome: "error" })], passing({ total: 11 }), 1), "fix_not_passing");
 });

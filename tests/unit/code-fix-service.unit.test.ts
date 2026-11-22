@@ -3,7 +3,7 @@
 // tests/helpers/code-fix-fakes.ts and the strict fake LLM; no git, no child process, no network.
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as z from "zod";
@@ -165,6 +165,8 @@ function setup(o: {
   query?: () => FakeConnectorQuery;
   nodes?: Partial<CodeFixGraphNodes>;
   dbPath?: string;
+  workspaceRoot?: string;
+  onSelfTest?: () => void;
 } = {}): Setup {
   const workspaces = new FreshWorkspaces(o.workspaceError ?? null);
   const reader = new FakeCodeHostReader();
@@ -184,8 +186,12 @@ function setup(o: {
         sandboxes.push(s);
         return s;
       },
-      selfTest: async () => ({ ok: o.selfTestOk ?? true }),
+      selfTest: async () => {
+        o.onSelfTest?.();
+        return { ok: o.selfTestOk ?? true };
+      },
       publish: async (id: string) => void published.push(id),
+      ...(o.workspaceRoot ? { workspaceRoot: o.workspaceRoot } : {}),
     },
     ...(o.nodes ? { codeFixNodes: o.nodes } : {}),
   });
@@ -604,6 +610,43 @@ describe("restart recovery (decision 2, AC-81)", () => {
       second.c.close();
     } finally {
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("on start, stale ic-fix-* attempt directories under the workspace root are removed before the self-test", async () => {
+    const root = mkdtempSync(join(tmpdir(), "ic-sweep-"));
+    const outside = mkdtempSync(join(tmpdir(), "ic-sweep-outside-"));
+    try {
+      const hourAgo = new Date(Date.now() - 3_600_000);
+      const inAnHour = new Date(Date.now() + 3_600_000);
+      const dir = (name: string, at: Date): string => {
+        const d = join(root, name);
+        mkdirSync(join(d, "repo"), { recursive: true });
+        writeFileSync(join(d, "repo", "secret.ts"), "private source\n");
+        utimesSync(d, at, at);
+        return d;
+      };
+      // A crashed attempt of a previous process: left behind, older than this start.
+      const stale = dir("ic-fix-AbC123", hourAgo);
+      // Created after this process started: never ours to remove.
+      const fresh = dir("ic-fix-Zz9999", inAnHour);
+      // Not an attempt directory (mkdtemp adds exactly six characters to "ic-fix-").
+      const other = dir("ic-fix-recover-abc123", hourAgo);
+      const unrelated = dir("unrelated", hourAgo);
+      writeFileSync(join(outside, "keep.txt"), "keep\n");
+      const link = join(root, "ic-fix-LnK000");
+      symlinkSync(outside, link);
+      let staleAtSelfTest: boolean | null = null;
+      const { c } = setup({ fixture: NO_TURNS, workspaceRoot: root, onSelfTest: () => void (staleAtSelfTest = existsSync(stale)) });
+      await c.codeFix!.start();
+      assert.equal(existsSync(stale), false, "the stale attempt directory is removed");
+      assert.equal(staleAtSelfTest, false, "before the self-test runs");
+      for (const kept of [fresh, other, unrelated, link]) assert.ok(existsSync(kept), kept);
+      assert.ok(existsSync(join(outside, "keep.txt")), "a symlink is never followed");
+      c.close();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+      rmSync(outside, { recursive: true, force: true });
     }
   });
 

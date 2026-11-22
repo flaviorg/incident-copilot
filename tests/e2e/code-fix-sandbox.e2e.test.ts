@@ -12,6 +12,10 @@ import { REDACTED } from "../../src/infra/redact.ts";
 import { ProcessSandboxRunner } from "../../src/infra/code-fix/process-sandbox.ts";
 import { RUNTIME_ADDED_ENV_KEYS, SANDBOX_ENV_KEYS } from "../../src/infra/code-fix/sandbox-argv.ts";
 import { SELF_TEST_CHECKS, runSandboxSelfTest } from "../../src/infra/code-fix/sandbox-self-test.ts";
+import { CODE_FIX_DEFAULT_LIMITS } from "../../src/domain/code-fix/limits.ts";
+import { createFixBaselineNode } from "../../src/graph/code-fix/nodes/fix-baseline-node.ts";
+import { createCodeFixSession } from "../../src/graph/code-fix/state.ts";
+import { locatedState, SAMPLE_REPO, sampleWorkspace, SHA_HEAD } from "../helpers/code-fix-fakes.ts";
 
 const NO_NETWORK = projectPath("tests/setup/no-network.ts");
 
@@ -88,6 +92,29 @@ test("a glob argument runs every match; zero matches is an error, never passed",
     const none = await runner(a).run({ files: ["nothing/**/*.test.js"], timeoutSec: 60, signal: signal() });
     assert.equal(none.outcome, "error");
     assert.equal(none.total, 0);
+  } finally {
+    await rm(a.base, { recursive: true, force: true });
+  }
+});
+
+test("a baseline with zero tests (no match, or files that declare no test) gives up with baseline_not_green (AC-67)", async () => {
+  const a = await makeAttempt({ "tests/empty.test.js": 'import { test } from "node:test";\n' });
+  try {
+    const baselineOf = async (testFiles: string[]) => {
+      const session = createCodeFixSession();
+      session.workspace = sampleWorkspace();
+      session.sandbox = runner(a);
+      const s = locatedState({ stage: "workspace", baseCommitSha: SHA_HEAD, repository: { ...SAMPLE_REPO, testFiles } });
+      return await createFixBaselineNode({ session, limits: CODE_FIX_DEFAULT_LIMITS })(s);
+    };
+    const none = await baselineOf(["nothing/**/*.test.js"]);
+    assert.deepEqual([none.failure, none.evidence?.baseline?.outcome, none.evidence?.baseline?.exitCode, none.evidence?.baseline?.total], ["baseline_not_green", "error", 0, 0]);
+    // Node reports a file without tests as one passing pseudo-test named after the file; it is not a test.
+    const empty = await baselineOf(["tests/empty.test.js"]);
+    assert.deepEqual([empty.failure, empty.evidence?.baseline?.total], ["baseline_not_green", 0]);
+    // A file that fails to load is still a failure, and a real test still counts.
+    const real = await runner(a).run({ files: ["tests/empty.test.js", "tests/cart.test.js"], timeoutSec: 60, signal: signal() });
+    assert.deepEqual([real.outcome, real.total, real.passed, real.failed], ["failed", 2, 1, 1], real.outputTail);
   } finally {
     await rm(a.base, { recursive: true, force: true });
   }

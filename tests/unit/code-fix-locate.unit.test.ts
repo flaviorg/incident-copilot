@@ -347,7 +347,8 @@ describe("fix_baseline", () => {
   test("baseline_not_green, baseline_timeout and sandbox_error (AC-67)", async () => {
     const cases: [ReturnType<typeof runSummary> | Error, string][] = [
       [failingRun([{ name: "t", file: "tests/a.test.ts", errorName: "AssertionError", message: "x", frames: [] }]), "baseline_not_green"],
-      [runSummary({ total: 0, passed: 0 }), "baseline_not_green"],
+      // Zero tests as the real runner reports them: `error`, exit 0, total 0 (tests/e2e/code-fix-sandbox.e2e.test.ts).
+      [runSummary({ outcome: "error", exitCode: 0, total: 0, passed: 0 }), "baseline_not_green"],
       [runSummary({ cancelled: 1, total: 3, passed: 2 }), "baseline_not_green"],
       [runSummary({ outcome: "timeout", exitCode: null }), "baseline_timeout"],
       [runSummary({ outcome: "error", exitCode: 1, total: 0, passed: 0 }), "sandbox_error"],

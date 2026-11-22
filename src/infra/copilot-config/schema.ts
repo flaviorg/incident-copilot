@@ -96,6 +96,7 @@ export const REF_NAME_RULE = "must be a valid branch name";
 export const GLOB_RULE = "globs may use only letters, digits and _ . / * { } , -, with no leading '-' or '/' and no '..'";
 export const EXCEPTION_TYPE_RULE = "must be an exception class name";
 export const AUTHOR_RULE = "must be a plain name and an email address";
+export const API_URL_RULE = "must not have a query or a fragment";
 
 const REPO_PART = /^[A-Za-z0-9_.-]{1,100}$/;
 export function isValidRepo(s: string): boolean {
@@ -167,8 +168,9 @@ export function CodeFixConfigSchema(h: ConfigHelpers): z.ZodType<CodeFixConfig> 
     mode: z.enum(["shadow", "draft_pr"]).default("shadow"),
     approvalTtlHours: z.number().int().min(1).max(168).default(72),
     sandbox: z.strictObject({ network: z.enum(["isolated", "best_effort"]).default("isolated") }).default({ network: "isolated" }),
+    // The GitHub client refuses a query or a fragment at startup; refusing it here keeps `config check` honest.
     github: z
-      .strictObject({ apiUrl: h.url().default(DEFAULT_GITHUB_API_URL), token: h.secret().nullable().default(null) })
+      .strictObject({ apiUrl: h.url().refine((s) => !/[?#]/.test(s), { message: API_URL_RULE }).default(DEFAULT_GITHUB_API_URL), token: h.secret().nullable().default(null) })
       .default({ apiUrl: DEFAULT_GITHUB_API_URL, token: null }),
     commitAuthor: z
       .strictObject({
