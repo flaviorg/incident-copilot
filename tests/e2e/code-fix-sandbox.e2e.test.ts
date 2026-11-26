@@ -301,7 +301,7 @@ test("output over maxOutputBytes is capped (tail kept) and the report still pars
   const a = await makeAttempt({
     "tests/loud.test.js": [
       'import { test } from "node:test";',
-      'test("loud", () => { for (let i = 0; i < 2000; i++) console.log("line " + i + " " + "x".repeat(100)); console.error("LAST-STDERR"); });',
+      'test("loud", () => { for (let i = 0; i < 2000; i++) console.log("line " + i + " " + "x".repeat(100)); console.log("LAST-LINE"); });',
       "",
     ].join("\n"),
   });
@@ -310,7 +310,9 @@ test("output over maxOutputBytes is capped (tail kept) and the report still pars
     assert.equal(r.outcome, "passed", r.outputTail.slice(0, 300));
     assert.equal(r.total, 1);
     assert.ok(Buffer.byteLength(r.outputTail) <= 4096, String(Buffer.byteLength(r.outputTail)));
-    assert.match(r.outputTail, /LAST-STDERR/);
+    // stdout and stderr are separate pipes with no ordering between them, so the marker goes on stdout,
+    // where it is the last non-report line the tail can receive.
+    assert.match(r.outputTail, /LAST-LINE/);
     assert.ok(!r.outputTail.includes("line 0 "));
   } finally {
     await rm(a.base, { recursive: true, force: true });
