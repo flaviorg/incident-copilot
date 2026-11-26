@@ -50,7 +50,7 @@ export function createGateNode(d: GateDeps): NodeFn {
     let world = state.world;
     const evaluated: Evaluated[] = [];
     for (const step of steps) {
-      const cls = classifyAction(step, { scope, revisionsExhausted, knownRunbookRefs });
+      const cls = classifyAction(step, { scope, revisionsExhausted, knownRunbookRefs, proposer: "remediation_planner" });
       const action: GatedAction = {
         id: d.ids.action(), incidentId: state.incidentId, planRevision: state.planRevision, order: step.order,
         actionType: step.actionType, target: step.target, params: step.params, dependsOn: step.dependsOn,

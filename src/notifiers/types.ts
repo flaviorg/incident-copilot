@@ -6,8 +6,38 @@ import type { Logger } from "../infra/logger.ts";
 import type { ConfigHelpers } from "../connectors/shared/config-helpers.ts";
 import type { HttpClient } from "../connectors/shared/http.ts";
 
-export type NotificationKind = "incident_opened" | "analysis_ready" | "run_failed" | "incident_resolved";
-export const NOTIFICATION_KINDS: readonly NotificationKind[] = ["incident_opened", "analysis_ready", "run_failed", "incident_resolved"];
+export type NotificationKind =
+  | "incident_opened" | "analysis_ready" | "run_failed" | "incident_resolved"
+  | "code_fix_ready" | "code_fix_pr_opened";
+export const NOTIFICATION_KINDS: readonly NotificationKind[] = [
+  "incident_opened", "analysis_ready", "run_failed", "incident_resolved", "code_fix_ready", "code_fix_pr_opened",
+];
+/** The `events` of a notifier entry that lists none: the four 0.4 kinds. The code-fix kinds are opt-in (spec 009, AC-83). */
+export const DEFAULT_NOTIFICATION_EVENTS: readonly NotificationKind[] = ["incident_opened", "analysis_ready", "run_failed", "incident_resolved"];
+
+export type CodeFixNotificationKind = Extract<NotificationKind, "code_fix_ready" | "code_fix_pr_opened">;
+
+/**
+ * The code-fix facts of a `code_fix_*` message (spec 009, AC-83), built from the stored attempt only: counts, the
+ * anchor, the regression test name and booleans over the test runs. Never the patch, a post-image or test output text.
+ */
+export type CodeFixNotification = {
+  attemptId: string;
+  /** patch_ready (shadow), awaiting_approval (draft_pr) or pr_opened. */
+  status: string;
+  mode: "shadow" | "draft_pr";
+  repo: string;
+  baseBranch: string;
+  location: { file: string; line: number } | null;
+  exceptionType: string | null;
+  diff: { added: number; removed: number; files: number };
+  testName: string | null;
+  /** failedBefore: every reproduction run failed; passesAfter: every fix run passed and the suite passed. */
+  evidence: { failedBefore: boolean; passesAfter: boolean; suiteTotal: number; suiteFailed: number };
+  approval: { id: string; expiresAt: string } | null;
+  pullRequest: { number: number; url: string } | null;
+  links: { approval: string | null; pullRequest: string | null };
+};
 
 export type NotificationMessage = {
   kind: NotificationKind;
@@ -22,6 +52,8 @@ export type NotificationMessage = {
   recommendations: { order: number; actionType: string; target: string; tier: 1 | 2 | 3 | 4; status: string }[];
   links: { incident: string | null }; // from publicUrl
   sentAt: string;
+  /** Present only on code_fix_ready and code_fix_pr_opened. */
+  codeFix?: CodeFixNotification;
 };
 
 export type NotifyOutcome = { ok: true } | { ok: false; retryable: boolean; retryAfterSec: number | null; reason: string };

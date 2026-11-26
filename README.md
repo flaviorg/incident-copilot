@@ -9,13 +9,13 @@
 [![Node 24.21](https://img.shields.io/badge/node-24.21-brightgreen?logo=nodedotjs&logoColor=white)](.nvmrc)
 [![TypeScript 7](https://img.shields.io/badge/TypeScript-7.0-3178c6?logo=typescript&logoColor=white)](tsconfig.json)
 [![Tests](https://img.shields.io/badge/tests-750%20backend%20%2B%2037%20web-brightgreen)](#tests-and-quality)
-[![Version 0.4.0](https://img.shields.io/badge/version-0.4.0-blue)](CHANGELOG.md)
+[![Version 0.5.0](https://img.shields.io/badge/version-0.5.0-blue)](CHANGELOG.md)
 
-[**Live War Room demo**](https://flaviorg.github.io/incident-copilot/) · [Quick start](#quick-start) · [Connect your stack](#connect-your-stack) · [Architecture](docs/architecture.md) · [Threat model](docs/threat-model.md) · [Changelog](CHANGELOG.md)
+[**Live War Room demo**](https://flaviorg.github.io/incident-copilot/) · [Quick start](#quick-start) · [Connect your stack](#connect-your-stack) · [Code fixes](#code-fixes) · [Architecture](docs/architecture.md) · [Threat model](docs/threat-model.md) · [Changelog](CHANGELOG.md)
 
 </div>
 
-A LangGraph supervisor coordinates telemetry, runbook, planning and audit agents. Risky actions go through an autonomy matrix with human approval, and forbidden ones never run, even when the model proposes them. MTTR and savings are computed from data, not by the LLM. It runs offline with a scripted fake LLM; plug in OpenRouter with two environment variables (API key and model). Since 0.4 it can also [connect to your stack](#connect-your-stack): Alertmanager, New Relic, Sentry, Bugsnag, any JSON webhook or any MCP server send alerts and serve read-only data, and every live incident runs in **shadow mode**, where the team diagnoses and recommends but nothing executes.
+A LangGraph supervisor coordinates telemetry, runbook, planning and audit agents. Risky actions go through an autonomy matrix with human approval, and forbidden ones never run, even when the model proposes them. MTTR and savings are computed from data, not by the LLM. It runs offline with a scripted fake LLM; plug in OpenRouter with two environment variables (API key and model). Since 0.4 it can also [connect to your stack](#connect-your-stack): Alertmanager, New Relic, Sentry, Bugsnag, any JSON webhook or any MCP server send alerts and serve read-only data, and every live incident runs in **shadow mode**, where the team diagnoses and recommends but nothing executes. Since 0.5 an optional [code fixer](#code-fixes) can turn a small bug behind a Sentry alert into a failing regression test and a minimal patch, verified in a sandbox, and, only after a human approves, a **draft** pull request. It never merges.
 
 <p align="center">
   <a href="https://flaviorg.github.io/incident-copilot/">
@@ -33,6 +33,7 @@ A LangGraph supervisor coordinates telemetry, runbook, planning and audit agents
 - [Quick start](#quick-start)
 - [Usage](#usage): [CLI](#cli) · [HTTP API](#http-api) · [MCP server](#mcp-server) · [War Room](#war-room) · [Real model](#using-a-real-model-openrouter)
 - [Connect your stack](#connect-your-stack)
+- [Code fixes](#code-fixes)
 - [Scenarios](#scenarios)
 - [Security and guardrails](#security-and-guardrails)
 - [Numbers without invention](#numbers-without-invention)
@@ -419,13 +420,28 @@ More in the [threat model](docs/threat-model.md#inbound-webhooks-and-connectors-
 
 ### Roadmap
 
-Not in 0.4, in no particular order:
+Not in 0.4 or 0.5, in no particular order:
 
 1. A `supervised` mode with real executors registered beside the simulated world: tier 2 runs, tier 3 asks a human. Tier 4 stays without an executor.
 2. Cross-provider correlation, so one outage seen by New Relic and Sentry opens one incident instead of two.
 3. A Prometheus query connector (PromQL from config templates).
 4. OAuth for MCP servers (0.4 sends static headers only; Sentry's hosted MCP server needs OAuth).
 5. Slack interactivity: acknowledging, escalating and approving from chat.
+6. For the code fixer: a container or VM sandbox runner, GitHub App installation tokens, and error sources beyond Sentry.
+
+## Code fixes
+
+Version 0.5 adds an optional **code fixer** (spec [`009-code-fixer`](specs/009-code-fixer/spec.md); guide [`docs/code-fixer.md`](docs/code-fixer.md)). Many incidents behind a `bad_deploy` diagnosis are small code bugs that the stack trace already points at. When a live incident from a Sentry issue alert is diagnosed as `bad_deploy`, the error is new in the failing release, and the stack trace's innermost in-app frame lands in a repository you allowlisted, the copilot:
+
+1. fetches that repository (shallow, hardened git, no install step) and checks that its `node --test` suite is green;
+2. has one prompt write a **regression test**, which must fail twice on today's code with the incident's error in the anchor file;
+3. has a second prompt, which never sees the test, write the **smallest patch**: at most 2 edits and 20 source lines, inside the stack trace's files, outside denied paths such as CI, migrations, auth, payments and lockfiles;
+4. requires the test to pass twice and the full suite to stay green with the same test count, builds the diff from the work tree, and asks a third prompt for a veto-only review;
+5. attaches the patch and the evidence to the report (`GET /incidents/:id/code-fix` and a "Code fix" section in the postmortem).
+
+**Shadow first.** `codeFix.mode: shadow` (the default) stops there: no GitHub write at all. `draft_pr` asks a human, through the usual `POST /approvals/:id/decision`, to approve opening a **draft** pull request; the approval is bound to the patch hash, the base branch must be protected, and the commit is deterministic, so a retry never opens a second one. **It never merges**, reviews, labels or closes anything, and opens at most one pull request per error group.
+
+**Most incidents are skipped**, and that is the normal outcome: every skip or give-up has a typed reason and an audit row, with no LLM call or git command before eligibility is proven. Tests run under the Node permission model (no child processes, no reads outside the work tree, no copilot secrets in the environment) and, on Linux, in an `unshare` network namespace; a startup self-test must prove all of it, or the fixer stays off. Enable it with the `codeFix` block in [`copilot.example.yaml`](copilot.example.yaml) and a fine-grained `GITHUB_FIX_TOKEN`, after reading the [isolation notes](docs/code-fixer.md#isolation).
 
 ## Scenarios
 
@@ -568,12 +584,13 @@ incident-copilot/
 ├── src/
 │   ├── contracts/      # Zod schemas and types shared with the War Room (no logic, no I/O)
 │   ├── domain/         # pure rules: tiers, approval, auditor, guards, canary, metrics, BM25
-│   ├── infra/          # SQLite, scenarios, runbooks, simulated world, clock, ids, logger, redaction, copilot-config/
+│   ├── infra/          # SQLite, scenarios, runbooks, simulated world, clock, ids, logger, redaction, copilot-config/, code-fix/
 │   ├── llm/            # providers (fake and OpenRouter) and resilience
 │   ├── prompts/v1/     # versioned prompts
 │   ├── tools/          # the analyst's tier 1 tools (metrics, logs, deploys, inventory); tools/live/ for live incidents
 │   ├── connectors/     # connector port, shared kit and one folder per provider (registry in index.ts)
 │   ├── notifiers/      # notifier port, slack and outbound-webhook (registry in index.ts)
+│   ├── codehost/       # GitHub REST client for the code fixer (reader, and a writer that only opens draft PRs)
 │   ├── graph/          # LangGraph graph, routes and nodes (one per file, created by factories)
 │   ├── app/            # application services and container.ts
 │   ├── http/           # entry point: Fastify API
@@ -682,7 +699,8 @@ The module 06 lessons use Python and CrewAI; here the mechanism was reimplemente
 
 The most important point first: **the fake provider proves the mechanics, not the quality of the model.** The whole demo and the whole suite run on scripted answers. With a real LLM, the diagnosis and the plan can be worse; the guards and the gate limit the damage but do not guarantee correctness. Model quality only shows up with `npm run test:live` and real use.
 
-- **Simulated world.** No action touches real infrastructure. Live incidents from connectors run in shadow mode only: they recommend, they never execute (real executors are on the [roadmap](#roadmap)).
+- **Simulated world.** No action touches real infrastructure. Live incidents from connectors run in shadow mode only: they recommend, they never execute (real executors are on the [roadmap](#roadmap)). The one real-world write is the code fixer's draft pull request, behind a human approval.
+- **Code fixer scope.** Sentry only, Node `node --test` repositories only, no dependency install or build step, one draft pull request per error group, and OS network isolation only where Linux user namespaces work (a stock Docker seccomp profile or Ubuntu 24.04's AppArmor restriction makes the self-test fail closed). Test results come from a reporter in the test process, so the human approval is the final control. Details in [`docs/code-fixer.md`](docs/code-fixer.md).
 - **Connector fixtures are not captures.** The provider payloads in `tests/fixtures/connectors/` are built from provider documentation; each guide in `docs/connectors/` lists the provider facts that are still unverified.
 - **One incident per provider.** There is no cross-provider correlation, and the alert queue is in process: a run interrupted by a crash is not resumed.
 - **Simulated clock in the demo.** The demo MTTR is the simulated timeline, not a measured time.

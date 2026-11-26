@@ -4,7 +4,10 @@
 import * as z from "zod";
 import type { Tier } from "../../contracts/index.ts";
 
-export type TargetKind = "incident" | "deployment" | "image" | "resource" | "volume" | "ip" | "instance";
+export type TargetKind = "incident" | "deployment" | "image" | "resource" | "volume" | "ip" | "instance" | "repository";
+
+/** Who proposes a step (spec 009, decision 13). An action with `proposers` is tier 4 for anyone outside the list. */
+export type Proposer = "remediation_planner" | "mcp_client" | "code_fixer";
 
 export type ActionSpec = {
   tier: 2 | 3;
@@ -17,6 +20,8 @@ export type ActionSpec = {
   targetPattern: string;
   paramsText: string;
   description: string;
+  /** Absent: any proposer. Present: reserved to these proposers; the others get tier 4 (raise-only rule). */
+  proposers?: readonly Proposer[];
 };
 
 const text = (max: number) => z.string().trim().min(1).max(max);
@@ -70,6 +75,13 @@ export const EXECUTABLE_ACTIONS = {
     targetPattern: "instance/<account>/<id>", paramsText: "{ toType: string }",
     description: "changes the instance type",
   },
+  open_draft_pull_request: {
+    tier: 3, mitigates: false, reversible: false, durationSec: 15, targetKind: "repository",
+    paramsSchema: z.strictObject({ attemptId: z.string().regex(/^fix_[a-z0-9]{8,40}$/), patchSha256: z.string().regex(/^[0-9a-f]{64}$/) }),
+    targetPattern: "repository/<service>", paramsText: "{ attemptId: string, patchSha256: string }",
+    description: "opens a draft pull request with the verified patch of a code-fix attempt",
+    proposers: ["code_fixer"],
+  },
 } as const satisfies Record<string, ActionSpec>;
 
 export type ExecutableActionType = keyof typeof EXECUTABLE_ACTIONS;
@@ -87,6 +99,7 @@ export const REASONS = {
   noRunbook: "step without a reference runbook",
   unknownRunbook: "runbook reference not among the retrieved runbooks",
   revisionsExhausted: "plan revisions exhausted",
+  reservedProposer: "reserved for another proposer (tier 4)",
   catalogTier: (tier: Tier) => `catalog tier: ${tier}`,
 } as const;
 
@@ -102,10 +115,17 @@ export function isMitigating(t: string): boolean {
   return isExecutable(t) && EXECUTABLE_ACTIONS[t].mitigates;
 }
 
+/** Whether `proposer` may propose `t` at its catalog tier (no `proposers` list means anyone). */
+export function allowsProposer(t: ExecutableActionType, proposer: Proposer): boolean {
+  const spec: ActionSpec = EXECUTABLE_ACTIONS[t];
+  return spec.proposers === undefined || spec.proposers.includes(proposer);
+}
+
+/** The planner prompt lists only the actions the planner may propose, so a reserved action never reaches its input. */
 export function catalogPromptText(): string {
   return [
     "Executable actions (type: target; parameters; effect; what it does):",
-    ...EXECUTABLE_ACTION_TYPES.map((t) => {
+    ...EXECUTABLE_ACTION_TYPES.filter((t) => allowsProposer(t, "remediation_planner")).map((t) => {
       const a = EXECUTABLE_ACTIONS[t];
       return `- ${t}: ${a.targetPattern}; parameters ${a.paramsText}; ${a.mitigates ? "mitigates the incident" : "does not mitigate on its own"}; ${a.description}`;
     }),
@@ -119,6 +139,8 @@ export type ClassificationContext = {
   revisionsExhausted: boolean;
   /** Refs the runbook retriever actually returned (see runbookRefsOf). A ref outside this set is not evidence. */
   knownRunbookRefs: ReadonlySet<string>;
+  /** Who proposes the step; a reserved action outside its `proposers` is raised to tier 4. */
+  proposer: Proposer;
 };
 
 /**
@@ -159,6 +181,10 @@ export function classifyAction(
   const spec: ActionSpec = EXECUTABLE_ACTIONS[step.actionType];
   let tier: Tier = spec.tier;
   const reasons = [REASONS.catalogTier(spec.tier)];
+  if (!allowsProposer(step.actionType, ctx.proposer)) {
+    tier = raise(tier, 4);
+    reasons.push(REASONS.reservedProposer);
+  }
   if (!targetInScope(step.target, ctx.scope)) {
     tier = raise(tier, 3);
     reasons.push(REASONS.outOfScope);

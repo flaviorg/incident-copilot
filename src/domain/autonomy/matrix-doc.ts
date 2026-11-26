@@ -2,6 +2,7 @@
 // versioned file with this output, so the documentation does not drift from the code.
 import { ReadToolNameSchema } from "../../contracts/index.ts";
 import { EXECUTABLE_ACTIONS, EXECUTABLE_ACTION_TYPES, FORBIDDEN_ACTIONS, REASONS } from "./catalog.ts";
+import type { ActionSpec } from "./catalog.ts";
 
 const yesNo = (b: boolean) => (b ? "yes" : "no");
 const code = (s: string) => `\`${s}\``;
@@ -13,6 +14,7 @@ export function renderAutonomyMatrix(): string {
       const a = EXECUTABLE_ACTIONS[t];
       return `| ${tier} | ${code(t)} | ${code(a.targetPattern)} | ${code(a.paramsText)} | ${yesNo(a.mitigates)} | ${yesNo(a.reversible)} | ${a.durationSec} s |`;
     });
+  const reserved = EXECUTABLE_ACTION_TYPES.filter((t) => (EXECUTABLE_ACTIONS[t] as ActionSpec).proposers !== undefined);
   const lines = [
     "# Autonomy Matrix",
     "",
@@ -43,6 +45,11 @@ export function renderAutonomyMatrix(): string {
     `- ${REASONS.outOfScope}: the target is neither the incident itself nor owned by the incident service or account (blast radius).`,
     `- ${REASONS.noRunbook}: the step does not cite a runbook passage (null \`runbookRef\`).`,
     `- ${REASONS.revisionsExhausted}: the plan reached the remediation gate with the auditor revisions exhausted and a final \`revise\` verdict.`,
+    "",
+    "## Reserved proposers (raise to tier 4)",
+    "",
+    `- ${REASONS.reservedProposer}: an action with a proposer list is tier 4, blocked as forbidden, for any other proposer (\`remediation_planner\`, \`mcp_client\` or \`code_fixer\`). Reserved actions are not listed in the planner prompt.`,
+    ...reserved.map((t) => `- ${code(t)}: ${(EXECUTABLE_ACTIONS[t] as ActionSpec).proposers!.map(code).join(", ")}`),
     "",
     "## Tier 4 by construction",
     "",

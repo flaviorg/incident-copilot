@@ -5,7 +5,8 @@
 // The graph never imports a connector: it sees the same tool names for every provider.
 import type * as z from "zod";
 import type {
-  DeployRecord, ErrorGroup, ExternalResult, ExternalToolInfo, LogEntry, MetricSeries, NormalizedAlert, Severity,
+  DeployRecord, ErrorEvent, ErrorGroup, ExternalResult, ExternalToolInfo, LogEntry, MetricSeries, NormalizedAlert, ReleaseCommit,
+  Severity,
 } from "../contracts/index.ts";
 import type { Logger } from "../infra/logger.ts";
 import type { ConfigHelpers } from "./shared/config-helpers.ts";
@@ -92,6 +93,14 @@ export interface QueryCapability {
   logs?(q: { service: string; level: "ERROR" | "WARN"; window: QueryWindow; limit: number }, io: QueryIO): Promise<LogEntry[]>;
   deploys?(q: { service: string; since: Date }, io: QueryIO): Promise<DeployRecord[]>;
   errors?(q: { service: string; window: QueryWindow; limit: number }, io: QueryIO): Promise<ErrorGroup[]>;
+  /**
+   * The exception and stack frames of the latest event of one error group (spec 009, decision 5), for the code fixer
+   * only: not an LLM tool (no ReadToolName). `errorId` must match ^\d{1,20}$ or the method throws unsafe_input before
+   * any request. Null when the group is unknown, belongs to another service or has no readable exception.
+   */
+  errorEvent?(q: { service: string; errorId: string }, io: QueryIO): Promise<ErrorEvent | null>;
+  /** The release's last commit (40-hex SHA and repository name); null when the release has none. Not an LLM tool. */
+  releaseCommit?(q: { service: string; version: string }, io: QueryIO): Promise<ReleaseCommit | null>;
   external?: {
     tools(io: QueryIO): Promise<ExternalToolInfo[]>;
     call(tool: string, args: Record<string, unknown>, io: QueryIO): Promise<ExternalResult>;

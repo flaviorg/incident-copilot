@@ -12,9 +12,9 @@ import type { NotifierDefinition } from "../../notifiers/types.ts";
 import {
   CONNECTOR_BASE_KEYS, ConnectorBaseSchema, NOTIFIER_BASE_KEYS, NotifierBaseSchema, topLevelSchema,
 } from "./schema.ts";
-import type { ConnectorEntry, CopilotConfig, NotifierEntry } from "./schema.ts";
+import type { CodeFixConfig, ConnectorEntry, CopilotConfig, NotifierEntry } from "./schema.ts";
 
-export type { CopilotConfig, ConnectorEntry, NotifierEntry, IngestSettings } from "./schema.ts";
+export type { CopilotConfig, ConnectorEntry, NotifierEntry, IngestSettings, CodeFixConfig, CodeFixRepository } from "./schema.ts";
 
 export type ConfigProblem = { path: string; rule: string };
 export type CopilotConfigResult = { ok: true; config: CopilotConfig } | { ok: false; problems: ConfigProblem[] };
@@ -155,6 +155,9 @@ export function parseCopilotConfig(text: string, o: CopilotConfigOptions): Copil
     }
   });
 
+  const codeFix = top.data.codeFix ?? null;
+  if (codeFix !== null) problems.push(...codeFixProblems(codeFix, seenServices, connectors));
+
   if (problems.length > 0) return { ok: false, problems };
   return {
     ok: true,
@@ -166,9 +169,34 @@ export function parseCopilotConfig(text: string, o: CopilotConfigOptions): Copil
       services: top.data.services,
       connectors,
       notifiers,
+      codeFix,
       secrets: [...new Set(secrets)],
     },
   };
+}
+
+/** Spec 009 cross-checks (AC-84). Fixed rules only: never a value. */
+function codeFixProblems(codeFix: CodeFixConfig, services: ReadonlySet<string>, connectors: readonly ConnectorEntry[]): ConfigProblem[] {
+  const out: ConfigProblem[] = [];
+  const usedServices = new Set<string>();
+  const usedRepos = new Set<string>();
+  codeFix.repositories.forEach((r, i) => {
+    const at = (key: string) => formatPath(["codeFix", "repositories", i, key]);
+    if (!services.has(r.service)) out.push({ path: at("service"), rule: "unknown service; must be a services[].name" });
+    else if (usedServices.has(r.service)) out.push({ path: at("service"), rule: "duplicate service; one repository per service" });
+    usedServices.add(r.service);
+    const connector = connectors.find((c) => c.id === r.connector);
+    if (!connector) out.push({ path: at("connector"), rule: "unknown connector id" });
+    else if (connector.type !== "sentry") out.push({ path: at("connector"), rule: "must be a connector of type sentry" });
+    // GitHub owner and repository names are case-insensitive.
+    const key = r.repo.toLowerCase();
+    if (usedRepos.has(key)) out.push({ path: at("repo"), rule: "duplicate repository" });
+    usedRepos.add(key);
+  });
+  if (codeFix.mode === "draft_pr" && codeFix.github.token === null) {
+    out.push({ path: "codeFix.github.token", rule: "required when mode is draft_pr" });
+  }
+  return out;
 }
 
 export function loadCopilotConfigFile(path: string, o: Omit<CopilotConfigOptions, "format">): CopilotConfigResult {
@@ -184,9 +212,30 @@ export function loadCopilotConfigFile(path: string, o: Omit<CopilotConfigOptions
   return parseCopilotConfig(text, { ...o, format });
 }
 
-/** npm start only (AC-55): the fake provider replays scripts, so it must never answer a real alert. */
-export function assertLiveSafe(config: Pick<Config, "llmProvider">, copilot: CopilotConfig | null): void {
-  if (config.llmProvider !== "fake" || copilot === null) return;
+/**
+ * Spec 009, decision 19: a draft_pr code fixer needs APPROVAL_TOKEN and the GitHub token. Shared by `npm start`
+ * (assertLiveSafe) and `config check`, so both refuse the same config.
+ */
+export function draftPrProblems(approvalToken: string | null | undefined, copilot: CopilotConfig): ConfigProblem[] {
+  const fix = copilot.codeFix;
+  if (!fix || !fix.enabled || fix.mode !== "draft_pr") return [];
+  const problems: ConfigProblem[] = [];
+  if (approvalToken === null || approvalToken === undefined || approvalToken === "") {
+    problems.push({ path: "codeFix.mode", rule: "draft_pr requires APPROVAL_TOKEN; a human approves every pull request" });
+  }
+  if (fix.github.token === null) problems.push({ path: "codeFix.github.token", rule: "required when mode is draft_pr" });
+  return problems;
+}
+
+/**
+ * npm start only. AC-55: the fake provider replays scripts, so it must never answer a real alert. Spec 009, decision 19:
+ * a draft_pr code fixer needs APPROVAL_TOKEN (a human approves every pull request) and the GitHub token, with any provider.
+ */
+export function assertLiveSafe(config: Pick<Config, "llmProvider" | "approvalToken">, copilot: CopilotConfig | null): void {
+  if (copilot === null) return;
+  const problems = draftPrProblems(config.approvalToken, copilot);
+  if (problems.length > 0) throw new CopilotConfigError(problems);
+  if (config.llmProvider !== "fake") return;
   // The entry decides, not its definition: a Sentry entry with only `query` receives nothing and is safe with the fake.
   const hasIngest = (c: CopilotConfig["connectors"][number]) => isRecord(c.config) && c.config.ingest !== undefined && c.config.ingest !== null;
   if (copilot.connectors.some((c) => c.enabled && c.capabilities.includes("ingest") && hasIngest(c))) {

@@ -35,7 +35,7 @@ notifiers:
 | `secretUrl` | `${VAR}` naming a variable that holds the URL (same URL rules as `url`). The value is redacted from logs and errors. Only with `urlIsSecret: true`. |
 | `signingSecret` | Optional. A whole `${VAR}` of at least 16 characters. Turns on the signature headers (section 3). |
 | `bearerToken` | Optional. A whole `${VAR}` of at least 16 characters, sent as `Authorization: Bearer <token>`. |
-| `events` | Optional. Any of `incident_opened`, `analysis_ready`, `run_failed`, `incident_resolved`. Defaults to all four. |
+| `events` | Optional. Any of `incident_opened`, `analysis_ready`, `run_failed`, `incident_resolved`, plus the opt-in code-fixer kinds `code_fix_ready` and `code_fix_pr_opened` (see [the code fixer](../code-fixer.md)). Defaults to the first four; the code-fix kinds are sent only when listed. |
 
 Unknown keys are refused. Secrets are accepted only as a whole `${VAR}` reference. Check the file with
 `npm run cli -- config check`; a problem is reported by path and rule and never shows a value. Prefer a `signingSecret`
@@ -68,7 +68,7 @@ to a Bearer token when the receiver can verify it: the signature also proves the
 | Field | Type | Meaning |
 |---|---|---|
 | `schemaVersion` | `1` | Version of this payload. Fields may be added within a version; a breaking change bumps it. Ignore unknown fields. |
-| `kind` | string | `incident_opened`, `analysis_ready`, `run_failed` or `incident_resolved`. |
+| `kind` | string | `incident_opened`, `analysis_ready`, `run_failed` or `incident_resolved`; `code_fix_ready` or `code_fix_pr_opened` when the notifier lists them in `events`. |
 | `incidentId` | string | The copilot's incident id, for example `INC-0001`. |
 | `title` | string | Incident title. Comes from the alert: treat it as untrusted text. |
 | `service` | string or null | Canonical service name, or `null` when the alert named none. |
@@ -81,6 +81,19 @@ to a Bearer token when the receiver can verify it: the signature also proves the
 | `recommendations[].status` | string | `recommended`, `blocked_forbidden` or `blocked_unknown` (or another `blocked_*`). In shadow mode nothing is executed. |
 | `links.incident` | string or null | URL of the incident in the copilot, built from `publicUrl`; `null` when `publicUrl` is not set. |
 | `sentAt` | string | ISO 8601 UTC time the message was built. |
+| `codeFix` | object | Only on `code_fix_ready` and `code_fix_pr_opened`; absent on every other kind. The facts of the code-fix attempt, built from the stored attempt: counts, names and booleans, never the patch, a file's content or test output text. Fields below. |
+| `codeFix.attemptId` | string | The attempt id. |
+| `codeFix.status` | string | `patch_ready` (shadow mode), `awaiting_approval` (draft_pr mode) or `pr_opened`. |
+| `codeFix.mode` | string | `shadow` or `draft_pr`. |
+| `codeFix.repo`, `codeFix.baseBranch` | string | The repository (`owner/name`) and its base branch, from `copilot.yaml`. |
+| `codeFix.location` | object or null | `file` and `line` of the stack frame the fix targets. |
+| `codeFix.exceptionType` | string or null | The exception class, for example `TypeError`. |
+| `codeFix.diff` | object | `added` and `removed` line counts and the number of `files`, the regression test included. |
+| `codeFix.testName` | string or null | Name of the new regression test. Comes from model-written code: treat it as untrusted text. |
+| `codeFix.evidence` | object | `failedBefore` (every reproduction run failed), `passesAfter` (every fix run and the suite passed), `suiteTotal` and `suiteFailed`. |
+| `codeFix.approval` | object or null | `id` and `expiresAt` of the pending approval in draft_pr mode; `null` otherwise. |
+| `codeFix.pullRequest` | object or null | `number` and `url` of the draft pull request once opened; `null` before. |
+| `codeFix.links` | object | `approval` (the pending approvals URL, built from `publicUrl`, or `null`) and `pullRequest` (the pull request URL, or `null`). |
 
 The message is redacted for the secrets of the copilot's configuration before it is sent.
 

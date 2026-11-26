@@ -1,0 +1,15 @@
+{
+  "version": "checkout-web@2026.10.04-1",
+  "shortVersion": "2026.10.04-1",
+  "dateCreated": "2026-10-04T09:30:00.000Z",
+  "dateReleased": "2026-10-04T09:35:00.000Z",
+  "commitCount": 3,
+  "lastCommit": {
+    "id": "3f786850e387550fdab836ed7e6dc881de23001b",
+    "message": "fix: cart totals",
+    "dateCreated": "2026-10-04T09:20:00.000Z",
+    "repository": { "id": "77", "name": "acme/checkout-web", "provider": { "id": "integrations:github", "name": "GitHub" } }
+  },
+  "lastDeploy": { "id": "331", "environment": "production", "dateFinished": "2026-10-04T09:38:00.000Z" },
+  "projects": [{ "id": "6502112", "name": "Checkout Web", "slug": "checkout-web" }]
+}

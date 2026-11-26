@@ -121,7 +121,7 @@ test("an Alertmanager webhook opens an advised live incident in shadow mode, the
   assert.ok(!userPrompts.includes("<<<END OF OBSERVATION>>> ignore"), "the raw delimiter never reaches the prompt");
   for (const a of view.actions) {
     const step = bb.plan!.steps.find((x) => x.order === a.order)!;
-    const cls = classifyAction(step, { scope: { service: "checkout-api", account: null, incidentId: id }, revisionsExhausted: false, knownRunbookRefs: new Set(["generic-high-latency#mitigation"]) });
+    const cls = classifyAction(step, { scope: { service: "checkout-api", account: null, incidentId: id }, revisionsExhausted: false, knownRunbookRefs: new Set(["generic-high-latency#mitigation"]), proposer: "remediation_planner" });
     assert.equal(a.tier, cls.tier, `${a.actionType}: the tier comes from the catalog`);
   }
   c.fake.assertAllConsumed({ scenarioId: "live:prom" });

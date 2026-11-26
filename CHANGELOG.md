@@ -2,6 +2,49 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-11-22
+
+Code fixer (spec [`009-code-fixer`](specs/009-code-fixer/spec.md), AC-60 to AC-85). When a live incident's diagnosis and Sentry's own data point at a small bug in an allowlisted repository, the copilot writes a regression test that must fail, the smallest patch that makes it pass, verifies both in a sandbox, has the diff reviewed, and attaches patch and evidence to the report. In `draft_pr` mode a human approval then opens a **draft** pull request on GitHub; nothing is ever merged. Without a `codeFix` block the copilot behaves exactly as in 0.4. Guide: [`docs/code-fixer.md`](docs/code-fixer.md).
+
+### Added
+
+- **Code-fix job** outside the incident graph: `CodeFixService` and `CodeFixQueue` (`src/app/`) start after a live incident is persisted as `advised`, with their own concurrency (`limits.maxConcurrent`), no run slot, no `runs` row and no blackboard write. A small LangGraph graph of its own (`src/graph/code-fix/`): `fix_eligibility`, `fix_locate`, `fix_workspace`, `fix_baseline`, `fix_author_test`, `fix_guard_test`, `fix_repro`, `fix_author_patch`, `fix_guard_patch`, `fix_verify`, `fix_review`, `fix_finalize` and `fix_give_up`, with pure routes and budgets checked before every LLM node.
+- **Deterministic eligibility and location** (`src/domain/code-fix/`): Sentry issue alerts only, `bad_deploy` with medium or high confidence, one allowlisted repository per service, an exception type in `fixableExceptionTypes`, an error group new in the failing release, the innermost in-app frame inside `sourceGlobs` and outside the denied paths, and a 40-hex commit confirmed by GitHub. Every failure is a typed `skipped` reason with an audit row and no git or LLM call.
+- **Sentry query members** `errorEvent` (the latest event's exception and stack frames) and `releaseCommit` (release version to commit SHA). They are not LLM tools.
+- **`GitCliWorkspace`**: a hardened shallow fetch into a temporary directory (no shell; the host's git config, hooks, symlinks, fsmonitor, credential helpers, submodules and LFS disabled; https only; the token only through a temporary askpass script), removed when the attempt ends.
+- **`ProcessSandboxRunner`**: `node --test` under the Node permission model (reads only in the work tree, the kit and `tmp/`, writes only in `tmp/`, no child process, worker, addon, WASI or inspector right), an allowlisted environment, a process-group timeout, capped and redacted output, our own NDJSON reporter cross-checked with the exit code, and network isolation through `unshare --user --map-root-user --net` (`codeFix.sandbox.network: isolated`) or an explicit, stamped `best_effort`. A startup self-test must prove every denial, or the fixer is disabled and eligible incidents are `skipped/sandbox_unavailable`.
+- **Two authors and a veto-only reviewer**: prompts `fix-test.v1`, `fix-patch.v1` (which never sees the test) and `fix-review.v1` in a new `FIX_PROMPTS` list. Pure guards `checkTestFile`, `checkPatch` and `checkDiff` report every violation at once; `classifyReproduction` requires both runs to fail with the incident's error in the anchor file, within 10 lines of the anchor line.
+- **Limits with fixed ceilings** (`src/domain/code-fix/limits.ts`): at most 3 files, 20 source lines, 50 total lines, 40 test lines and 2 edits, plus LLM call, token, time, output, daily and per-group caps. Config can only lower them.
+- **GitHub code host** (`src/codehost/github/`): REST over the injected `fetch` with timeout, response cap and no redirects; a reader (commit, branch, compare, pull lookup, ref, commit object) and a writer that can only open a draft pull request. Owner and repository are checked against the allowlist before any request; errors are `CodeHostError` kinds with no body, header or token.
+- **`CodeFixPublisher`**: after approval it verifies the stored patch and post-images against the approved hash, re-classifies the action as tier 3, requires a protected and unchanged base, builds one deterministic commit on `incident-copilot/fix-<attemptId>` and opens the pull request with `draft: true`; a retry reuses its own branch or pull request.
+- **Catalog action `open_draft_pull_request`**: tier 3, not a mitigation, not reversible, reserved for the new `code_fixer` proposer. `ActionSpec` gains `proposers`, `TargetKind` gains `repository`, and `ClassificationContext` gains a required `proposer`; the planner or an MCP client proposing it gets tier 4 (`blocked_forbidden`, MCP refusal `action_reserved`), and the planner's prompt does not list it.
+- **Modes**: `codeFix.mode: shadow` (default) ends a successful attempt at `patch_ready` with no GitHub write; `draft_pr` moves it to `awaiting_approval` with an approval bound to the patch hash (`approvalTtlHours`, default 72).
+- **Surfaces**: `GET /incidents/:id/code-fix` (the latest attempt, redacted, without post-images), a "Code fix" section appended to the Markdown postmortem only when an attempt exists, code-fix approvals in `GET /approvals` and `POST /approvals/:id/decision` (409 `code_fix_not_awaiting_approval`), and the opt-in notification kinds `code_fix_ready` and `code_fix_pr_opened`.
+- **Audit events** `code_fix_skipped`, `code_fix_started`, `code_fix_gave_up`, `code_fix_patch_ready`, `code_fix_pr_opened` and `code_fix_publish_failed`; approvals reuse `approval_*` with `details.subject: "code_fix"`. Agent id `code_fixer`.
+- **`copilot.yaml` `codeFix` section**, strict, with `{ path, rule }` cross-checks (service, connector of type `sentry`, unique repository, glob allowlist, a token for `draft_pr`). `assertLiveSafe` refuses `draft_pr` without `APPROVAL_TOKEN` or a token. `copilot.example.yaml` has a shadow-mode block with `${GITHUB_FIX_TOKEN}`, and `.env.example` lists `GITHUB_FIX_TOKEN`.
+- **Docs**: `docs/code-fixer.md` (flow, eligibility, reason tables, limits, denied paths, isolation, token setup, modes, approvals with `curl`, facts and unverified items), a "Code fixer" section in `docs/connectors/sentry.md`, the new trust boundaries in `docs/threat-model.md` and `docs/architecture.md`, Node 24.21 permission-model and test-runner checks in `docs/api-notes.md`, README "Code fixes", AGENTS.md "How the code fixer works".
+- **Tests**: unit tests for every pure rule, the graph, the service, the store, approvals and the publisher; end-to-end tests with a real `node --test` child, real git over a local bare repository and a fake GitHub (`tests/e2e/code-fix*.e2e.test.ts`), on the `tiny-cart` fixture repository.
+
+### Changed
+
+- Schema version 5: tables `code_fix_attempts` (with a partial unique index on `(repo, error_group_id)` while the key is held) and `code_fix_approvals`. `trace_events` joins the enum-checked tables, so a v4 database rebuilds its CHECK in place, keeping every row, `seq`, the audit hash chain and the append-only triggers.
+- `ApprovalSchema` gains the optional `subject` and `patchSha256`, with no defaults, so action approvals are byte-identical. `ApprovalService.decide` branches on the table right after the lookup, before any expiry handling.
+- The notifier `events` default is now the fixed list of the four 0.4 kinds, and its maximum grows to 6.
+- `npm run fixtures:rehash` hashes `[...ALL_PROMPTS, ...FIX_PROMPTS]` but writes a `fix-*` hash only into a fixture that has a turn of that prompt.
+- The runtime image installs `git`, `util-linux` and `ca-certificates` and sets `TMPDIR=/data/code-fix`, a scratch directory owned by `node`.
+- Version bumped to 0.5.0 in both packages.
+
+### Dependencies
+
+- No new npm dependency. The runtime image gains the system packages `git` (workspace) and `util-linux` (`unshare`), plus `ca-certificates` so git can verify https.
+
+### Security
+
+- Model-written code runs only in the sandbox above; the copilot's source, `copilot.yaml`, `.env` and database are outside every read grant, and `GITHUB_FIX_TOKEN`, `OPENROUTER_API_KEY`, `APPROVAL_TOKEN` and `API_TOKEN` are never in the child's environment.
+- The fixer graph never receives a GitHub writer; only the publisher has one, only for an approved attempt, and only in `draft_pr` mode.
+- Stack traces, exception messages, repository files and test output are untrusted: sanitized, clipped, fenced for the model, scanned for injection markers in model output, and never used to choose a repository, path, commit, command, tier, approval or publication.
+- Every text the fixer sends out goes through `redactSecrets`; a patch that redaction would change gives up with `patch_contains_secret`, and the pull request body never carries test output text.
+
 ## [0.4.0] - 2026-11-20
 
 Connectors and live incidents (spec [`008-connectors`](specs/008-connectors/spec.md), AC-42 to AC-59). The copilot now plugs into a team's own observability and error stack: providers send alerts by webhook, the team investigates with read-only provider data, and the outcome goes to chat. Every live incident runs in **shadow mode**: nothing executes. Scenario mode (demo, goldens, recordings, War Room) is unchanged.

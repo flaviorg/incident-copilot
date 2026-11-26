@@ -1,16 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  catalogPromptText, classifyAction, runbookRefsOf, EXECUTABLE_ACTIONS, FORBIDDEN_ACTIONS, isExecutable, isMitigating, targetInScope,
+  catalogPromptText, classifyAction, runbookRefsOf, EXECUTABLE_ACTIONS, EXECUTABLE_ACTION_TYPES, FORBIDDEN_ACTIONS, REASONS, isExecutable, isMitigating,
+  targetInScope,
 } from "../../src/domain/autonomy/catalog.ts";
-import type { ExecutableActionType } from "../../src/domain/autonomy/catalog.ts";
+import type { ExecutableActionType, Proposer } from "../../src/domain/autonomy/catalog.ts";
 
 const knownRunbookRefs = runbookRefsOf([
   { runbookId: "orders-5xx-after-deploy", section: "Mitigation" },
   { runbookId: "cloud-cost-anomaly", section: "mitigation" },
 ]);
-const ctx = { scope: { service: "orders-api", account: null, incidentId: "INC-0001" }, revisionsExhausted: false, knownRunbookRefs };
-const costCtx = { scope: { service: null, account: "data-platform", incidentId: "INC-0002" }, revisionsExhausted: false, knownRunbookRefs };
+const ctx = { scope: { service: "orders-api", account: null, incidentId: "INC-0001" }, revisionsExhausted: false, knownRunbookRefs, proposer: "remediation_planner" as Proposer };
+const costCtx = { scope: { service: null, account: "data-platform", incidentId: "INC-0002" }, revisionsExhausted: false, knownRunbookRefs, proposer: "remediation_planner" as Proposer };
 const s = (actionType: string, target = "deployment/orders-api", params: Record<string, unknown> = {}, runbookRef: string | null = "orders-5xx-after-deploy#mitigation") =>
   ({ actionType, target, params, runbookRef });
 
@@ -38,7 +39,8 @@ test("catalog values follow the spec 6.4 table", () => {
   assert.deepEqual(row("release_elastic_ip"), [3, true, false, 5]);
   assert.deepEqual(row("delete_volume"), [3, true, false, 20]);
   assert.deepEqual(row("resize_instance"), [3, true, true, 300]);
-  assert.equal(Object.keys(EXECUTABLE_ACTIONS).length, 8);
+  assert.deepEqual(row("open_draft_pull_request"), [3, false, false, 15]);
+  assert.equal(Object.keys(EXECUTABLE_ACTIONS).length, 9);
   assert.deepEqual([...FORBIDDEN_ACTIONS], ["delete_audit_log", "disable_security_scanner", "export_user_data", "run_arbitrary_command", "delete_backups"]);
   assert.equal(isMitigating("rollback_deployment"), true);
   assert.equal(isMitigating("block_image_tag"), false);
@@ -105,9 +107,14 @@ test("forbidden types are not executable at the type level", () => {
   void t;
 });
 
-test("catalog prompt text lists every executable action and the forbidden ones", () => {
+test("catalog prompt text lists every executable action open to the planner and the forbidden ones", () => {
   const text = catalogPromptText();
-  for (const t of Object.keys(EXECUTABLE_ACTIONS)) assert.match(text, new RegExp(`^- ${t}: `, "m"), t);
+  const plannerActions = EXECUTABLE_ACTION_TYPES.filter((t) => {
+    const p: readonly Proposer[] | undefined = (EXECUTABLE_ACTIONS[t] as { proposers?: readonly Proposer[] }).proposers;
+    return p === undefined || p.includes("remediation_planner");
+  });
+  assert.equal(plannerActions.length, 8);
+  for (const t of plannerActions) assert.match(text, new RegExp(`^- ${t}: `, "m"), t);
   assert.match(text, /rollback_deployment: deployment\/<service>; parameters \{ toVersion: string \}; mitigates the incident/);
   for (const t of FORBIDDEN_ACTIONS) assert.ok(text.includes(t), t);
   assert.doesNotMatch(text, /\btier\b/i);
@@ -124,4 +131,73 @@ test("a runbookRef the retriever never returned raises the step to tier 3 (the r
   // A retrieved ref keeps the catalog tier, case-insensitively, by section or by runbook id alone.
   assert.equal(classifyAction(s("block_image_tag", "image/orders-api:3.8.0", {}, "orders-5xx-after-deploy#mitigation"), ctx).tier, 2);
   assert.equal(classifyAction(s("block_image_tag", "image/orders-api:3.8.0", {}, "Orders-5xx-After-Deploy"), ctx).tier, 2);
+});
+
+// Snapshot of catalogPromptText() taken before open_draft_pull_request existed (spec 009, decision 13; AC-73 and AC-85).
+const PROMPT_TEXT_V04 = [
+  "Executable actions (type: target; parameters; effect; what it does):",
+  "- add_incident_note: incident/<incident service or account>; parameters { text: string }; does not mitigate on its own; records a note on the ongoing incident",
+  "- block_image_tag: image/<service>:<tag>; parameters {}; does not mitigate on its own; prevents the image tag from being promoted again",
+  "- tag_resource_for_review: <volume, ip or instance>/<account>/<id>; parameters { reason: string }; does not mitigate on its own; tags the resource for owner review",
+  "- create_volume_snapshot: volume/<account>/<id>; parameters {}; does not mitigate on its own; creates a snapshot of the volume",
+  "- rollback_deployment: deployment/<service>; parameters { toVersion: string }; mitigates the incident; rolls the deployment back to a version from the deploy history",
+  "- release_elastic_ip: ip/<account>/<id>; parameters {}; mitigates the incident; releases an unassociated public IPv4",
+  "- delete_volume: volume/<account>/<id>; parameters {}; mitigates the incident; deletes an unattached volume",
+  "- resize_instance: instance/<account>/<id>; parameters { toType: string }; mitigates the incident; changes the instance type",
+  "Forbidden by construction (never executed): delete_audit_log, disable_security_scanner, export_user_data, run_arbitrary_command, delete_backups.",
+  "Any type not in this list is blocked.",
+].join("\n");
+
+const PR_PARAMS = { attemptId: "fix_abcd1234", patchSha256: "a".repeat(64) };
+const prStep = (params: Record<string, unknown> = PR_PARAMS) => s("open_draft_pull_request", "repository/orders-api", params);
+
+test("open_draft_pull_request is tier 3 for the code fixer, with strict parameters", () => {
+  const spec = EXECUTABLE_ACTIONS.open_draft_pull_request;
+  assert.deepEqual([spec.targetKind, spec.targetPattern, spec.proposers], ["repository", "repository/<service>", ["code_fixer"]]);
+  const ok = classifyAction(prStep(), { ...ctx, proposer: "code_fixer" });
+  assert.deepEqual([ok.tier, ok.known, ok.executable, ok.paramsOk, ok.reasons], [3, true, true, true, ["catalog tier: 3"]]);
+  assert.deepEqual(ok.params, PR_PARAMS);
+  const fixer = { ...ctx, proposer: "code_fixer" as const };
+  assert.equal(classifyAction(prStep({ ...PR_PARAMS, extra: 1 }), fixer).paramsOk, false);
+  assert.equal(classifyAction(prStep({ ...PR_PARAMS, patchSha256: "A".repeat(64) }), fixer).paramsOk, false);
+  assert.equal(classifyAction(prStep({ ...PR_PARAMS, patchSha256: "a".repeat(63) }), fixer).paramsOk, false);
+  assert.equal(classifyAction(prStep({ ...PR_PARAMS, attemptId: "fix_short" }), fixer).paramsOk, false);
+  assert.equal(classifyAction(prStep({ attemptId: PR_PARAMS.attemptId }), fixer).paramsOk, false);
+});
+
+test("a reserved action proposed by the planner or an MCP client is tier 4", () => {
+  for (const proposer of ["remediation_planner", "mcp_client"] as const) {
+    const c = classifyAction(prStep(), { ...ctx, proposer });
+    assert.equal(c.tier, 4, proposer);
+    assert.equal(c.known, true, proposer);
+    assert.ok(c.reasons.includes(REASONS.reservedProposer), proposer);
+  }
+  assert.equal(REASONS.reservedProposer, "reserved for another proposer (tier 4)");
+});
+
+test("every other action keeps its tier for every proposer", () => {
+  const steps: Record<Exclude<ExecutableActionType, "open_draft_pull_request">, [ReturnType<typeof s>, typeof ctx | typeof costCtx]> = {
+    add_incident_note: [s("add_incident_note", "incident/INC-0001", { text: "x" }), ctx],
+    block_image_tag: [s("block_image_tag", "image/orders-api:3.8.0"), ctx],
+    tag_resource_for_review: [s("tag_resource_for_review", "volume/data-platform/vol-0c41d2", { reason: "idle" }), costCtx],
+    create_volume_snapshot: [s("create_volume_snapshot", "volume/data-platform/vol-0c41d2"), costCtx],
+    rollback_deployment: [s("rollback_deployment", "deployment/orders-api", { toVersion: "v3.7.2" }), ctx],
+    release_elastic_ip: [s("release_elastic_ip", "ip/data-platform/eipalloc-0f19"), costCtx],
+    delete_volume: [s("delete_volume", "volume/data-platform/vol-0c41d2"), costCtx],
+    resize_instance: [s("resize_instance", "instance/data-platform/i-07ab3", { toType: "r6i.large" }), costCtx],
+  };
+  for (const t of EXECUTABLE_ACTION_TYPES) {
+    if (t === "open_draft_pull_request") continue;
+    const [step, base] = steps[t];
+    for (const proposer of ["remediation_planner", "mcp_client", "code_fixer"] as const) {
+      const c = classifyAction(step, { ...base, proposer });
+      assert.deepEqual([c.tier, c.reasons], [EXECUTABLE_ACTIONS[t].tier, [`catalog tier: ${EXECUTABLE_ACTIONS[t].tier}`]], `${t} ${proposer}`);
+    }
+  }
+});
+
+test("the planner prompt does not list reserved actions and is byte-identical to 0.4", () => {
+  const text = catalogPromptText();
+  assert.ok(!text.includes("open_draft_pull_request"));
+  assert.equal(text, PROMPT_TEXT_V04);
 });

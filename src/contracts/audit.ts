@@ -17,6 +17,8 @@ export const AuditEventSchema = z.enum([
   "approval_requested", "approval_approved", "approval_rejected", "approval_expired", "approval_auth_failed",
   "canary_rollback", "circuit_opened", "incident_escalated", "incident_resolved",
   "alert_ingested", "alert_resolved", "action_recommended",
+  // spec 009: code fixer (approvals reuse approval_* with details.subject)
+  "code_fix_skipped", "code_fix_started", "code_fix_gave_up", "code_fix_patch_ready", "code_fix_pr_opened", "code_fix_publish_failed",
 ]);
 
 // Audit trail row (spec 6.8): hash-chained.

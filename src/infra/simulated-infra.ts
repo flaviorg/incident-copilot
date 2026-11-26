@@ -191,6 +191,11 @@ const EXECUTORS: Record<ExecutableActionType, Executor> = {
       return null;
     },
   },
+  // Exists only for the type registry (spec 009, decision 13): the code-fix publisher opens the pull request.
+  open_draft_pull_request: {
+    check: () => ({ ok: false, reason: "executed by the code-fix publisher, not the simulated world" }),
+    apply: () => {},
+  },
 };
 
 export class SimulatedInfra {

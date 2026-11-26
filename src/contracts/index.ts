@@ -37,7 +37,13 @@ import {
 } from "./ingest.ts";
 import {
   ErrorGroupSchema, MetricSeriesSchema, LogEntrySchema, DeployRecordSchema, ExternalToolInfoSchema, ExternalResultSchema,
+  StackFrameSchema, ErrorEventSchema, ReleaseCommitSchema,
 } from "./live-telemetry.ts";
+import {
+  CodeFixModeSchema, CodeFixIsolationSchema, CodeFixStatusSchema, CodeFixStageSchema, CodeFixReasonSchema, TestFailureSchema,
+  TestRunSummarySchema, CodeFixFileSchema, CodeFixSuggestionSchema, CodeFixAttemptSchema, CodeFixAttemptViewSchema,
+  FixTestProposalSchema, FixPatchProposalSchema, FixReviewSchema,
+} from "./code-fix.ts";
 
 export {
   SeveritySchema, IncidentStatusSchema, PhaseSchema, AgentIdSchema, TierSchema, RootCauseCategorySchema,
@@ -65,6 +71,10 @@ export {
   MAX_ALERT_ATTRIBUTES, ConnectorIdSchema, AlertSignalSchema, NormalizedAlertSchema, IngestOutcomeSchema, IngestedAlertRecordSchema,
   IncidentOriginSchema,
   ErrorGroupSchema, MetricSeriesSchema, LogEntrySchema, DeployRecordSchema, ExternalToolInfoSchema, ExternalResultSchema,
+  StackFrameSchema, ErrorEventSchema, ReleaseCommitSchema,
+  CodeFixModeSchema, CodeFixIsolationSchema, CodeFixStatusSchema, CodeFixStageSchema, CodeFixReasonSchema, TestFailureSchema,
+  TestRunSummarySchema, CodeFixFileSchema, CodeFixSuggestionSchema, CodeFixAttemptSchema, CodeFixAttemptViewSchema,
+  FixTestProposalSchema, FixPatchProposalSchema, FixReviewSchema,
 };
 
 export type Severity = z.infer<typeof SeveritySchema>;
@@ -158,6 +168,23 @@ export type LogEntry = z.infer<typeof LogEntrySchema>;
 export type DeployRecord = z.infer<typeof DeployRecordSchema>;
 export type ExternalToolInfo = z.infer<typeof ExternalToolInfoSchema>;
 export type ExternalResult = z.infer<typeof ExternalResultSchema>;
+export type StackFrame = z.infer<typeof StackFrameSchema>;
+export type ErrorEvent = z.infer<typeof ErrorEventSchema>;
+export type ReleaseCommit = z.infer<typeof ReleaseCommitSchema>;
+export type CodeFixMode = z.infer<typeof CodeFixModeSchema>;
+export type CodeFixIsolation = z.infer<typeof CodeFixIsolationSchema>;
+export type CodeFixStatus = z.infer<typeof CodeFixStatusSchema>;
+export type CodeFixStage = z.infer<typeof CodeFixStageSchema>;
+export type CodeFixReason = z.infer<typeof CodeFixReasonSchema>;
+export type TestFailure = z.infer<typeof TestFailureSchema>;
+export type TestRunSummary = z.infer<typeof TestRunSummarySchema>;
+export type CodeFixFile = z.infer<typeof CodeFixFileSchema>;
+export type CodeFixSuggestion = z.infer<typeof CodeFixSuggestionSchema>;
+export type CodeFixAttempt = z.infer<typeof CodeFixAttemptSchema>;
+export type CodeFixAttemptView = z.infer<typeof CodeFixAttemptViewSchema>;
+export type FixTestProposal = z.infer<typeof FixTestProposalSchema>;
+export type FixPatchProposal = z.infer<typeof FixPatchProposalSchema>;
+export type FixReview = z.infer<typeof FixReviewSchema>;
 
 /** Default caps from spec 6.2. */
 export const DEFAULT_LIMITS: Limits = Object.freeze({

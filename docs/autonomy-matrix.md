@@ -10,7 +10,7 @@ The tier of each step comes from the catalog and from context rules that only ra
 |---|---|---|
 | Tier 1: decides alone | Read-only, zero risk | Tools `query_metrics`, `query_logs`, `list_deploys`, `audit_cloud_inventory`, `query_errors`, `query_external` |
 | Tier 2: decides and records | Reversible change or no effect on the service, with audit | `add_incident_note`, `block_image_tag`, `tag_resource_for_review`, `create_volume_snapshot` |
-| Tier 3: requires human approval | Destructive or high impact | `rollback_deployment`, `release_elastic_ip`, `delete_volume`, `resize_instance` |
+| Tier 3: requires human approval | Destructive or high impact | `rollback_deployment`, `release_elastic_ip`, `delete_volume`, `resize_instance`, `open_draft_pull_request` |
 | Tier 4: forbidden by construction | Exposing data, deleting audit or backup, disabling controls | `delete_audit_log`, `disable_security_scanner`, `export_user_data`, `run_arbitrary_command`, `delete_backups` and any type not in the catalog (deny by default) |
 
 ## Executable action catalog
@@ -25,6 +25,7 @@ The tier of each step comes from the catalog and from context rules that only ra
 | 3 | `release_elastic_ip` | `ip/<account>/<id>` | `{}` | yes | no | 5 s |
 | 3 | `delete_volume` | `volume/<account>/<id>` | `{}` | yes | no | 20 s |
 | 3 | `resize_instance` | `instance/<account>/<id>` | `{ toType: string }` | yes | yes | 300 s |
+| 3 | `open_draft_pull_request` | `repository/<service>` | `{ attemptId: string, patchSha256: string }` | no | no | 15 s |
 
 Parameters outside the catalog schema move the step to `rejected_invalid_params`, without a dry run.
 
@@ -33,6 +34,11 @@ Parameters outside the catalog schema move the step to `rejected_invalid_params`
 - target outside the incident scope: the target is neither the incident itself nor owned by the incident service or account (blast radius).
 - step without a reference runbook: the step does not cite a runbook passage (null `runbookRef`).
 - plan revisions exhausted: the plan reached the remediation gate with the auditor revisions exhausted and a final `revise` verdict.
+
+## Reserved proposers (raise to tier 4)
+
+- reserved for another proposer (tier 4): an action with a proposer list is tier 4, blocked as forbidden, for any other proposer (`remediation_planner`, `mcp_client` or `code_fixer`). Reserved actions are not listed in the planner prompt.
+- `open_draft_pull_request`: `code_fixer`
 
 ## Tier 4 by construction
 

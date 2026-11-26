@@ -1,0 +1,40 @@
+{
+  "text": "[SEV2] Code fix ready: High error rate in checkout &lt;script&gt;&amp; (checkout-api)",
+  "blocks": [
+    {
+      "type": "section",
+      "text": { "type": "mrkdwn", "text": "*High error rate in checkout &lt;script&gt;&amp;*\nINC-0001 - advised" }
+    },
+    {
+      "type": "section",
+      "fields": [
+        { "type": "mrkdwn", "text": "*Severity*\nSEV2" },
+        { "type": "mrkdwn", "text": "*Service*\ncheckout-api" },
+        { "type": "mrkdwn", "text": "*Source*\nprom (alertmanager)" },
+        { "type": "mrkdwn", "text": "*Status*\nadvised" }
+      ]
+    },
+    {
+      "type": "section",
+      "text": { "type": "mrkdwn", "text": "*Diagnosis*\nCategory: bad_deploy | Confidence: high\nThe v2.4.0 deploy introduced a TypeError in PriceFormatter" }
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Code fix*\nStatus: awaiting approval to open a draft pull request\nRepository: acme/checkout-web (main)\nLocation: src/checkout/cart-summary.ts:12 (TypeError)\nDiff: +10 -1 in 2 files\nRegression test: summarize returns 0 for &lt;empty&gt; &amp; missing totals\nEvidence: failed before / passes after; suite 4 tests, 0 failed\nApproval APR-0007 expires 2026-10-07T10:04:00.000Z"
+      }
+    },
+    {
+      "type": "context",
+      "elements": [{ "type": "mrkdwn", "text": "Nothing is published until a human approves; the pull request is a draft and is never merged." }]
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "<https://copilot.example.com/incidents/INC-0001|Open incident> | <https://copilot.example.com/approvals?status=pending|Review approval> | <https://prometheus.example.com/graph?g0.expr=up|Source alert (prom)>"
+      }
+    }
+  ]
+}

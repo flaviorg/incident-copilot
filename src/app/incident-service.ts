@@ -4,7 +4,7 @@
 import { GraphRecursionError } from "@langchain/langgraph";
 import { ProposeRemediationInputSchema } from "../contracts/index.ts";
 import type {
-  Approval, AuditEntryView, AuditEvent, Blackboard, DryRunResult, Escalation, GatedAction, Incident, IncidentStatus, IncidentSummary, IncidentView, Limits,
+  Approval, AuditEntryView, AuditEvent, Blackboard, CodeFixAttempt, DryRunResult, Escalation, GatedAction, Incident, IncidentStatus, IncidentSummary, IncidentView, Limits,
   PostmortemDoc, ProposeRemediationInput, ProposeRemediationResult, TraceEvent, WorldState,
 } from "../contracts/index.ts";
 import type { IncidentFilter, SqliteIncidentStore, TraceFilter } from "../infra/db/incident-store.ts";
@@ -16,13 +16,16 @@ import { ConflictError, LlmUnavailableError, NotFoundError, RunTimeoutError, Unp
 import { decideAlertAction } from "../domain/ingest/dedupe.ts";
 import { redactThenClip } from "../infra/redact.ts";
 import type { NotificationKind } from "../notifiers/types.ts";
-import { classifyAction, runbookRefsOf, EXECUTABLE_ACTIONS, isExecutable } from "../domain/autonomy/catalog.ts";
+import { classifyAction, runbookRefsOf, EXECUTABLE_ACTIONS, REASONS, isExecutable } from "../domain/autonomy/catalog.ts";
 import { parseWithIssues } from "../domain/validation.ts";
 import { effectiveStatus, isExpired, transition } from "../domain/approval/approval-machine.ts";
 import { ApprovalTransitionError } from "../domain/errors.ts";
 import { ACTION_STATUS_LABELS } from "../domain/report/postmortem-template.ts";
 import { deriveIncidentStatus } from "../domain/status/derive-status.ts";
 import { renderPostmortemMarkdown } from "../domain/report/postmortem-template.ts";
+import { renderCodeFixSection } from "../domain/report/code-fix-section.ts";
+import { SqliteCodeFixStore } from "../infra/db/code-fix-store.ts";
+import { redactSecrets } from "../infra/redact.ts";
 import type { CompiledIncidentGraph } from "../graph/graph.ts";
 import type { NodeConfig, NodeFn } from "../graph/run-context.ts";
 import { actionArgs, DRY_RUN_SEC } from "../graph/nodes/gate-node.ts";
@@ -56,6 +59,8 @@ export type LiveIncidentDeps = {
   /** Never throws (NotificationService). */
   notify(kind: NotificationKind, incidentId: string): Promise<void>;
   secrets: readonly string[];
+  /** The code fixer (spec 009, decision 1): never throws and never awaits the attempt; absent when disabled. */
+  codeFix?: { consider(incidentId: string, ctx?: { requestId: string | null }): void };
 };
 
 export type RunCtx = { requestId: string | null };
@@ -157,6 +162,7 @@ export class IncidentService {
         return async () => {
           await opening;
           await live.notify(failed ? "run_failed" : "analysis_ready", incidentId);
+          if (!failed) live.codeFix?.consider(incidentId, { requestId: rec.requestId });
         };
       }
       if (action === "deduplicate") {
@@ -432,6 +438,7 @@ export class IncidentService {
         scope: { service: blackboard.alert.service, account: blackboard.alert.account, incidentId: i.incidentId },
         revisionsExhausted: false,
         knownRunbookRefs: runbookRefsOf(blackboard.runbookMatches),
+        proposer: "mcp_client",
       },
     );
     const head = `${i.actionType} tier ${cls.tier}`;
@@ -444,7 +451,9 @@ export class IncidentService {
       status = cls.known ? "blocked_forbidden" : "blocked_unknown";
       event = cls.known ? "action_blocked_forbidden" : "action_blocked_unknown";
       summary = `${head}: blocked without dry run (${cls.reasons.join("; ")})`;
-      refusal = cls.known
+      refusal = cls.reasons.includes(REASONS.reservedProposer)
+        ? { code: "action_reserved", message: `action refused: ${i.actionType} is reserved for the code fixer (tier 4)` }
+        : cls.known
         ? { code: "action_forbidden", message: `action refused: ${i.actionType} is forbidden by construction (tier 4)` }
         : { code: "action_unknown", message: `action refused: ${i.actionType} is not in the catalog (deny by default)` };
     } else if (!cls.paramsOk || cls.params === null) {
@@ -554,8 +563,30 @@ export class IncidentService {
     return pm;
   }
 
+  /**
+   * Markdown post-mortem; when the incident has a code-fix attempt, its "Code fix" section is appended, redacted
+   * (spec 009; AC-74). With no attempt the output is byte-identical to before. The JSON form is never changed.
+   */
   postmortemMarkdown(id: string): string {
-    return renderPostmortemMarkdown(this.postmortem(id));
+    const md = renderPostmortemMarkdown(this.postmortem(id));
+    const attempt = this.fixes().latestForIncident(id);
+    if (attempt === null) return md;
+    return `${md}\n${redactSecrets(renderCodeFixSection(attempt), this.d.live?.secrets ?? [])}`;
+  }
+
+  /** Latest code-fix attempt of the incident (spec 009, HTTP table); the caller builds the redacted view. */
+  codeFixAttempt(id: string): CodeFixAttempt {
+    if (!this.d.store.getIncident(id)) throw new NotFoundError("incident_not_found", `incident not found: ${id}`);
+    const attempt = this.fixes().latestForIncident(id);
+    if (attempt === null) throw new NotFoundError("code_fix_not_found", `incident ${id} has no code-fix attempt`);
+    return attempt;
+  }
+
+  /** Read access to code_fix_attempts over the same database (the tables exist with or without a codeFix config). */
+  private fixesStore: SqliteCodeFixStore | null = null;
+  private fixes(): SqliteCodeFixStore {
+    this.fixesStore ??= new SqliteCodeFixStore(this.d.store);
+    return this.fixesStore;
   }
 
   private requireIncident(id: string) {

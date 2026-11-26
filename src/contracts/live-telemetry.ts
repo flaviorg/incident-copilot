@@ -50,3 +50,25 @@ export const ExternalResultSchema = z.object({
   ok: z.boolean(),
   text: z.string().max(8000),
 });
+
+// Spec 009: error event and release commit, read by the code fixer through the connector (not LLM tools).
+export const StackFrameSchema = z.object({
+  file: z.string().max(300),
+  line: z.number().int().positive(),
+  column: z.number().int().nonnegative().nullable(),
+  function: z.string().max(120).nullable(),
+  inApp: z.boolean(),
+});
+
+export const ErrorEventSchema = z.object({
+  errorId: z.string().max(200),
+  release: z.string().max(120).nullable(),
+  firstSeen: iso.nullable(),
+  exception: z.object({ type: z.string().max(120), value: z.string().max(300) }),
+  frames: z.array(StackFrameSchema).max(50), // innermost last
+});
+
+export const ReleaseCommitSchema = z.object({
+  sha: z.string().regex(/^[0-9a-f]{40}$/),
+  repository: z.string().max(200).nullable(),
+});

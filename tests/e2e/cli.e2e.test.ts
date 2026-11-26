@@ -202,6 +202,8 @@ test("config check accepts copilot.example.yaml when its variables are set", asy
     SLACK_WEBHOOK_URL: "https://hooks.slack.com/services/" + fill("T0/B0/", 24),
     OUTBOUND_WEBHOOK_SIGNING_SECRET: fill("sign-", 32),
     OUTBOUND_WEBHOOK_TOKEN: fill("out-", 32),
+    // A fine-grained PAT shape, built at run time (AGENTS.md): the codeFix block references it (spec 009).
+    GITHUB_FIX_TOKEN: "github_pat_" + "A1b2".repeat(20),
   };
   const r = await runCli(["config", "check", "--file", "copilot.example.yaml"], env);
   assert.equal(r.code, 0, r.stderr);
@@ -210,4 +212,69 @@ test("config check accepts copilot.example.yaml when its variables are set", asy
     assert.match(r.stdout, new RegExp(`\\(${type}\\)`), type);
   }
   for (const value of Object.values(env)) assert.ok(!r.stdout.includes(value) && !r.stderr.includes(value));
+});
+
+// Spec 009 (AC-84): the example declares a shadow-mode codeFix block whose token is a whole ${GITHUB_FIX_TOKEN} secret,
+// so leaving that variable unset is a { path, rule } problem with no value echoed.
+test("config check refuses copilot.example.yaml without GITHUB_FIX_TOKEN", async () => {
+  const fill = (prefix: string, n: number) => prefix + "x".repeat(n);
+  const env: Record<string, string> = {
+    ALERTMANAGER_WEBHOOK_TOKEN: fill("am-", 30),
+    NEW_RELIC_WEBHOOK_TOKEN: fill("nr-hook-", 30),
+    NEW_RELIC_API_KEY: fill("NRAK-", 27),
+    SENTRY_CLIENT_SECRET: fill("", 64),
+    SENTRY_AUTH_TOKEN: fill("sentry-", 40),
+    BUGSNAG_WEBHOOK_TOKEN: fill("bugsnag_", 32),
+    BUGSNAG_AUTH_TOKEN: fill("bugsnag-", 40),
+    GENERIC_WEBHOOK_SECRET: fill("generic-", 32),
+    SLACK_WEBHOOK_URL: "https://hooks.slack.com/services/" + fill("T0/B0/", 24),
+    OUTBOUND_WEBHOOK_SIGNING_SECRET: fill("sign-", 32),
+    OUTBOUND_WEBHOOK_TOKEN: fill("out-", 32),
+  };
+  const r = await runCli(["config", "check", "--file", "copilot.example.yaml"], env);
+  assert.equal(r.code, 1);
+  assert.match(r.stderr, /^- codeFix\.github\.token: /m);
+  for (const value of Object.values(env)) assert.ok(!r.stdout.includes(value) && !r.stderr.includes(value));
+});
+
+// Spec 009 (decision 19, AC-84): config check applies the rule npm start applies, so a draft_pr code fixer without
+// APPROVAL_TOKEN is refused before deploy, not only at startup. The summary names the codeFix mode.
+test("config check refuses draft_pr without APPROVAL_TOKEN and accepts it with one", async () => {
+  const { writeFileSync, rmSync } = await import("node:fs");
+  const dir = mkdtempSync(join(tmpdir(), "ic-cli-fix-"));
+  const fixToken = "github_pat_" + "C3d4".repeat(20);
+  const approval = "cli-approval-" + "z".repeat(20);
+  try {
+    const file = join(dir, "draft.yaml");
+    writeFileSync(file, readFileSync(join(PROJECT_ROOT, "copilot.example.yaml"), "utf8").replace(/^  mode: shadow\b/m, "  mode: draft_pr"));
+    const fill = (prefix: string, n: number) => prefix + "x".repeat(n);
+    const env: Record<string, string> = {
+      ALERTMANAGER_WEBHOOK_TOKEN: fill("am-", 30),
+      NEW_RELIC_WEBHOOK_TOKEN: fill("nr-hook-", 30),
+      NEW_RELIC_API_KEY: fill("NRAK-", 27),
+      SENTRY_CLIENT_SECRET: fill("", 64),
+      SENTRY_AUTH_TOKEN: fill("sentry-", 40),
+      BUGSNAG_WEBHOOK_TOKEN: fill("bugsnag_", 32),
+      BUGSNAG_AUTH_TOKEN: fill("bugsnag-", 40),
+      GENERIC_WEBHOOK_SECRET: fill("generic-", 32),
+      SLACK_WEBHOOK_URL: "https://hooks.slack.com/services/" + fill("T0/B0/", 24),
+      OUTBOUND_WEBHOOK_SIGNING_SECRET: fill("sign-", 32),
+      OUTBOUND_WEBHOOK_TOKEN: fill("out-", 32),
+      GITHUB_FIX_TOKEN: fixToken,
+    };
+    const refused = await runCli(["config", "check", "--file", file], env);
+    assert.equal(refused.code, 1, refused.stdout);
+    assert.match(refused.stderr, /^copilot config invalid: 1 problem\(s\)/);
+    assert.match(refused.stderr, /^- codeFix\.mode: draft_pr requires APPROVAL_TOKEN/m);
+    assert.doesNotMatch(refused.stdout, /copilot config OK/);
+
+    const accepted = await runCli(["config", "check", "--file", file], { ...env, APPROVAL_TOKEN: approval });
+    assert.equal(accepted.code, 0, accepted.stderr);
+    assert.match(accepted.stdout, /^codeFix: draft_pr; repositories 1$/m);
+    for (const out of [refused.stdout, refused.stderr, accepted.stdout, accepted.stderr]) {
+      for (const value of [...Object.values(env), approval]) assert.ok(!out.includes(value));
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

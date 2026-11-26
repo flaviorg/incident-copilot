@@ -7,17 +7,20 @@ import { join, relative, sep } from "node:path";
 import { PROJECT_ROOT } from "../src/infra/paths.ts";
 
 /**
- * OpenRouter key, `sk-` format key, and APPROVAL_TOKEN or API_TOKEN assignments with a value of 8 characters or more.
- * The last two are built by concatenation, so this file does not match its own patterns.
+ * OpenRouter key, `sk-` format key, APPROVAL_TOKEN or API_TOKEN assignments with a value of 8 characters or more, and
+ * GitHub classic (`ghp_`) and fine-grained (`github_pat_`) tokens (spec 009, AC-79). The assignment patterns are built by
+ * concatenation, so this file does not match its own patterns.
  */
 const SECRET_PATTERNS: RegExp[] = [
   /\bsk-or-v1-[A-Za-z0-9]{20,}/g,
   /\bsk-[A-Za-z0-9]{20,}/g,
   new RegExp("APPROVAL_TOKEN" + "=\\S{8,}", "g"),
   new RegExp("\\bAPI_TOKEN" + "=\\S{8,}", "g"),
+  /\bghp_[A-Za-z0-9]{36}/g,
+  /\bgithub_pat_[A-Za-z0-9_]{60,}/g,
 ];
 
-const PATTERN_NAMES = ["OpenRouter key", "sk- key", "APPROVAL_TOKEN with a value", "API_TOKEN with a value"];
+const PATTERN_NAMES = ["OpenRouter key", "sk- key", "APPROVAL_TOKEN with a value", "API_TOKEN with a value", "GitHub token", "GitHub fine-grained token"];
 
 export type SecretFinding = { path: string; line: number; pattern: string };
 

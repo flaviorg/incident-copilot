@@ -5,8 +5,10 @@ import { ConnectorIdSchema, SeveritySchema } from "../../contracts/index.ts";
 import type { Severity } from "../../contracts/index.ts";
 import type { ServiceMap } from "../../domain/ingest/service-map.ts";
 import type { ConfigHelpers } from "../../connectors/shared/config-helpers.ts";
-import { NOTIFICATION_KINDS } from "../../notifiers/types.ts";
+import { DEFAULT_NOTIFICATION_EVENTS, NOTIFICATION_KINDS } from "../../notifiers/types.ts";
 import type { NotificationKind } from "../../notifiers/types.ts";
+import { CODE_FIX_CEILINGS, CODE_FIX_DEFAULT_LIMITS, CODE_FIX_FLOORS } from "../../domain/code-fix/limits.ts";
+import type { CodeFixLimits } from "../../domain/code-fix/limits.ts";
 
 export const DEFAULT_INGEST = { maxBodyBytes: 1_048_576, rateLimitPerMin: 60, maxQueued: 100, dedupeWindowMin: 1440, trustProxy: false as TrustProxySetting } as const;
 
@@ -53,6 +55,8 @@ export type CopilotConfig = {
   services: ServiceMap;
   connectors: ConnectorEntry[];
   notifiers: NotifierEntry[];
+  /** The code fixer (spec 009); null when the section is absent. */
+  codeFix: CodeFixConfig | null;
   /** Every secret resolved from the file, for the redaction list (AC-52). */
   secrets: readonly string[];
 };
@@ -81,6 +85,106 @@ export function topLevelSchema(h: ConfigHelpers) {
       .default([]),
     connectors: z.array(z.unknown()).max(100).default([]),
     notifiers: z.array(z.unknown()).max(50).default([]),
+    codeFix: CodeFixConfigSchema(h).optional(),
+  });
+}
+
+// ---- codeFix (spec 009, decisions 7, 10, 16, 19 and 20; AC-84) ----
+
+export const REPO_RULE = "must be owner/name (letters, digits, '_', '.' or '-', at most 100 each)";
+export const REF_NAME_RULE = "must be a valid branch name";
+export const GLOB_RULE = "globs may use only letters, digits and _ . / * { } , -, with no leading '-' or '/' and no '..'";
+export const EXCEPTION_TYPE_RULE = "must be an exception class name";
+export const AUTHOR_RULE = "must be a plain name and an email address";
+export const API_URL_RULE = "must not have a query or a fragment";
+
+const REPO_PART = /^[A-Za-z0-9_.-]{1,100}$/;
+export function isValidRepo(s: string): boolean {
+  const parts = s.split("/");
+  return parts.length === 2 && parts.every((p) => REPO_PART.test(p) && p !== "." && p !== "..");
+}
+
+/** A conservative subset of git-check-ref-format for branch names. */
+export function isValidRefName(s: string): boolean {
+  if (s.length < 1 || s.length > 200 || !/^[A-Za-z0-9._/-]+$/.test(s)) return false;
+  if (s.startsWith("-") || s.endsWith("/") || s.endsWith(".") || s.endsWith(".lock") || s.includes("..") || s.includes("//")) return false;
+  return s.split("/").every((c) => c !== "" && !c.startsWith(".") && !c.endsWith(".lock"));
+}
+
+/** Decision 7: test and path globs reach the runner's argv, so they pass a strict allowlist. */
+export function isAllowedGlob(s: string): boolean {
+  return s.length <= 200 && /^[A-Za-z0-9_./*{},-]+$/.test(s) && !s.startsWith("-") && !s.startsWith("/") && !s.includes("..");
+}
+
+const CODE_FIX_LIMIT_KEYS = Object.keys(CODE_FIX_CEILINGS) as (keyof CodeFixLimits)[];
+const limitField = (k: keyof CodeFixLimits) => z.number().int().min(CODE_FIX_FLOORS[k]).max(CODE_FIX_CEILINGS[k]).default(CODE_FIX_DEFAULT_LIMITS[k]);
+const limitsShape = Object.fromEntries(CODE_FIX_LIMIT_KEYS.map((k) => [k, limitField(k)])) as Record<keyof CodeFixLimits, ReturnType<typeof limitField>>;
+
+export const DEFAULT_GITHUB_API_URL = "https://api.github.com";
+export const DEFAULT_COMMIT_AUTHOR = { name: "incident-copilot", email: "incident-copilot@example.invalid" } as const;
+export const DEFAULT_FIXABLE_EXCEPTION_TYPES = ["TypeError", "RangeError", "ReferenceError"] as const;
+
+export type CodeFixRepository = {
+  repo: string;
+  service: string;
+  connector: string;
+  baseBranch: string;
+  pathPrefixes: string[];
+  sourceGlobs: string[];
+  testGlobs: string[];
+  testFiles: string[];
+  deniedPaths: string[];
+};
+
+export type CodeFixConfig = {
+  enabled: boolean;
+  mode: "shadow" | "draft_pr";
+  approvalTtlHours: number;
+  sandbox: { network: "isolated" | "best_effort" };
+  github: { apiUrl: string; token: string | null };
+  commitAuthor: { name: string; email: string };
+  limits: CodeFixLimits;
+  fixableExceptionTypes: string[];
+  repositories: CodeFixRepository[];
+};
+
+/** The `codeFix` section. Strict throughout; config can only lower the limits in src/domain/code-fix/limits.ts. */
+export function CodeFixConfigSchema(h: ConfigHelpers): z.ZodType<CodeFixConfig> {
+  const glob = h.text({ max: 200 }).refine(isAllowedGlob, { message: GLOB_RULE });
+  const globs = (min: number, max: number) => z.array(glob).min(min).max(max);
+  const repository = z.strictObject({
+    repo: h.text({ max: 201 }).refine(isValidRepo, { message: REPO_RULE }),
+    service: h.text({ max: 120 }),
+    connector: h.text({ max: 64 }),
+    baseBranch: h.text({ max: 300 }).refine(isValidRefName, { message: REF_NAME_RULE }),
+    pathPrefixes: z.array(h.text({ max: 200 })).max(10).default([]),
+    sourceGlobs: globs(1, 20),
+    testGlobs: globs(1, 20),
+    testFiles: globs(1, 20),
+    deniedPaths: globs(0, 50).default([]),
+  });
+  return z.strictObject({
+    enabled: z.boolean().default(true),
+    mode: z.enum(["shadow", "draft_pr"]).default("shadow"),
+    approvalTtlHours: z.number().int().min(1).max(168).default(72),
+    sandbox: z.strictObject({ network: z.enum(["isolated", "best_effort"]).default("isolated") }).default({ network: "isolated" }),
+    // The GitHub client refuses a query or a fragment at startup; refusing it here keeps `config check` honest.
+    github: z
+      .strictObject({ apiUrl: h.url().refine((s) => !/[?#]/.test(s), { message: API_URL_RULE }).default(DEFAULT_GITHUB_API_URL), token: h.secret().nullable().default(null) })
+      .default({ apiUrl: DEFAULT_GITHUB_API_URL, token: null }),
+    commitAuthor: z
+      .strictObject({
+        name: h.text({ max: 100 }).refine((s) => !/[<>\n\r]/.test(s) && s.trim() !== "", { message: AUTHOR_RULE }),
+        email: h.text({ max: 200 }).refine((s) => /^[^\s@<>]+@[^\s@<>]+$/.test(s), { message: AUTHOR_RULE }),
+      })
+      .default({ ...DEFAULT_COMMIT_AUTHOR }),
+    limits: z.strictObject(limitsShape).default({ ...CODE_FIX_DEFAULT_LIMITS }),
+    fixableExceptionTypes: z
+      .array(h.text({ max: 64 }).refine((s) => /^[A-Z][A-Za-z0-9_]{0,63}$/.test(s), { message: EXCEPTION_TYPE_RULE }))
+      .min(1)
+      .max(20)
+      .default([...DEFAULT_FIXABLE_EXCEPTION_TYPES]),
+    repositories: z.array(repository).min(1).max(20),
   });
 }
 
@@ -94,7 +198,7 @@ export const ConnectorBaseSchema = z.strictObject({
 export const NotifierBaseSchema = z.strictObject({
   id: ConnectorIdSchema,
   type: z.string().min(1).max(64),
-  events: z.array(z.enum(NOTIFICATION_KINDS as [NotificationKind, ...NotificationKind[]])).min(1).max(4).default([...NOTIFICATION_KINDS]),
+  events: z.array(z.enum(NOTIFICATION_KINDS as [NotificationKind, ...NotificationKind[]])).min(1).max(6).default([...DEFAULT_NOTIFICATION_EVENTS]),
 });
 
 export const CONNECTOR_BASE_KEYS = ["id", "type", "enabled", "severityMap"] as const;

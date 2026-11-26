@@ -1,4 +1,4 @@
-// The repository's own SDD specs (Task 43; spec 9 and lessons 221505, 210745): each feature has non-goals and
+// The repository's own SDD specs (Task 43; spec 9 and lessons 221505, 210745; spec 009 owns AC-60..AC-85): each feature has non-goals and
 // EARS acceptance criteria, and the constitution fits in 80 lines.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -7,7 +7,7 @@ import { join } from "node:path";
 
 test("every feature spec has non-goals and EARS criteria", () => {
   const dirs = readdirSync("specs").filter((d) => /^\d{3}-/.test(d));
-  assert.equal(dirs.length, 8, `expected 8 feature specs, found ${dirs.join(", ")}`);
+  assert.equal(dirs.length, 9, `expected 9 feature specs, found ${dirs.join(", ")}`);
   for (const dir of dirs) {
     const t = readFileSync(join("specs", dir, "spec.md"), "utf8");
     assert.match(t, /^## Non-goals/m, dir);
@@ -27,6 +27,6 @@ test("every acceptance criterion of the design appears in exactly one feature sp
       owner.set(id, dir);
     }
   }
-  const missing = Array.from({ length: 59 }, (_, i) => `AC-${String(i + 1).padStart(2, "0")}`).filter((id) => !owner.has(id));
+  const missing = Array.from({ length: 85 }, (_, i) => `AC-${String(i + 1).padStart(2, "0")}`).filter((id) => !owner.has(id));
   assert.deepEqual(missing, []);
 });

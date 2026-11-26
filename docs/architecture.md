@@ -81,6 +81,49 @@ flowchart LR
 
 Live mode (0.4) adds the connectors box: a provider webhook goes through `IngestService` (verify, parse, map, record) onto the `AlertQueue`, which opens or deduplicates the incident and runs the same graph in shadow mode. The telemetry analyst's live tools read through the `ConnectorRegistry`; `NotificationService` sends the outcome to the configured notifiers. Details: [`docs/connectors-architecture.md`](connectors-architecture.md).
 
+### Code fixer (0.5)
+
+The code fixer (spec [`009-code-fixer`](../specs/009-code-fixer/spec.md), guide [`docs/code-fixer.md`](code-fixer.md)) is a post-incident job, not a graph node. It has its own small LangGraph `StateGraph` and two new trust boundaries, drawn as dashed boxes:
+
+```mermaid
+flowchart LR
+  AQ[AlertQueue follow-up<br/>after the run slot is freed] -- advised only --> CFS[CodeFixService.consider]
+  CFS --> CFQ[CodeFixQueue<br/>own concurrency, no RunSlots]
+  CFQ --> FG
+  subgraph FG [Fixer graph src/graph/code-fix]
+    EL[fix_eligibility] --> LO[fix_locate] --> WS[fix_workspace] --> BL[fix_baseline]
+    BL --> AT[fix_author_test] --> GT[fix_guard_test] --> RP[fix_repro]
+    RP --> AP[fix_author_patch] --> GP[fix_guard_patch] --> VE[fix_verify]
+    VE --> RV[fix_review] --> FI[fix_finalize]
+  end
+  LO -- errorEvent, releaseCommit, deploys --> CR[ConnectorRegistry: Sentry]
+  LO -- commitExists --> RD[CodeHostReader]
+  WS --> GW[GitCliWorkspace]
+  subgraph SBX [Trust boundary: model-written code]
+    SR[ProcessSandboxRunner<br/>node --permission, unshare --net]
+  end
+  BL --> SR
+  RP --> SR
+  VE --> SR
+  AT -. LLM .-> LLM[LlmProvider]
+  AP -. LLM .-> LLM
+  RV -. LLM .-> LLM
+  FI --> CFA[(code_fix_attempts,<br/>code_fix_approvals)]
+  HUM[Human: POST /approvals/:id/decision] --> AS[ApprovalService] --> CFS
+  CFS -- approved --> PUB
+  subgraph GH [Trust boundary: GitHub write path]
+    PUB[CodeFixPublisher, no LLM] --> WR[CodeHostWriter<br/>draft pull request only]
+  end
+  WR --> GHAPI[("GitHub REST API")]
+  RD --> GHAPI
+```
+
+- **Least privilege by construction.** The fixer graph receives a `CodeHostReader`, a `GitWorkspacePort`, a `SandboxRunner` and the LLM, never a writer. Only `CodeFixPublisher`, which has no LLM, holds a `CodeHostWriter`, and only for an approved attempt; in shadow mode the container builds no writer at all. The writer type has no merge, review, label, PUT, PATCH or DELETE method.
+- **No shared state with the incident.** The fixer reads the blackboard once with `loadBlackboard` and never writes it. It holds no `runs` row and no run slot, uses no recursion or team budget, and its approvals live in `code_fix_approvals`, which no incident path reads. The `code_fix_attempts` row is the single source of truth, written at stage boundaries with an optimistic `version`.
+- **Pure rules.** Eligibility, frame selection, paths and denied paths, limits, the test and patch guards, the reproduction classifier, the budget and the pull request body live in `src/domain/code-fix/`, with no `node:*` imports. Routes are pure functions in `src/graph/code-fix/routing.ts`, one `addConditionalEdges` per origin with an explicit path map.
+- **Tier from the catalog.** `fix_finalize` and the publisher classify `open_draft_pull_request` with `proposer: "code_fixer"` and require exactly tier 3. The same action proposed by the planner or an MCP client is tier 4 by a raise-only rule, and the planner's prompt never lists it.
+- **Prompts outside `ALL_PROMPTS`.** `fix-test.v1`, `fix-patch.v1` and `fix-review.v1` are in `FIX_PROMPTS`, so the scenario fixtures, the recordings and the goldens are unchanged.
+
 Everything is wired by `createContainer` (`src/app/container.ts`), the single source used by the API, the MCP server, the CLI, and the tests. Tests use `createTestContainer` (`tests/helpers/container.ts`), with an explicit `:memory:` database, simulated clock, and fake provider.
 
 ## Graph
@@ -190,7 +233,7 @@ stateDiagram-v2
 ## Dependency rule
 
 - `src/contracts` and `src/domain` import no `node:*` modules and nothing from `infra`, `llm`, `graph`, `app`, `http`, `mcp`, or `cli`. The War Room reuses both in the browser. This is checked in `tests/unit/contracts.unit.test.ts` ("contracts and domain import neither node: nor outer layers").
-- `graph` receives dependencies through factories (`createXNode(deps)`), and each node gets only what it uses. `gate`, `executor`, `verifier`, `runbook_retriever`, and `escalation` do not receive `llm`.
+- `graph` receives dependencies through factories (`createXNode(deps)`), and each node gets only what it uses. `gate`, `executor`, `verifier`, `runbook_retriever`, and `escalation` do not receive `llm`. In the fixer graph, only `fix_author_test`, `fix_author_patch` and `fix_review` receive `llm`, and no node receives a code-host writer.
   - From outer layers, nodes import only types (`import type`): `LlmProvider`, `Clock`, `SimulatedInfra`, `ScenarioRepository`, `TraceSink`. Some of these types are the classes themselves, not separate interfaces; since the dependency is type-only and the instance comes through the factory, tests inject doubles.
   - At runtime, nodes import the domain, the prompts, and two trace formatting utilities (`clip` and `llmInfoOf`, from `src/app/trace-sink.ts`).
 - The ports (`http`, `mcp`, `cli`) talk to `app` for rules and data. They use only cross-cutting utilities from `infra`: secret redaction, project paths, and app version. The exception is the `diagnose` CLI command, which builds the analyst node directly, since it is an isolated diagnostic command that does not open an incident through the service.

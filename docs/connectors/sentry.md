@@ -5,7 +5,8 @@ Type `sentry`. It has two independent halves, and you can enable either or both:
 - **ingest**: it **receives** webhooks of a Sentry internal integration (issue alerts, metric alerts and issue events),
   verifies `Sentry-Hook-Signature` on the raw bytes, and opens (or deduplicates into) a live incident;
 - **query**: it **reads** unresolved issues (`query_errors`) and releases (`query_deploys`) over the Sentry REST API
-  during the investigation. It has no metrics or logs capability.
+  during the investigation, and, for the [code fixer](../code-fixer.md), an issue's latest event and a release's last
+  commit. It has no metrics or logs capability.
 
 Every live incident runs in **shadow mode**: the team investigates and plans, the gate classifies each step by the
 catalog, and nothing executes.
@@ -160,6 +161,31 @@ Rate limits: Sentry sends `X-Sentry-Rate-Limit-Limit`, `-Remaining` and `-Reset`
 The `window` of `query_errors` is not sent to Sentry: the issue list uses a fixed 24-hour period, and the model sees
 the first, last and count fields to judge recency.
 
+## Code fixer
+
+Since 0.5 the query half also serves the [code fixer](../code-fixer.md) (spec 009) with two members that are **not** LLM
+tools: the model never calls them and never chooses their arguments.
+
+| Member | Requests | Result |
+|---|---|---|
+| `errorEvent({ service, errorId })` | `GET <baseUrl>/api/0/organizations/<org>/issues/<id>/` (for `firstSeen` and the project), then `GET .../issues/<id>/events/latest/` *(unverified)* | the raised exception (`type`, sanitized `value`), up to 50 stack frames innermost last (`file`, `line`, `column`, `function`, `inApp`), the `release` tag and `firstSeen` |
+| `releaseCommit({ service, version })` | `GET <baseUrl>/api/0/organizations/<org>/releases/<version>/` *(unverified)* | `lastCommit.id` (40 hex) and `lastCommit.repository.name` |
+
+- The issue id comes from the alert's fingerprint `issue:<id>`, which the ingest code sets from `event_alert`; it must be
+  1 to 20 digits. A release version must match `^[A-Za-z0-9][A-Za-z0-9_.@+:~-]{0,199}$`. Anything else is
+  `unsafe_input` before any request. Both are URL-encoded.
+- An issue whose `project.slug` is not the service's alias, or a release whose `projects` do not include it, is "no
+  data". So is a 404. The fixer then skips (`error_event_unavailable`, `commit_unresolved`).
+- The mapper reads only the last exception value's `type`, `value` and `stacktrace.frames[]` (`filename`, else
+  `abs_path`; `lineno`, `colno`, `function`, `in_app`), the `release` tag and `firstSeen`. It never reads `vars`,
+  `context_line`, `pre_context`, `post_context`, `request`, `user`, `contexts` or `breadcrumbs`, so local variables and
+  request data never reach the fixer or its prompts.
+- The fixer also needs `deploys` (the releases list above) to check that the error group is new in the failing release.
+- For the fixer to resolve a commit, connect your repository in Sentry and associate commits with releases (so
+  `lastCommit` is set), or use the commit SHA as the release version (`<name>@<sha>` works: the part after the last `@`
+  is used).
+- Grant the integration read access to **releases** as well as issues and events (step 3).
+
 ## The Sentry hosted MCP server
 
 Sentry hosts an MCP server at `https://mcp.sentry.dev/mcp`. It authenticates with OAuth. The 0.4 `mcp` connector
@@ -193,6 +219,10 @@ and issues pages, and https://docs.sentry.io/api/ (checked for 0.4.0):
   parameters `project`, `environment` and `per_page` (at most 100) and the fields `version`, `dateReleased`,
   `dateCreated`, `lastDeploy` and `projects`.
 - Every API response carries `X-Sentry-Rate-Limit-Limit`, `-Remaining` and `-Reset` (epoch seconds).
+- Code fixer (checked for 0.5.0): an issue's latest event has `entries[]`, where the entry of `type: "exception"` holds
+  `data.values[]` with `type`, `value` and `stacktrace.frames[]` (innermost last), and `tags[]` as `{ key, value }`
+  pairs including `release`. Retrieve a release is `GET /api/0/organizations/{org}/releases/{version}/`, with
+  `lastCommit` and `projects`.
 
 The fixtures in `tests/fixtures/connectors/sentry/` are built from these field tables and the abridged examples, not
 captured from Sentry.
@@ -219,3 +249,11 @@ Handled defensively, not relied upon:
   not part of the digest, and the connector does not enforce a replay window; the copilot's idempotency on
   `externalId` absorbs a replayed delivery.
 - The Developer Settings UI path and the permission names in steps 1 and 3.
+- Code fixer: the issue detail, latest event and release detail paths, and their field names. In particular the
+  casing of frame fields (`lineno` or `lineNo`, `in_app` or `inApp`, `abs_path` or `absPath`): the mapper reads the
+  snake_case names only, so a camelCase-only response gives no frames and the fixer skips with `no_in_app_frame`
+  instead of guessing. A top-level `exception.values` is accepted when there is no `entries[]`.
+- Code fixer: whether `lastCommit.repository.name` is the `owner/name` the fixer allowlists. When it is not, the
+  fixer falls back to a 40-hex release version or skips with `commit_unresolved`.
+- Code fixer: whether the latest event of an issue is the event that fired the alert. The fixer only needs one event
+  of the error group, and it requires the group to be new in the event's release.

@@ -198,3 +198,22 @@ test("the caller's abort signal ends the send", async () => {
   const out = await b.notifier.send(sampleNotificationMessage(), { signal: ac.signal });
   assert.equal(out.ok, false);
 });
+
+test("a code-fix message carries its codeFix object; the 0.4 golden has none (spec 009, AC-83)", async () => {
+  const codeFix: NonNullable<NotificationMessage["codeFix"]> = {
+    attemptId: "fix_0123456789abcdef", status: "pr_opened", mode: "draft_pr", repo: "acme/checkout-web", baseBranch: "main",
+    location: { file: "src/checkout/cart-summary.ts", line: 12 }, exceptionType: "TypeError",
+    diff: { added: 10, removed: 1, files: 2 }, testName: "summarize returns zero for a cart without totals",
+    evidence: { failedBefore: true, passesAfter: true, suiteTotal: 4, suiteFailed: 0 },
+    approval: null, pullRequest: { number: 42, url: "https://github.com/acme/checkout-web/pull/42" },
+    links: { approval: null, pullRequest: "https://github.com/acme/checkout-web/pull/42" },
+  };
+  const m = sampleNotificationMessage({ kind: "code_fix_pr_opened", codeFix });
+  const b = build([ok()]);
+  assert.deepEqual(await send(b, m), { ok: true });
+  const body = JSON.parse(b.calls[0]!.body!);
+  assert.equal(body.schemaVersion, 1);
+  assert.equal(body.kind, "code_fix_pr_opened");
+  assert.deepEqual(body.codeFix, codeFix);
+  assert.equal("codeFix" in JSON.parse(renderOutbound(sampleNotificationMessage())), false);
+});

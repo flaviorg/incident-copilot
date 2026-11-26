@@ -238,7 +238,9 @@ Roadmap: a `supervised` mode where tier 2 runs and tier 3 asks for approval, thr
 ```ts
 export interface NotifierDefinition<C> { readonly type: string; configSchema(h: ConfigHelpers): z.ZodType<C>; create(config: C, deps: { id: string; http: HttpClient; logger: Logger }): Notifier }
 export interface Notifier { readonly id: string; readonly type: string; send(m: NotificationMessage, io: { signal: AbortSignal }): Promise<NotifyOutcome> }
-export type NotificationKind = "incident_opened" | "analysis_ready" | "run_failed" | "incident_resolved";
+export type NotificationKind =
+  | "incident_opened" | "analysis_ready" | "run_failed" | "incident_resolved"   // DEFAULT_NOTIFICATION_EVENTS
+  | "code_fix_ready" | "code_fix_pr_opened";                                    // opt-in (spec 009, AC-83)
 export type NotificationMessage = {
   kind: NotificationKind; incidentId: string; title: string; service: string | null; severity: Severity; status: IncidentStatus;
   source: { connectorId: string; type: string; url: string | null };
@@ -246,6 +248,7 @@ export type NotificationMessage = {
   recommendations: { order: number; actionType: string; target: string; tier: 1 | 2 | 3 | 4; status: string }[];
   links: { incident: string | null };   // from publicUrl
   sentAt: string;
+  codeFix?: CodeFixNotification;         // only on code_fix_*: counts, names and booleans, never patch or output text
 };
 export type NotifyOutcome = { ok: true } | { ok: false; retryable: boolean; retryAfterSec: number | null; reason: string };
 ```

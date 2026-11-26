@@ -1,4 +1,5 @@
-# incident-copilot 0.4 configuration example (spec 008; guides in docs/connectors/<type>.md).
+# incident-copilot 0.5 configuration example (specs 008 and 009; guides in docs/connectors/<type>.md and
+# docs/code-fixer.md).
 #
 # Copy it to copilot.yaml, keep only the connectors and notifiers you use, set the variables it references
 # (see the commented block at the end of .env.example), then validate it:
@@ -14,7 +15,7 @@
 
 version: 1
 
-# The only operating mode for live incidents in 0.4: the team diagnoses, plans and classifies tiers; nothing executes.
+# The only operating mode for live incidents: the team diagnoses, plans and classifies tiers; nothing executes.
 # Tier 2 and tier 3 steps are recorded as recommendations, tier 4 stays forbidden.
 mode: shadow
 
@@ -127,3 +128,46 @@ notifiers:
     signingSecret: "${OUTBOUND_WEBHOOK_SIGNING_SECRET}"
     bearerToken: "${OUTBOUND_WEBHOOK_TOKEN}"
     events: [analysis_ready, incident_resolved]
+
+# Code fixer (spec 009, docs/code-fixer.md). Optional: remove the block, or set enabled: false, to behave as in 0.4.
+# For a live incident diagnosed as bad_deploy on a Sentry issue alert, it writes a failing regression test and the
+# smallest patch that makes it pass, inside a sandbox, and attaches both to the report. It never merges.
+# Start in shadow mode: no GitHub write at all. draft_pr opens a draft pull request after a human approval, and needs
+# APPROVAL_TOKEN, the token below and branch protection on baseBranch.
+codeFix:
+  enabled: true
+  mode: shadow                    # shadow | draft_pr
+  approvalTtlHours: 72            # 1..168; draft_pr only
+  sandbox: { network: isolated }  # isolated (Linux unshare, fails closed) | best_effort (stamped on every attempt)
+  github:
+    apiUrl: https://api.github.com
+    # Fine-grained PAT with contents and pull_requests read/write on the repositories below only.
+    # Required for draft_pr and for private repositories.
+    token: "${GITHUB_FIX_TOKEN}"
+  commitAuthor: { name: incident-copilot, email: incident-copilot@example.invalid }
+  limits:                         # can only lower the ceilings in src/domain/code-fix/limits.ts; these are the defaults
+    maxConcurrent: 1              # 1..2
+    maxFiles: 3                   # 1..3, test included
+    maxSourceLines: 20            # 1..20
+    maxTotalLines: 50             # 1..50, test included
+    maxTestLines: 40              # 1..40
+    maxEdits: 2                   # 1..2
+    maxAuthorAttempts: 2          # 1..3, per author
+    maxLlmCalls: 6                # 3..8
+    maxTokens: 60000              # 1000..200000
+    attemptTimeoutMin: 15         # 1..30
+    testTimeoutSec: 120           # 5..600
+    maxOutputBytes: 65536         # 4096..262144
+    maxAttemptsPerDay: 5          # 1..20, per repository
+    maxAttemptsPerGroup: 3        # 1..5
+  fixableExceptionTypes: [TypeError, RangeError, ReferenceError]
+  repositories:                   # at most 20; one repository per service
+    - repo: acme/checkout-web     # owner/name on GitHub
+      service: checkout-api       # a services[].name above
+      connector: sentry-prod      # a connector id of type sentry
+      baseBranch: main            # must be protected on GitHub for draft_pr
+      pathPrefixes: ["/app/", "app:///", "webpack:///./"]   # stripped from Sentry frame paths
+      sourceGlobs: ["src/**/*.{js,ts}"]
+      testGlobs: ["tests/**/*.test.{js,ts}"]
+      testFiles: ["tests/**/*.test.js"]   # what the runner passes to node --test
+      deniedPaths: ["src/pricing/**"]     # added to the built-in denied paths

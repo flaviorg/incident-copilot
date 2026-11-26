@@ -1,7 +1,8 @@
 // Test container (spec 8.1): :memory:, simulated clock, sequential ids, explicit fake and captured logs.
 import { loadConfig } from "../../src/config.ts";
 import { createContainer } from "../../src/app/container.ts";
-import type { Container } from "../../src/app/container.ts";
+import type { CodeFixPorts, Container } from "../../src/app/container.ts";
+import type { CodeFixGraphNodes } from "../../src/graph/code-fix/graph.ts";
 import { openIncidentRecord } from "../../src/app/incident-setup.ts";
 import { loadFixtures } from "../../src/llm/fixture-format.ts";
 import type { FixtureFile } from "../../src/llm/fixture-format.ts";
@@ -37,6 +38,9 @@ export type TestContainerOptions = {
   /** Transport of connectors and notifiers (tests/helpers/fake-fetch.ts). */
   fetch?: typeof fetch;
   sleep?: (ms: number) => Promise<void>;
+  /** Code fixer ports (tests/helpers/code-fix-fakes.ts); without them a codeFix config uses the real git, sandbox and GitHub. */
+  codeFixPorts?: CodeFixPorts;
+  codeFixNodes?: Partial<CodeFixGraphNodes>;
 };
 
 export type TestContainer = Container & { fake: FakeLlmProvider; logs: string[] };
@@ -72,6 +76,8 @@ export function createTestContainer(o: TestContainerOptions = {}): TestContainer
     ...(o.notifierDefinitions ? { notifierDefinitions: o.notifierDefinitions } : {}),
     ...(o.fetch ? { fetch: o.fetch } : {}),
     ...(o.sleep ? { sleep: o.sleep } : {}),
+    ...(o.codeFixPorts ? { codeFixPorts: o.codeFixPorts } : {}),
+    ...(o.codeFixNodes ? { codeFixNodes: o.codeFixNodes } : {}),
   });
   if (!c.fake) throw new Error("test container without a fake provider");
   return { ...c, fake: c.fake, logs };

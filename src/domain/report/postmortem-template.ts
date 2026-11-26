@@ -38,6 +38,7 @@ export const AGENT_LABELS: Record<AgentId, string> = {
   human: "human",
   system: "system",
   mcp_client: "MCP client",
+  code_fixer: "Code fixer",
 };
 
 export const CONFIDENCE_LABELS: Record<Confidence, string> = { low: "low", medium: "medium", high: "high" };

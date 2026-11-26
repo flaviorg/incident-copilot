@@ -234,3 +234,68 @@ test("config: strict keys, a whole ${VAR} reference and at least 30 characters",
   assert.ok(!parseEntry({}).ok);
   assert.ok(!parseEntry({ webhookUrl: "${SLACK_WEBHOOK_URL}", allowedHosts: ["https://has-scheme.example"] }).ok);
 });
+
+// ---------- code-fix messages (spec 009, AC-83) ----------
+
+function codeFixFacts(over: Partial<NonNullable<NotificationMessage["codeFix"]>> = {}): NonNullable<NotificationMessage["codeFix"]> {
+  return {
+    attemptId: "fix_0123456789abcdef", status: "awaiting_approval", mode: "draft_pr", repo: "acme/checkout-web", baseBranch: "main",
+    location: { file: "src/checkout/cart-summary.ts", line: 12 }, exceptionType: "TypeError",
+    diff: { added: 10, removed: 1, files: 2 }, testName: "summarize returns 0 for <empty> & missing totals",
+    evidence: { failedBefore: true, passesAfter: true, suiteTotal: 4, suiteFailed: 0 },
+    approval: { id: "APR-0007", expiresAt: "2026-10-07T10:04:00.000Z" }, pullRequest: null,
+    links: { approval: "https://copilot.example.com/approvals?status=pending", pullRequest: null },
+    ...over,
+  };
+}
+const codeFixMessage = (over: Partial<NonNullable<NotificationMessage["codeFix"]>> = {}, kind: NotificationMessage["kind"] = "code_fix_ready") =>
+  sampleNotificationMessage({ kind, codeFix: codeFixFacts(over) });
+
+test("a code_fix_ready message matches its hand-written golden", async () => {
+  assert.deepEqual(renderSlack(codeFixMessage()), JSON.parse(readFileSync("tests/fixtures/notifiers/slack-code-fix-ready.json", "utf8")));
+  const b = build([okRoute]);
+  assert.deepEqual(await send(b, codeFixMessage()), { ok: true });
+  assert.deepEqual(JSON.parse(b.calls[0]!.body!), JSON.parse(readFileSync("tests/fixtures/notifiers/slack-code-fix-ready.json", "utf8")));
+});
+
+test("code-fix messages: the fallback names the kind; shadow and opened pull requests say what happened, never a merge", () => {
+  const base = { title: "Disk full", service: "billing", severity: "sev1" } as const;
+  assert.equal(renderSlack(sampleNotificationMessage({ ...base, kind: "code_fix_ready", codeFix: codeFixFacts() })).text, "[SEV1] Code fix ready: Disk full (billing)");
+  assert.equal(renderSlack(sampleNotificationMessage({ ...base, kind: "code_fix_pr_opened", codeFix: codeFixFacts() })).text, "[SEV1] Draft pull request opened: Disk full (billing)");
+
+  const shadow = texts(renderSlack(codeFixMessage({ status: "patch_ready", mode: "shadow", approval: null, links: { approval: null, pullRequest: null } })));
+  const fixBlock = shadow.find((t) => t.text.startsWith("*Code fix*"))!;
+  assert.ok(fixBlock.text.includes("Status: patch ready (shadow mode, not published)"));
+  assert.ok(!fixBlock.text.includes("Approval"));
+  assert.ok(shadow.some((t) => t.where === "context" && t.text === "Shadow mode: the fix was not published."));
+  assert.ok(!shadow.some((t) => t.text.startsWith("*Recommendations*")), "a code-fix message does not repeat the incident's recommendations");
+
+  const opened = texts(renderSlack(codeFixMessage({
+    status: "pr_opened", approval: null, pullRequest: { number: 42, url: "https://github.com/acme/checkout-web/pull/42" },
+    links: { approval: null, pullRequest: "https://github.com/acme/checkout-web/pull/42" },
+  }, "code_fix_pr_opened")));
+  const openedBlock = opened.find((t) => t.text.startsWith("*Code fix*"))!;
+  assert.ok(openedBlock.text.includes("Status: draft pull request opened"));
+  assert.ok(openedBlock.text.includes("Pull request: #42"));
+  assert.ok(opened.some((t) => t.where === "context" && t.text === "Draft pull request opened after human approval; it is never merged."));
+  assert.ok(opened.some((t) => t.text.includes("<https://github.com/acme/checkout-web/pull/42|Draft pull request #42>")));
+});
+
+test("code-fix messages: the weak evidence, a missing location and a single file are stated plainly; every text is escaped", () => {
+  const evil = "<!channel> & <script>";
+  const r = renderSlack(codeFixMessage({
+    repo: evil, baseBranch: evil, location: null, exceptionType: evil, testName: evil, diff: { added: 1, removed: 0, files: 1 },
+    evidence: { failedBefore: false, passesAfter: false, suiteTotal: 4, suiteFailed: 1 },
+  }));
+  const block = texts(r).find((t) => t.text.startsWith("*Code fix*"))!;
+  assert.ok(block.text.includes("Location: unknown"));
+  assert.ok(block.text.includes("Diff: +1 -0 in 1 file\n"));
+  assert.ok(block.text.includes("Evidence: did not fail before / does not pass after; suite 4 tests, 1 failed"));
+  for (const t of [r.text, ...texts(r).map((x) => x.text)]) {
+    assert.doesNotMatch(t.replace(/<https?:[^>]*>/g, ""), /[<>]/);
+    assert.doesNotMatch(t, /&(?!amp;|lt;|gt;)/);
+  }
+  assert.ok(!JSON.stringify(r).includes("<!channel>"));
+  const noTest = texts(renderSlack(codeFixMessage({ testName: null }))).find((t) => t.text.startsWith("*Code fix*"))!;
+  assert.ok(noTest.text.includes("Regression test: -"));
+});
